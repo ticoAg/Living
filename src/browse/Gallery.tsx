@@ -6,6 +6,7 @@ import { buildTagTree, filterByTags, inclusiveCounts } from '../lib/tags';
 import { enc, usePhotoList, usePoiList, useTagTree } from './api';
 import { setBrowseList } from './context';
 import GalleryTile from './GalleryTile';
+import { livingForFilter } from './links';
 import { byTakenDesc } from './sort';
 import TagFilter from './TagFilter';
 import { EmptyState, LoadError } from './ui';
@@ -52,7 +53,10 @@ export default function Gallery({ owner }: { owner?: string }) {
     replaceQuery({ tags: (selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]).join(',') });
   const clear = () => replaceQuery({ tags: null, city: null });
 
+  const filtered = selected.length > 0 || !!city;
   const total = shown.length;
+  const livingHref = livingForFilter({ tags: selected, city, user: owner });
+  const livingLabel = `Living，${filtered ? '播放当前筛选的' : '随机播放全部'} ${total} 张`;
   const canUpload = !!user && (!owner || user.handle.toLowerCase() === owner.toLowerCase());
 
   let body: ReactNode;
@@ -97,7 +101,22 @@ export default function Gallery({ owner }: { owner?: string }) {
 
   return (
     <div className="gal">
-      {photos && tree && tree.roots.length > 0 && <TagFilter tree={tree} selected={selected} counts={counts} onToggle={toggleTag} />}
+      <div className="gal-head">
+        <div className="gal-head-tags">
+          {photos && tree && tree.roots.length > 0 && <TagFilter tree={tree} selected={selected} counts={counts} onToggle={toggleTag} />}
+        </div>
+        {total > 0 ? (
+          <Link href={livingHref} className="btn btn-primary btn-living" aria-label={livingLabel}>
+            <Icon name="play" size={16} />
+            Living
+          </Link>
+        ) : (
+          <button type="button" className="btn btn-primary btn-living" disabled>
+            <Icon name="play" size={16} />
+            Living
+          </button>
+        )}
+      </div>
       {body}
     </div>
   );

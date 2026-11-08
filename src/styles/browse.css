@@ -18,6 +18,10 @@
 
 /* ---------- gallery ---------- */
 .gal { padding-top: 48px; }
+.gal-head { display: flex; align-items: flex-start; gap: 12px 32px; border-bottom: 1px solid var(--rule); }
+.gal-head .tagf { border-bottom: 0; }
+.gal-head-tags { flex: 1; min-width: 0; }
+.gal-head > .btn-living { flex: none; }
 .gal-cities { display: flex; flex-wrap: wrap; gap: 0 6px; margin-left: -10px; }
 .gal-city { min-height: 60px; padding: 0 0 0 10px; border: 0; background: transparent; cursor: pointer; font: 600 clamp(22px, 2.5vw, 36px) / 1.2 var(--serif); letter-spacing: 0.32em; color: var(--ink-3); }
 .gal-city:hover:not(:disabled) { color: var(--ink); }
@@ -262,6 +266,9 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .gal-count-n, .prof-num, .plc-stat-n { font-size: 32px; }
   .prof-head { padding-top: 28px; }
   /* tag rows scroll sideways instead of stacking into a wall of chips */
+  .gal-head { flex-direction: column-reverse; align-items: stretch; border-bottom: 0; }
+  .gal-head .tagf { border-bottom: 1px solid var(--rule); }
+  .gal-head > .btn-living { align-self: flex-end; }
   .tagf { margin-inline: calc(var(--gutter) * -1); }
   .tagf-row { flex-wrap: nowrap; overflow-x: auto; margin-left: 0; padding: 2px var(--gutter) 2px calc(var(--gutter) - 10px); scrollbar-width: none; }
   .tagf-row::-webkit-scrollbar { display: none; }
