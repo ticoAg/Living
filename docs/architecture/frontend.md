@@ -41,7 +41,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/lib/tags.ts` | 标签树、子孙展开、按标签筛选、包含计数 |
 | `src/lib/format.ts` | 日期、时段、距今、距离、度分秒 |
 | `src/components/Img.tsx` | 响应式图片 + ThumbHash 占位 |
-| `src/components/MapView.tsx` | MapLibre 封装：点（`cluster` 属性可选聚合，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线 |
+| `src/components/MapView.tsx` | MapLibre 封装：点（`cluster` 属性可选聚合，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放 |
 | `src/components/icons.tsx` | 地点类别符号 `CategoryIcon`、界面图标 `Icon` |
 | `src/components/Header.tsx` | 站点页眉与导航 |
 | `src/styles/base.css` | 设计令牌与通用控件（按钮、标签片、色块、分段、输入框） |

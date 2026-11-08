@@ -143,6 +143,9 @@
 .pk-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
 .pk-list { display: flex; flex-direction: column; gap: 6px; }
 .pk-more { align-self: flex-start; }
+.pk-map { height: 300px; }
+.pk-map .map-pt-dot { min-width: 22px; height: 22px; padding: 0 5px; font-size: 11px; }
+@media (max-width: 600px) { .pk-map { height: 240px; } }
 .pk-row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 12px; border: 1px solid var(--rule-2); border-radius: 3px; background: var(--paper); cursor: pointer; }
 .pk-row:hover { background: var(--mat); }
 .pk-row:focus-within { outline: 2px solid var(--hydro); outline-offset: 2px; }
