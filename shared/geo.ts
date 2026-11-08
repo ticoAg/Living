@@ -112,11 +112,12 @@ export function gcj02ToWgs84(lat: number, lng: number): [number, number] {
 /** 30°15′33″N style formatting. */
 export function dms(v: number, pos: string, neg: string, secDigits = 0): string {
   const h = v >= 0 ? pos : neg;
-  const a = Math.abs(v);
-  const d = Math.floor(a);
-  const mf = (a - d) * 60;
-  const m = Math.floor(mf);
-  const s = (mf - m) * 60;
+  // Round to the printed precision first, so 59.6″ carries into the next minute (and 59′60″ into the next degree) instead of printing 60″.
+  const unit = 10 ** secDigits;
+  const total = Math.round(Math.abs(v) * 3600 * unit);
+  const d = Math.floor(total / (3600 * unit));
+  const m = Math.floor(total / (60 * unit)) % 60;
+  const s = (total % (60 * unit)) / unit;
   const sTxt = s.toFixed(secDigits).padStart(secDigits ? secDigits + 3 : 2, '0');
   return `${d}°${String(m).padStart(2, '0')}′${sTxt}″${h}`;
 }
