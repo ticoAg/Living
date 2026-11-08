@@ -81,6 +81,7 @@ export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRe
             onChange={(patch) => onPatch(item.id, 'geoPrivacy' in patch ? { ...patch, geoTouched: true } : patch)}
             tags={{ value: tags.value, suggested: tags.suggested, onChange: (ids) => onPatch(item.id, tagPatch(item, all, ids)) }}
             geoLocked={zone ? `在隐私区域「${zone}」内，位置固定为隐藏` : null}
+            toggles={false}
             disabled={locked}
           />
 
