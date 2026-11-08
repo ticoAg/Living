@@ -3,7 +3,7 @@ import { POI_CATEGORIES, type MatchCandidate, type Poi } from '../../shared/type
 import { distance as geoDistance, fmtDistance } from '../../shared/geo';
 import { CategoryIcon, Icon } from '../components/icons';
 import { invalidate } from '../lib/useApi';
-import MatchMap from './MatchMap';
+import MatchMap, { resultMark } from './MatchMap';
 import MatchPlot from './MatchPlot';
 import {
   DEFAULT_RADIUS,
@@ -22,20 +22,32 @@ import {
 import { errMsg } from './util';
 
 /** Candidates shown before "显示全部". */
-const SHORT_LIST = 12;
+const SHORT_LIST = 8;
 /** MapLibre needs WebGL 2; without it the schematic plot stands in for the map. */
 const HAS_WEBGL2 = typeof WebGL2RenderingContext !== 'undefined';
 
-// Place chooser used by the upload page and the photo editor: the match plot with its radius slider and
-// radio list of candidates, search by name, and "create a place". It never talks to the photo itself;
-// it reports the chosen PlaceChoice (or null to clear) and the caller decides when to save.
+// Place chooser used by the upload page and the photo editor: the match map with its radius slider and
+// radio list of candidates, search by name (results shown on the same map, lettered), and "create a place".
+// It never talks to the photo itself; it reports the chosen PlaceChoice (or null to clear) and the caller
+// decides when to save.
 
 /** The current place with how it was decided. */
-export function PlaceSummary({ value, onClear, disabled }: { value: PlaceChoice | null; onClear?: () => void; disabled?: boolean }) {
+export function PlaceSummary({
+  value,
+  onClear,
+  disabled,
+  empty
+}: {
+  value: PlaceChoice | null;
+  onClear?: () => void;
+  disabled?: boolean;
+  /** what to add when there is no place, e.g. that the photo has no position */
+  empty?: string;
+}) {
   if (!value) {
     return (
       <div className="pk-current" data-empty="true">
-        <span className="muted">未选择地点</span>
+        <span className="muted">未选择地点{empty ? ` · ${empty}` : ''}</span>
       </div>
     );
   }
@@ -86,7 +98,8 @@ function Row({
   onActive
 }: {
   group: string;
-  rank?: number;
+  /** the number (candidates) or letter (search results) also shown on the map */
+  rank?: number | string;
   row: RowData;
   checked: boolean;
   disabled?: boolean;
@@ -135,82 +148,90 @@ function Row({
   );
 }
 
-function PlaceSearch({
+interface SearchState {
+  loading: boolean;
+  error: string | null;
+  results: MatchCandidate[] | null;
+  term: string;
+}
+const NO_SEARCH: SearchState = { loading: false, error: null, results: null, term: '' };
+
+/** The search box: one row, the label read out but not shown. */
+function SearchForm({
   at,
+  loading,
+  onSearch,
+  disabled
+}: {
+  at: { lat: number; lng: number } | null;
+  loading: boolean;
+  onSearch: (term: string) => void;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  const [q, setQ] = useState('');
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const term = q.trim();
+    if (term) onSearch(term);
+  };
+  return (
+    <form className="pk-searchrow" onSubmit={submit} role="search">
+      <label className="visually-hidden" htmlFor={`${id}-q`}>
+        {at ? '搜索附近的地点' : '搜索地点'}
+      </label>
+      <input
+        id={`${id}-q`}
+        className="input"
+        type="search"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder={at ? '搜索附近的地点，如 断桥、咖啡' : '搜索地点，如 断桥残雪'}
+        disabled={disabled}
+        maxLength={60}
+        enterKeyHint="search"
+      />
+      <button type="submit" className="btn" disabled={disabled || loading || !q.trim()}>
+        <Icon name="search" size={16} />
+        搜索
+      </button>
+    </form>
+  );
+}
+
+/** What the search found, lettered as on the map. */
+function SearchResults({
+  at,
+  state,
   value,
   onPick,
   disabled
 }: {
   at: { lat: number; lng: number } | null;
+  state: SearchState;
   value: PlaceChoice | null;
   onPick: (c: PlaceChoice) => void;
   disabled?: boolean;
 }) {
   const id = useId();
-  const [q, setQ] = useState('');
-  const [state, setState] = useState<{ loading: boolean; error: string | null; results: MatchCandidate[] | null; term: string }>({
-    loading: false,
-    error: null,
-    results: null,
-    term: ''
-  });
-  const seq = useRef(0);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const term = q.trim();
-    if (!term) return;
-    const mine = ++seq.current;
-    setState({ loading: true, error: null, results: null, term });
-    try {
-      const results = await searchPois(term, at);
-      if (mine === seq.current) setState({ loading: false, error: null, results, term });
-    } catch (err) {
-      if (mine === seq.current) setState({ loading: false, error: errMsg(err, '搜索失败'), results: null, term });
-    }
-  }
-
   return (
-    <section className="pk-block" aria-label={at ? '搜索附近的地点' : '搜索地点'}>
-      <form className="field" onSubmit={submit} role="search">
-        <label className="label" htmlFor={`${id}-q`}>
-          {at ? '搜索附近的地点' : '搜索地点'}
-        </label>
-        <div className="pk-searchrow">
-          <input
-            id={`${id}-q`}
-            className="input"
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={at ? '名称或其中几个字，如 断桥、咖啡' : '地点名称，如 断桥残雪'}
-            disabled={disabled}
-            maxLength={60}
-            enterKeyHint="search"
-          />
-          <button type="submit" className="btn" disabled={disabled || state.loading || !q.trim()}>
-            <Icon name="search" size={16} />
-            搜索
-          </button>
-        </div>
-      </form>
-      <div aria-live="polite">
-        {state.loading && <p className="small muted">搜索中…</p>}
+    <>
+      <div aria-live="polite" className="pk-status small">
+        {state.loading && <span className="muted">搜索中…</span>}
         {state.error && (
-          <p className="error-text" role="alert">
+          <span className="error-text" role="alert">
             {state.error}
-          </p>
+          </span>
         )}
-        {state.results && state.results.length === 0 && (
-          <p className="small muted">没有找到「{state.term}」。可以换个说法，或在下面新建。</p>
-        )}
+        {state.results && state.results.length === 0 && <span className="muted">没有找到「{state.term}」，换个说法或新建。</span>}
       </div>
       {state.results && state.results.length > 0 && (
         <div className="pk-list" role="radiogroup" aria-label={`「${state.term}」的搜索结果`}>
-          {state.results.map((c) => (
+          {state.results.map((c, i) => (
             <Row
               key={c.key}
               group={`${id}-r`}
+              rank={resultMark(i)}
               row={{
                 key: c.key,
                 name: c.name,
@@ -226,7 +247,7 @@ function PlaceSearch({
           ))}
         </div>
       )}
-    </section>
+    </>
   );
 }
 
@@ -393,6 +414,40 @@ export default function PlacePicker({
       .map((p) => ({ poi: p, distance: coords ? Math.round(geoDistance(coords.lat, coords.lng, p.lat, p.lng)) : null }));
   }, [candidates, extras, coords]);
 
+  // the name search lives here so its results can share the map with the candidates
+  const [search, setSearch] = useState<SearchState>(NO_SEARCH);
+  const searchSeq = useRef(0);
+  async function runSearch(term: string) {
+    const mine = ++searchSeq.current;
+    setSearch({ loading: true, error: null, results: null, term });
+    try {
+      const results = await searchPois(term, coords);
+      if (mine === searchSeq.current) setSearch({ loading: false, error: null, results, term });
+    } catch (err) {
+      if (mine === searchSeq.current) setSearch({ loading: false, error: errMsg(err, '搜索失败'), results: null, term });
+    }
+  }
+  const results = search.results ?? [];
+  const pick = (c: MatchCandidate) => onChange(choiceFromCandidate(c, results.some((r) => r.key === c.key) ? 'manual' : 'confirmed'));
+
+  const withMatch = !!coords && !!match;
+  // without a position the map appears once there is something to show: search results, or the chosen place
+  const mapless = !withMatch && !results.length && (value?.lat == null || value.lng == null);
+  const map =
+    HAS_WEBGL2 && !mapless ? (
+      <MatchMap
+        at={coords}
+        heading={heading}
+        radius={radius}
+        candidates={candidates}
+        results={results}
+        selected={value}
+        onPick={pick}
+        disabled={disabled}
+        className={withMatch ? 'pk-map' : 'pk-map pk-map-short'}
+      />
+    ) : null;
+
   return (
     <div className="pk">
       {privacyZone && (
@@ -401,21 +456,13 @@ export default function PlacePicker({
         </p>
       )}
 
-      {!hideCurrent && <PlaceSummary value={value} onClear={() => onChange(null)} disabled={disabled} />}
+      {!hideCurrent && (
+        <PlaceSummary value={value} onClear={() => onChange(null)} disabled={disabled} empty={coords ? undefined : '照片没有位置信息'} />
+      )}
 
-      {coords && match ? (
+      {withMatch && match ? (
         <section className="pk-block" aria-label="地点匹配">
-          {HAS_WEBGL2 ? (
-            <MatchMap
-              at={coords}
-              heading={heading}
-              radius={radius}
-              candidates={candidates}
-              selectedKey={value?.key ?? null}
-              onPick={(c) => onChange(choiceFromCandidate(c, 'confirmed'))}
-              disabled={disabled}
-            />
-          ) : (
+          {map ?? (
             <MatchPlot
               radius={radius}
               heading={heading}
@@ -426,15 +473,10 @@ export default function PlacePicker({
               onPick={(c) => !disabled && onChange(choiceFromCandidate(c, 'confirmed'))}
             />
           )}
-          <p className="small muted pk-plot-note">
-            {HAS_WEBGL2
-              ? '虚线为匹配半径 · 扇形为镜头朝向 ±30° · 点地图上的编号选择地点'
-              : '同心圆 50 / 100 / 200 / 300 m · 虚线为匹配半径 · 扇形为镜头朝向 ±30°'}
-          </p>
 
-          <div className="field">
-            <label className="label" htmlFor={`${id}-radius`}>
-              匹配半径 <span className="mono pk-radius-val">{radius} m</span>
+          <div className="pk-radius">
+            <label className="small muted" htmlFor={`${id}-radius`}>
+              半径
             </label>
             <input
               id={`${id}-radius`}
@@ -446,15 +488,17 @@ export default function PlacePicker({
               value={radius}
               onChange={(e) => onRadius(Number(e.target.value))}
               disabled={disabled}
+              aria-valuetext={`${radius} 米`}
             />
+            <span className="mono small pk-radius-val">{radius} m</span>
           </div>
-
           <div className="pk-status small" aria-live="polite">
             {match.loading && <span className="muted">匹配中…</span>}
             {!match.loading && res && (
               <span className="muted">
                 {[res.city, res.district].filter(Boolean).join(' · ') || '未知区域'} · {PROVIDER_LABEL[res.provider]} · {candidates.length}{' '}
                 个候选
+                {res.provider === 'local' && '（外部地点服务暂时不可用）'}
               </span>
             )}
           </div>
@@ -466,8 +510,17 @@ export default function PlacePicker({
               </button>
             </div>
           )}
-          {res?.provider === 'local' && !match.loading && <p className="small muted">外部地点服务暂时不可用，只显示站内已有地点。</p>}
+        </section>
+      ) : null}
 
+      <section className="pk-block" aria-label={coords ? '搜索附近的地点' : '搜索地点'}>
+        <SearchForm at={coords} loading={search.loading} onSearch={(t) => void runSearch(t)} disabled={disabled} />
+        {!withMatch && map}
+        <SearchResults at={coords} state={search} value={value} onPick={onChange} disabled={disabled} />
+      </section>
+
+      {withMatch && match && (
+        <section className="pk-block" aria-label="候选地点">
           {candidates.length > 0 ? (
             <div className="pk-list" role="radiogroup" aria-label="候选地点">
               {listed.map((c, i) => {
@@ -504,11 +557,7 @@ export default function PlacePicker({
             </button>
           )}
         </section>
-      ) : (
-        !coords && <p className="small muted pk-nogps">这张照片没有位置信息。可以搜索地点，或新建一个。</p>
       )}
-
-      <PlaceSearch at={coords} value={value} onPick={onChange} disabled={disabled} />
 
       {extraRows.length > 0 && (
         <section className="pk-block" aria-label="本次新建的地点">

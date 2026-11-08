@@ -1,11 +1,11 @@
 import type { CreatePhotoMeta, GeoPrivacy, Visibility } from '../../shared/types';
 import { initialMatch, placeFields, shouldAutoMatch, choiceFromCandidate, type MatchState, type PlaceChoice } from './match';
-import { subjectTagsForCategory, type ProcessPhase, type Processed } from './process';
+import type { ProcessPhase, Processed } from './process';
 import { uid } from './util';
 import type { MatchResponse } from '../../shared/types';
 
 // The upload queue's data model: one Item per file, plus the pure functions that derive status,
-// inferred places, tag suggestions and the POST /api/photos metadata from it.
+// inferred places and the POST /api/photos metadata from it.
 
 export type Stage = 'queued' | 'processing' | 'ready' | 'error';
 
@@ -41,10 +41,8 @@ export interface Item {
   cleared: boolean;
   title: string;
   note: string;
-  /** tags chosen by hand */
-  picked: string[];
-  /** suggestions the user switched off */
-  dismissed: string[];
+  /** tag ids, in the order they were chosen */
+  tags: string[];
   visibility: Visibility;
   geoPrivacy: GeoPrivacy;
   /** the user changed location precision themselves */
@@ -70,8 +68,7 @@ export function newItem(file: File): Item {
     cleared: false,
     title: '',
     note: '',
-    picked: [],
-    dismissed: [],
+    tags: [],
     visibility: 'public',
     geoPrivacy: 'exact',
     geoTouched: false,
@@ -155,29 +152,6 @@ export function customAtFor(it: Item, all: Item[]): { lat: number; lng: number }
   return hit ? coordsOf(hit.other) : null;
 }
 
-export function suggestionsFor(it: Item, all: Item[]): string[] {
-  if (!it.p) return [];
-  const out: string[] = [];
-  for (const id of [...subjectTagsForCategory(placeOf(it, all)?.category), ...it.p.suggestedTagIds]) if (!out.includes(id)) out.push(id);
-  return out;
-}
-
-/** Every selected tag id (accepted suggestions plus hand-picked) and the suggestion list. */
-export function tagState(it: Item, all: Item[]): { value: string[]; suggested: string[] } {
-  const suggested = suggestionsFor(it, all);
-  const off = new Set(it.dismissed);
-  const value = suggested.filter((id) => !off.has(id));
-  for (const id of it.picked) if (!value.includes(id)) value.push(id);
-  return { value, suggested };
-}
-
-/** Turn the picker's new selection back into hand-picked tags and dismissed suggestions. */
-export function tagPatch(it: Item, all: Item[], next: string[]): Pick<Item, 'picked' | 'dismissed'> {
-  const suggested = suggestionsFor(it, all);
-  const set = new Set(next);
-  return { picked: next.filter((id) => !suggested.includes(id)), dismissed: suggested.filter((id) => !set.has(id)) };
-}
-
 export type StatusKey = 'processing' | 'matched' | 'review' | 'nogps' | 'hidden' | 'sending' | 'published' | 'duplicate' | 'failed';
 export interface Status {
   key: StatusKey;
@@ -203,9 +177,61 @@ export function canPublish(it: Item, all: Item[]): boolean {
   return s !== 'processing' && s !== 'sending' && s !== 'published' && s !== 'duplicate';
 }
 
-/** Photos that "发布全部已匹配" sends. */
-export const isBulkReady = (it: Item, all: Item[]) =>
-  it.stage === 'ready' && it.publish.state === 'idle' && statusOf(it, all).key === 'matched';
+/** Sent, being sent or already on the site: nothing left to edit or send. */
+export const isLocked = (it: Item) => it.publish.state === 'sending' || it.publish.state === 'done' || it.publish.state === 'duplicate';
+
+/** Can still be edited, alone or in a selection: not locked and not a file that could not be read. */
+export const isEditable = (it: Item) => it.stage !== 'error' && !isLocked(it);
+
+/** Will "全部发布" send it, now or once it is processed: not on the site, not in flight, not unreadable. */
+export const inBulk = (it: Item) => it.stage !== 'error' && (it.publish.state === 'idle' || it.publish.state === 'failed');
+
+const unsettled = (o: Item) => o.stage === 'queued' || o.stage === 'processing' || !!o.match?.loading;
+
+/**
+ * Can "全部发布" send it right now, as it is: processed and its place match back. A photo without GPS whose place may
+ * come from a neighbour taken around the same time also waits until no other photo is still being read or matched.
+ */
+export function bulkSendable(it: Item, all: Item[]): boolean {
+  if (it.stage !== 'ready' || !it.p || !inBulk(it) || it.match?.loading) return false;
+  if (!hasGps(it) && !it.place && !it.cleared) return !all.some((o) => o.id !== it.id && unsettled(o));
+  return true;
+}
+
+/**
+ * How a click in the queue picks: a plain click shows one photo; ctrl/⌘ adds or drops a photo, starting from the one
+ * on screen as in a file manager; a checkbox adds or drops just its own photo; shift takes the run from the last click.
+ */
+export type PickHow = 'one' | 'toggle' | 'check' | 'range';
+
+/**
+ * The queue's selection after a click on `id`: the photo on screen, and the checked photos in queue order. Two or
+ * more checked photos are edited together; with one checked, the checkboxes stay out while the next is picked.
+ */
+export function pickRows(
+  order: readonly string[],
+  checked: readonly string[],
+  current: string | null,
+  id: string,
+  how: PickHow,
+  from: string | null
+): { checked: string[]; current: string } {
+  if (how === 'one') return { checked: [], current: id };
+  let set: Set<string>;
+  if (how === 'range') {
+    const a = order.indexOf(from ?? current ?? id);
+    const b = order.indexOf(id);
+    set = new Set(a < 0 || b < 0 ? [id] : order.slice(Math.min(a, b), Math.max(a, b) + 1));
+  } else {
+    set = new Set(checked.length || how === 'check' || !current ? checked : [current]);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+  }
+  const list = order.filter((x) => set.has(x));
+  if (!list.length) return { checked: [], current: id };
+  const keep = set.has(id) ? id : current;
+  return { checked: list, current: keep && set.has(keep) ? keep : list[list.length - 1] };
+}
 
 /** What happens when a match response arrives: record it and make the automatic decision once. */
 export function applyMatch(cur: Item, res: MatchResponse, radius: number): Partial<Item> {
@@ -227,9 +253,6 @@ export function buildMeta(it: Item, all: Item[]): CreatePhotoMeta {
   const x = p.exif;
   const place = placeOf(it, all);
   const pf = placeFields(place);
-  const { suggested } = tagState(it, all);
-  const off = new Set(it.dismissed);
-  const suggestedTagIds = suggested.filter((id) => !off.has(id) && !it.picked.includes(id));
   const res = it.match?.res;
   return {
     title: it.title.trim() || null,
@@ -269,8 +292,7 @@ export function buildMeta(it: Item, all: Item[]): CreatePhotoMeta {
     inLiving: it.inLiving,
     favorite: it.favorite,
     sha256: p.sha256,
-    tagIds: [...it.picked],
-    suggestedTagIds,
+    tagIds: [...it.tags],
     themeIds: [...it.themeIds]
   };
 }

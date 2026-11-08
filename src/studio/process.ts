@@ -1,10 +1,10 @@
 // Per-file upload pipeline, run in the browser before anything is sent to the server:
-// EXIF → decode (orientation applied) → three WebP/JPEG sizes → ThumbHash → palette → tone → SHA-256.
-// The generated sizes carry no EXIF. Heavy libraries (exifr, thumbhash, suncalc) are imported lazily so
-// they only load on the upload page; a HEIC/HEIF file the browser cannot open itself is decoded by libheif
-// (WebAssembly, in a worker) loaded only for that file, see heic.ts. Files are processed one at a time by the
-// caller to bound memory.
-// Docs: /docs/product/features/upload.md, /docs/product/features/hierarchical-tags.md
+// EXIF → decode (orientation applied) → three WebP/JPEG sizes → ThumbHash → palette → SHA-256.
+// The generated sizes carry no EXIF. Heavy libraries (exifr, thumbhash) are imported lazily so they only load
+// on the upload page; a HEIC/HEIF file the browser cannot open itself is decoded by libheif (WebAssembly, in a
+// worker) loaded only for that file, see heic.ts. Files are processed one at a time by the caller to bound
+// memory.
+// Docs: /docs/product/features/upload.md
 
 import { isComplete, isHeif } from './heif';
 
@@ -58,11 +58,7 @@ export interface Processed {
   thumbhash: string;
   /** up to 5 hex colours, most dominant first */
   palette: string[];
-  /** preset tone tag id (warm/cool/green/blue/mono) */
-  toneTag: string | null;
   sha256: string | null;
-  /** preset tag ids from time of day, season and colour; subject tags come from the chosen place */
-  suggestedTagIds: string[];
 }
 
 const EMPTY_EXIF: ExifSummary = {
@@ -222,77 +218,6 @@ export async function readExif(file: Blob): Promise<ExifSummary> {
   }
 }
 
-/* ---------------------------------------------------------------- suggestions (pure) */
-
-type SunCalcApi = typeof import('suncalc');
-
-const SUBJECT_TAGS: Record<string, string> = {
-  桥: 'bridge',
-  湖: 'lake',
-  山: 'mountain',
-  寺: 'temple',
-  塔: 'pagoda',
-  海岸: 'sea',
-  岛: 'sea',
-  街区: 'street',
-  建筑: 'architecture',
-  美术馆: 'architecture'
-};
-/** POI category → subject preset tag ids. */
-export function subjectTagsForCategory(category: string | null | undefined): string[] {
-  const id = category ? SUBJECT_TAGS[category] : undefined;
-  return id ? [id] : [];
-}
-
-/** Season preset id from the capture month; the southern hemisphere is shifted by half a year. */
-export function seasonTag(takenAt: string | null, lat: number | null): string | null {
-  if (!takenAt) return null;
-  const month = Number(takenAt.slice(5, 7));
-  if (!(month >= 1 && month <= 12)) return null;
-  const m = lat != null && lat < 0 ? ((month + 5) % 12) + 1 : month;
-  if (m >= 3 && m <= 5) return 'spring';
-  if (m >= 6 && m <= 8) return 'summer';
-  if (m >= 9 && m <= 11) return 'autumn';
-  return 'winter';
-}
-
-/** Daypart from the local hour when there is no position to compute the sun from. */
-export function daypartByHour(takenAt: string | null): string | null {
-  if (!takenAt || takenAt.length < 13) return null;
-  const h = Number(takenAt.slice(11, 13));
-  if (!(h >= 0 && h <= 23)) return null;
-  if (h >= 5 && h < 9) return 'morning';
-  if (h >= 9 && h < 16) return 'daylight';
-  if (h >= 16 && h < 19) return 'sunset';
-  return 'night';
-}
-
-/** UTC instant of a local wall-clock time; without an offset, assume mean solar time at the longitude. */
-export function wallClockToUtcMs(takenAt: string, tz: string | null, lng: number | null): number {
-  const wall = Date.parse(`${takenAt}Z`);
-  let offset = 0;
-  const m = tz ? /^([+-])(\d{2}):(\d{2})$/.exec(tz) : null;
-  if (m) offset = (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000;
-  else if (lng != null) offset = Math.round(lng / 15) * 3600000;
-  return wall - offset;
-}
-
-/** Daypart preset id from the sun's altitude at the capture point. */
-export function daypartBySun(sun: SunCalcApi, takenAt: string, tz: string | null, lat: number, lng: number): string | null {
-  const ms = wallClockToUtcMs(takenAt, tz, lng);
-  if (!Number.isFinite(ms)) return daypartByHour(takenAt);
-  const date = new Date(ms);
-  const alt = (sun.getPosition(date, lat, lng).altitude * 180) / Math.PI;
-  if (!Number.isFinite(alt)) return daypartByHour(takenAt);
-  if (alt <= -12) return 'night';
-  if (alt < -1) return 'bluehour';
-  if (alt >= 10) return 'daylight';
-  // sun low: first light after sunrise or golden hour before sunset
-  const noon = sun.getTimes(date, lat, lng).solarNoon.getTime();
-  const morning = Number.isFinite(noon) ? ms < noon : Number(takenAt.slice(11, 13)) < 12;
-  return morning ? 'morning' : 'sunset';
-}
-
 /* ---------------------------------------------------------------- colour (pure) */
 
 const hex2 = (n: number) =>
@@ -449,57 +374,6 @@ export function kmeansPalette(rgba: ArrayLike<number>, k = 5, maxIter = 16): Pal
     else out.push({ color: { ...c }, lab });
   }
   return out.map((o) => o.color);
-}
-
-/** Hue (0..360), HSV saturation and value (0..1), and chroma (max-min, 0..1) of a hex colour. */
-export function hueInfo(hex: string): { h: number; s: number; v: number; chroma: number } {
-  const [r, g, b] = fromHex(hex).map((c) => c / 255);
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const c = max - min;
-  let h = 0;
-  if (c > 0) {
-    if (max === r) h = ((g - b) / c) % 6;
-    else if (max === g) h = (b - r) / c + 2;
-    else h = (r - g) / c + 4;
-    h = (h * 60 + 360) % 360;
-  }
-  return { h, s: max === 0 ? 0 : c / max, v: max, chroma: c };
-}
-
-/** Tone preset id (warm/cool/green/blue/mono) from a weighted palette, or null when unclear. */
-export function toneFromPalette(palette: readonly PaletteColor[]): string | null {
-  if (!palette.length) return null;
-  let wSum = 0;
-  let chromaSum = 0;
-  const votes = { warm: 0, cool: 0, green: 0, blue: 0 };
-  for (const p of palette) {
-    const { h, v, chroma } = hueInfo(p.hex);
-    wSum += p.weight;
-    chromaSum += p.weight * chroma;
-    if (v < 0.08 || chroma < 0.03) continue; // near-black and greys carry no hue
-    const vote = p.weight * chroma;
-    if (h < 70 || h >= 330) votes.warm += vote;
-    else if (h < 165) votes.green += vote;
-    else if (h < 190) votes.cool += vote; // cyan, teal
-    else if (h <= 270) {
-      // saturated blue is 蓝 (sky, sea); washed-out blue is 冷
-      if (chroma >= 0.25) votes.blue += vote;
-      else votes.cool += vote;
-    } else if (h < 300) votes.cool += vote; // violet dusk
-    else votes.warm += vote; // magenta, rose
-  }
-  if (wSum === 0) return null;
-  if (chromaSum / wSum < 0.06) return 'mono';
-  let bestKey: keyof typeof votes | null = null;
-  let bestVote = 0;
-  for (const key of Object.keys(votes) as (keyof typeof votes)[]) {
-    if (votes[key] > bestVote) {
-      bestVote = votes[key];
-      bestKey = key;
-    }
-  }
-  return bestKey && bestVote / wSum >= 0.02 ? bestKey : null;
 }
 
 /* ---------------------------------------------------------------- canvas helpers */
@@ -720,28 +594,9 @@ export async function processFile(file: File, onPhase?: (phase: ProcessPhase | n
     const small = scaleTo(sCanvas, sCanvas.width, sCanvas.height, pw, ph);
     canvases.push(small);
     const colors = kmeansPalette(ctx2d(small).getImageData(0, 0, small.width, small.height).data, 5);
-    const toneTag = toneFromPalette(colors);
     await tick();
 
     const sha256 = await sha256Hex(file);
-
-    // time-of-day, season, tone
-    const suggested: string[] = [];
-    let daypart: string | null = null;
-    if (exif.takenAt) {
-      if (exif.lat != null && exif.lng != null) {
-        try {
-          const mod = await import('suncalc');
-          const sun = ((mod as unknown as { default?: SunCalcApi }).default ?? mod) as SunCalcApi;
-          daypart = daypartBySun(sun, exif.takenAt, exif.tz, exif.lat, exif.lng);
-        } catch {
-          daypart = daypartByHour(exif.takenAt);
-        }
-      } else {
-        daypart = daypartByHour(exif.takenAt);
-      }
-    }
-    for (const id of [daypart, seasonTag(exif.takenAt, exif.lat), toneTag]) if (id && !suggested.includes(id)) suggested.push(id);
 
     return {
       exif,
@@ -750,9 +605,7 @@ export async function processFile(file: File, onPhase?: (phase: ProcessPhase | n
       variants: { s, m, l },
       thumbhash,
       palette: colors.map((c) => c.hex),
-      toneTag,
-      sha256,
-      suggestedTagIds: suggested
+      sha256
     };
   } finally {
     decoded.close();

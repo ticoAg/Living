@@ -1,7 +1,7 @@
 ---
 type: D1 Table
 title: photo_tags
-description: 照片与标签的多对多关联，区分手动选择和系统建议。
+description: 照片与标签的多对多关联，记录标签来源；现在的标签都由人选择。
 tags: [data, d1, tags, photos]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/migrations/0001_init.sql
@@ -13,7 +13,7 @@ sources:
 |---|---|---|---|
 | `photo_id` | TEXT | 非空，主键（与 `tag_id` 联合），外键 → `photos.id`，删除时级联删除 | 照片 |
 | `tag_id` | TEXT | 非空，主键（与 `photo_id` 联合），外键 → `tags.id`，删除时级联删除 | 标签 |
-| `source` | TEXT | 非空，默认 `'manual'`，取值 `manual` `suggested` | 来源：用户选择，或上传时系统建议 |
+| `source` | TEXT | 非空，默认 `'manual'`，取值 `manual` `suggested` | 来源：用户选择；`suggested` 是早先上传页自动建议并被保留的标签 |
 
 索引：
 
@@ -27,7 +27,7 @@ sources:
 # 规则
 
 - 只记录照片直接带的标签，不展开祖先。选中父标签时包含全部子孙，由 `src/lib/tags.ts` 在客户端展开。
-- 上传时，用户选择的标签记为 `manual`，系统建议的（默认选中、可取消）记为 `suggested`。
+- 上传时，标签记为 `manual`。上传页已不再自动建议标签，接口仍接受 `suggestedTagIds` 并记为 `suggested`，所以旧的行里还有这个值。
 - 修改照片时 `tagIds` 整体替换，之后所有关联都记为 `manual`。
 - 只接受预置标签和照片所有者自己的标签。
 

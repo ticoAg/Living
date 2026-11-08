@@ -16,7 +16,7 @@ decided: 2026-11-08
 
 所有图像运算在浏览器里完成，Worker 只做校验、写 R2 和 D1：
 
-1. 浏览器逐张处理：`exifr` 读 EXIF；按方向旋正（HEIC 浏览器解不开时由 `libheif-js` 解码，见下）；缩放并重新编码为 WebP（不支持时用 JPEG）；`thumbhash` 生成占位；提取主色；`crypto.subtle` 计算 SHA-256；`suncalc` 算太阳高度，用于建议光线和季节标签。重新编码的图片本身不含 EXIF。
+1. 浏览器逐张处理：`exifr` 读 EXIF；按方向旋正（HEIC 浏览器解不开时由 `libheif-js` 解码，见下）；缩放并重新编码为 WebP（不支持时用 JPEG）；`thumbhash` 生成占位；提取主色；`crypto.subtle` 计算 SHA-256。重新编码的图片本身不含 EXIF。（早先还用 `suncalc` 算太阳高度来建议光线和季节标签，标签建议去掉后不再需要。）
 2. 一张照片一次 `multipart/form-data` 请求：`meta`（JSON）、`original`、`s`、`m`、`l`，见 [照片接口](/api/photos.md)。
 3. 原图原样存入 R2，只有所有者能读；公开展示只用生成的三种尺寸，见 [R2 媒体文件](/data/media.md)。
 

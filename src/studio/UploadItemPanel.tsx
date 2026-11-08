@@ -1,5 +1,5 @@
 import type { Poi } from '../../shared/types';
-import ExifList from './ExifList';
+import { ExifLine } from './ExifList';
 import PlacePicker from './PlacePicker';
 import type { PlaceChoice } from './match';
 import { customAtFor, coordsOf, PHASE_TEXT, placeOf, type Item } from './upload-model';
@@ -17,7 +17,7 @@ interface Props {
   onRetryProcess: (id: string) => void;
 }
 
-/** Middle column: the photo, what the file knows about itself, and the place chooser. */
+/** Middle column: the photo, what the file knows about itself in two lines, and the place chooser. */
 export default function UploadItemPanel({ item, all, extras, onCreated, onPlace, onRadius, onRetryMatch, onRetryProcess }: Props) {
   const preview = useObjectUrl(item.p?.variants.m.blob);
   const place = placeOf(item, all);
@@ -25,9 +25,11 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
   const busy = item.publish.state === 'sending' || item.publish.state === 'done' || item.publish.state === 'duplicate';
 
   return (
-    <div className="up-panel stack" style={{ ['--gap' as string]: '18px' }}>
+    <div className="up-panel up-photo">
       <div className="up-panel-head">
-        <h2 className="up-h serif">{item.file.name}</h2>
+        <h2 className="up-h up-name serif" title={item.file.name}>
+          {item.file.name}
+        </h2>
         <StatusChip item={item} all={all} />
       </div>
 
@@ -52,9 +54,7 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
       {item.stage === 'ready' && item.p && (
         <>
           <figure className="up-figure">
-            <div className="up-preview" style={{ aspectRatio: `${item.p.width} / ${item.p.height}` }}>
-              {preview && <img src={preview} alt={`${item.file.name} 的预览`} />}
-            </div>
+            <div className="up-preview">{preview && <img src={preview} alt={`${item.file.name} 的预览`} />}</div>
             {item.p.palette.length > 0 && (
               <div className="up-palette" aria-label="主色">
                 {item.p.palette.map((c) => (
@@ -64,19 +64,14 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
             )}
           </figure>
 
-          <ExifList x={{ ...item.p.exif, width: item.p.width, height: item.p.height, bytes: item.file.size }} />
-          {item.publish.state !== 'done' && (
-            <p className="small muted up-variants">
-              已生成{' '}
-              {(['s', 'm', 'l'] as const)
-                .map((k) => `${item.p!.variants[k].w}×${item.p!.variants[k].h}（${fmtBytes(item.p!.variants[k].blob.size)}）`)
-                .join(' · ')}
-              ，不含 EXIF。
-            </p>
-          )}
+          <ExifLine
+            x={{ ...item.p.exif, width: item.p.width, height: item.p.height, bytes: item.file.size }}
+            sizes={`已生成 ${(['s', 'm', 'l'] as const)
+              .map((k) => `${item.p!.variants[k].w}×${item.p!.variants[k].h}（${fmtBytes(item.p!.variants[k].blob.size)}）`)
+              .join(' · ')}，不含 EXIF`}
+          />
 
           <section className="up-section" aria-label="地点">
-            <h3 className="up-sub serif">地点</h3>
             <PlacePicker
               key={item.id}
               coords={coords}
@@ -93,9 +88,6 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
               disabled={busy}
             />
           </section>
-          {!coords && place == null && !item.p.exif.takenAt && (
-            <p className="small muted">这张照片既没有位置也没有拍摄时间，没法按时间推断，请搜索地点。</p>
-          )}
         </>
       )}
     </div>
