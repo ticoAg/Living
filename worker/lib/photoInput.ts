@@ -4,7 +4,7 @@ import type { GeoPrivacy, NewPoi, PoiMethod, Visibility } from '../../shared/typ
 import { invalid } from './http';
 import { parseNewPoi } from './poi';
 import {
-  isPlainObject, optBool, optColor, optEnum, optFocus, optHeading, optNum, optPalette, optTakenAt, optText, optTz, strArray, type Body
+  isPlainObject, optBool, optEnum, optFocus, optHeading, optNum, optPalette, optTakenAt, optText, optTz, strArray, type Body
 } from './validate';
 
 export const VISIBILITIES = ['public', 'unlisted', 'private'] as const;
@@ -85,7 +85,7 @@ export function parseCreateMeta(raw: unknown): ParsedMeta {
     title: optText(m.title, '标题', 200),
     note: optText(m.note, '笔记', 5000),
     takenAt: optTakenAt(m.takenAt),
-    tz: optTz(m.tz),
+    tz: optTz(m.tz, true),
     lat,
     lng,
     alt: optNum(m.alt, '海拔', { min: -1000, max: 100000 }),

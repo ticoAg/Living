@@ -86,7 +86,7 @@ tags.post('/', async (c) => {
   const db = c.env.DB;
 
   const name = reqStr(body, 'name', '标签名称', 1, 24);
-  const parentId = body.parentId === undefined || body.parentId === null ? null : body.parentId;
+  const parentId = body.parentId === undefined || body.parentId === null || body.parentId === '' ? null : body.parentId;
   if (parentId !== null && typeof parentId !== 'string') throw invalid('上级标签格式不对');
   const color = optColor(body.color);
   if (parentId) await assertParentUsable(db, parentId, user.id);
@@ -117,7 +117,7 @@ tags.patch('/:id', async (c) => {
     nameChanged = name !== tag.name;
   }
   if (has(body, 'parentId')) {
-    const p = body.parentId;
+    const p = body.parentId === '' ? null : body.parentId;
     if (p !== null && typeof p !== 'string') throw invalid('上级标签格式不对');
     if (p !== tag.parent_id) {
       parentChanged = true;

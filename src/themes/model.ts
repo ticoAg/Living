@@ -55,7 +55,8 @@ export function buildReaderModel(theme: ThemeDetail): ReaderModel {
       // inside a day section only the time; elsewhere date and time
       const when = day && day === today ? fmtTime(photo.takenAt) : [day ? fmtDay(day) : '', fmtTime(photo.takenAt)].filter(Boolean).join(' ');
       // the theme's own words win over the photo's note
-      const text = item.text?.trim() ? item.text : (photo.note ?? '');
+      const written = item.text?.trim() ? item.text : (photo.note ?? '');
+      const text = written.trim() ? written : '';
       blocks.push({ type: 'photo', key: item.id, photo, poi, when, text });
     }
   }

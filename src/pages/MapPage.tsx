@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'wouter';
 import type { PhotoSummary, Poi } from '../../shared/types';
 import { dms } from '../../shared/geo';
@@ -46,11 +46,10 @@ export default function MapPage() {
 
   const facts = useMemo(
     () =>
-      (photos ?? []).map((p) => ({
-        p,
-        season: seasonOf(p, tree),
-        tags: tree ? tree.expand(p.tagIds) : new Set(p.tagIds)
-      })),
+      (photos ?? []).map((p) => {
+        const tags = tree ? tree.expand(p.tagIds) : new Set(p.tagIds);
+        return { p, tags, season: seasonOf(p, tree, tags) };
+      }),
     [photos, tree]
   );
   const matching = useMemo(
@@ -89,8 +88,22 @@ export default function MapPage() {
     return [...n.keys()].sort((a, b) => (n.get(b) ?? 0) - (n.get(a) ?? 0) || a.localeCompare(b, 'zh-CN'));
   }, [markers]);
 
-  const select = useCallback((id: string) => replaceQuery({ poi: id === selectedId ? null : id }), [selectedId]);
+  // On phones the panel sits under the map: after a pick, bring it into view
+  const panelRef = useRef<HTMLElement>(null);
+  const picked = useRef(false);
+  const select = useCallback(
+    (id: string) => {
+      picked.current = id !== selectedId;
+      replaceQuery({ poi: id === selectedId ? null : id });
+    },
+    [selectedId]
+  );
   const selected = markers.find((m) => m.id === selectedId);
+  useEffect(() => {
+    if (!picked.current || !selected) return;
+    picked.current = false;
+    if (window.matchMedia('(max-width: 900px)').matches) panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selected]);
 
   const points = useMemo<MapPoint[]>(
     () =>
@@ -114,8 +127,7 @@ export default function MapPage() {
     if (!size) return null;
     const of = city ? markers.filter((m) => m.city === city) : markers;
     return fitViewport((of.length ? of : markers).map((m) => [m.lat, m.lng]), size, { padding: 56, right: 96, maxZoom: 15 });
-    // markers change with every filter; the view should only follow the data set and the city
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `markers` is left out of the dependencies on purpose: it changes with every filter, while the view follows only the data set and the city
   }, [size, city, pois]);
 
   const panelPhotos = useMemo<PhotoSummary[]>(
@@ -204,7 +216,10 @@ export default function MapPage() {
           {pois && photos && markers.length === 0 && <p className="mpg-none">还没有带位置的照片</p>}
         </div>
 
-        <aside className="mpg-panel" aria-live="polite">
+        <aside ref={panelRef} className="mpg-panel" aria-label="地点">
+          <p className="visually-hidden" role="status">
+            {selected ? `${selected.name}，${selected.n} 张` : ''}
+          </p>
           {selected ? (
             <>
               <div className="mpg-sel">

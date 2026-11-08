@@ -38,8 +38,8 @@ media.get('/v/:photoId/:file', async (c) => {
   const cache = caches.default;
   const cacheKey = mediaCacheKey(origin, key);
 
-  // Edge copy of a public size: no D1, no R2.
-  const hit = await cache.match(cacheKey);
+  // Edge copy of a public size: no D1, no R2. A broken cache must never break the image, so lookups fail open.
+  const hit = await cache.match(cacheKey).catch(() => undefined);
   if (hit) {
     const etag = hit.headers.get('ETag');
     if (etag && etagMatches(c.req.header('if-none-match'), etag)) {

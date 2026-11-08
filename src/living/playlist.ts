@@ -38,9 +38,9 @@ export function shuffle(photos: readonly PhotoSummary[], seed: number): PhotoSum
 /** Oldest first; photos without a capture time go last. */
 export function sortByTime(photos: readonly PhotoSummary[]): PhotoSummary[] {
   return photos.slice().sort((a, b) => {
-    if (a.takenAt === b.takenAt) return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-    if (a.takenAt === null) return 1;
-    if (b.takenAt === null) return -1;
+    if ((a.takenAt ?? null) === (b.takenAt ?? null)) return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    if (a.takenAt == null) return 1;
+    if (b.takenAt == null) return -1;
     return a.takenAt < b.takenAt ? -1 : 1;
   });
 }
@@ -72,8 +72,9 @@ export interface PlaylistInput {
 
 export function buildPlaylist({ photos, source, tree, seed, today, startId }: PlaylistInput): PhotoSummary[] {
   const seen = new Set<string>();
+  // Only photos switched on for Living (an explicit `false` leaves one out) that can actually be drawn.
   let list = photos.filter((p) => {
-    if (!p.inLiving || seen.has(p.id)) return false;
+    if (p.inLiving === false || seen.has(p.id) || !p.variants?.s || !p.variants.m || !p.variants.l) return false;
     seen.add(p.id);
     return true;
   });
@@ -83,7 +84,8 @@ export function buildPlaylist({ photos, source, tree, seed, today, startId }: Pl
   if (source.src === 'tags' && source.tags.length) {
     const wanted = source.tags;
     list = list.filter((p) => {
-      const have = tree ? tree.expand(p.tagIds) : new Set(p.tagIds);
+      const direct = p.tagIds ?? [];
+      const have = tree ? tree.expand(direct) : new Set(direct);
       return source.match === 'all' ? wanted.every((id) => have.has(id)) : wanted.some((id) => have.has(id));
     });
   }

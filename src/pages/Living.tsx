@@ -9,7 +9,7 @@ import Caption from '../living/Caption';
 import Controls from '../living/Controls';
 import Drawer, { type Scope, type TagsState } from '../living/Drawer';
 import Stage from '../living/Stage';
-import { announceText, buildCaption, hasCaption } from '../living/caption';
+import { announceText, buildCaption, hasCaption } from '../living/captionText';
 import { useAutoHide, useClock, useDocumentHidden, useFullscreen, useLatest, useReducedMotion, useWakeLock } from '../living/hooks';
 import { buildPlaylist } from '../living/playlist';
 import { preloadPhoto } from '../living/preload';
@@ -55,6 +55,8 @@ export default function Living() {
   const [run, setRun] = useState(0);
   const [paused, setPaused] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // The tag list is fetched the first time the drawer opens, so the chips are ready when 标签 is picked.
+  const [drawerEverOpened, setDrawerEverOpened] = useState(false);
   const [fieldsOff, setFieldsOff] = useState(false);
   const [briefOver, setBriefOver] = useState(false);
   const [peek, setPeek] = useState(0);
@@ -79,7 +81,7 @@ export default function Living() {
 
   /* ---------------------------------------------------------------- data */
 
-  const needTags = source.src === 'tags' || settings.fields.includes('tags');
+  const needTags = source.src === 'tags' || settings.fields.includes('tags') || drawerEverOpened;
   const ownerQ = source.user ? `?owner=${encodeURIComponent(source.user)}` : '';
   const listPath = photosPath(source);
   const photosRes = useApi<PhotosResponse>(listPath);
@@ -104,7 +106,7 @@ export default function Living() {
 
   // "Start from this photo" can name one that is not in the list (unlisted, or beyond the 5000 cap).
   const canBorrowStart = !!startId && source.src === 'all' && !source.city && !source.user;
-  const startListed = !!photos && photos.some((p) => p.id === startId);
+  const startListed = !startId || (!!photos && photos.some((p) => p.id === startId));
   const needStart = canBorrowStart && !!photos && !startListed;
   const startRes = useApi<unknown>(needStart ? `/api/photos/${encodeURIComponent(startId)}` : null);
   const startPending = needStart && !startRes.data && !startRes.error;
@@ -180,6 +182,22 @@ export default function Living() {
     };
   }, [sig, holding, n, everyMs, goRef]);
 
+  // A photo whose image cannot be fetched is skipped, unless every photo is failing (offline).
+  const failures = useRef(0);
+  const live = useLatest({ curId: cur?.id ?? null, n });
+  const onBroken = useCallback(
+    (id: string) => {
+      if (id !== live.current.curId || ++failures.current > Math.max(2, live.current.n)) return;
+      window.setTimeout(() => {
+        if (live.current.curId === id) goRef.current(1);
+      }, 600);
+    },
+    [live, goRef]
+  );
+  const onShown = useCallback(() => {
+    failures.current = 0;
+  }, []);
+
   // Warm the cache with the next photo.
   const nextPhoto = next;
   const preloaded = useRef<HTMLImageElement | null>(null);
@@ -224,7 +242,10 @@ export default function Living() {
   const barShown = ui.visible || hold;
 
   const togglePause = useCallback(() => setPaused((p) => !p), []);
-  const openDrawer = useCallback(() => setDrawerOpen(true), []);
+  const openDrawer = useCallback(() => {
+    setDrawerEverOpened(true);
+    setDrawerOpen(true);
+  }, []);
   const restoreFocus = useRef(false);
   const closeDrawer = useCallback(() => {
     restoreFocus.current = !!document.getElementById('lv-drawer')?.contains(document.activeElement);
@@ -271,7 +292,7 @@ export default function Living() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
-      const t = e.target as HTMLElement | null;
+      const t = e.target instanceof HTMLElement ? e.target : null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       const a = actions.current;
       a.poke();
@@ -375,7 +396,11 @@ export default function Living() {
     if (source.src === 'place') parts.push(poiById.get(source.place)?.name ?? '地点');
     else if (source.src === 'theme') parts.push(themeTitle.current || '主题');
     else if (source.src === 'today') parts.push('那年今日');
-    else if (source.src === 'tags') parts.push(...source.tags.map((id) => tree?.byId.get(id)?.name ?? id));
+    else if (source.src === 'tags' && source.tags.length) {
+      // ids the viewer cannot see (someone else's own tags) have no name; never print raw ids
+      const names = source.tags.map((id) => tree?.byId.get(id)?.name).filter((x): x is string => !!x);
+      parts.push(...(names.length ? names : ['标签']));
+    }
     if (source.city && source.src !== 'theme') parts.push(source.city);
     if (source.user && source.src !== 'theme') parts.push(`@${source.user}`);
     return parts.length ? parts.join(' · ') : '全部';
@@ -390,7 +415,7 @@ export default function Living() {
     const counts =
       source.src === 'tags' && tree && photos
         ? inclusiveCounts(
-            photos.filter((p) => p.inLiving && (!source.city || p.city === source.city)),
+            photos.filter((p) => p.inLiving !== false && (!source.city || p.city === source.city)).map((p) => (p.tagIds ? p : { ...p, tagIds: [] })),
             tree
           )
         : null;
@@ -452,7 +477,7 @@ export default function Living() {
       }}
     >
       <div className="lv-stage" onPointerDown={onStageDown} onPointerUp={onStageUp} onPointerCancel={() => (swipe.current = null)} onClick={onStageClick}>
-        <Stage photo={cur} fit={settings.fit} fx={effectiveFx} everySec={settings.every} paused={holding} />
+        <Stage photo={cur} fit={settings.fit} fx={effectiveFx} everySec={settings.every} paused={holding} onShown={onShown} onBroken={onBroken} />
       </div>
 
       {dimmed && <div className="lv-dim" aria-hidden="true" />}

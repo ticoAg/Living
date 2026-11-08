@@ -260,8 +260,8 @@ export default function Upload() {
       await publishOne(id);
       if (!alive.current) return;
       const list = itemsRef.current;
-      const done = list.find((i) => i.id === id);
-      if (done?.publish.state !== 'done' && done?.publish.state !== 'duplicate') return;
+      // A duplicate stays selected: its explanation and the link to the existing photo are on this panel.
+      if (list.find((i) => i.id === id)?.publish.state !== 'done') return;
       const at = list.findIndex((i) => i.id === id);
       const open = (i: Item) => i.publish.state !== 'done' && i.publish.state !== 'duplicate';
       const nxt = list.slice(at + 1).find(open) ?? list.find(open);
@@ -349,15 +349,13 @@ export default function Upload() {
   /* ------------------------------------------------------------ derived */
 
   const selected = useMemo(() => items.find((i) => i.id === selectedId) ?? items[0] ?? null, [items, selectedId]);
+  const statuses = useMemo(() => items.map((it) => statusOf(it, items)), [items]);
   const counts = useMemo(() => {
     const c = new Map<StatusKey, number>();
-    for (const it of items) {
-      const k = statusOf(it, items).key;
-      c.set(k, (c.get(k) ?? 0) + 1);
-    }
+    for (const s of statuses) c.set(s.key, (c.get(s.key) ?? 0) + 1);
     return c;
-  }, [items]);
-  const bulkCount = useMemo(() => items.filter((i) => isBulkReady(i, items)).length, [items]);
+  }, [statuses]);
+  const bulkCount = useMemo(() => items.filter((it, i) => it.stage === 'ready' && it.publish.state === 'idle' && statuses[i].key === 'matched').length, [items, statuses]);
   const publishedCount = (counts.get('published') ?? 0) + (counts.get('duplicate') ?? 0);
   const othersOpen = selected ? items.filter((i) => i.id !== selected.id && i.stage === 'ready' && !settled(i)).length : 0;
 
@@ -422,7 +420,7 @@ export default function Upload() {
                 )}
               </div>
             </div>
-            <UploadQueue items={items} selectedId={selected.id} onSelect={setSelectedId} onRemove={remove} />
+            <UploadQueue items={items} statuses={statuses} selectedId={selected.id} onSelect={setSelectedId} onRemove={remove} />
           </aside>
 
           <section className="up-col up-col-match" aria-label="照片与地点">
@@ -440,7 +438,7 @@ export default function Upload() {
           </section>
 
           <section className="up-col up-col-details" aria-label="整理">
-            <UploadDetails item={selected} all={items} onPatch={onPatch} onPublish={(id) => void publishAndAdvance(id)} onApplyRest={applyRest} unpublishedOthers={othersOpen} />
+            <UploadDetails key={selected.id} item={selected} all={items} onPatch={onPatch} onPublish={(id) => void publishAndAdvance(id)} onApplyRest={applyRest} unpublishedOthers={othersOpen} />
           </section>
         </div>
       )}

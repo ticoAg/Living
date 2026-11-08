@@ -8,7 +8,7 @@ import type { ExternalPlace, Geocode } from './types';
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
 
-interface OverpassElement {
+export interface OverpassElement {
   type: 'node' | 'way' | 'relation';
   id: number;
   lat?: number;
@@ -37,14 +37,21 @@ out center tags 150;`;
 
 /** Named places of interest within `radius` metres. */
 export async function overpassAround(lat: number, lng: number, radius: number): Promise<ExternalPlace[]> {
-  const data = await fetchJson<{ elements?: OverpassElement[] }>(OVERPASS, 'overpass', {
+  const data = await fetchJson<{ elements?: OverpassElement[]; remark?: string }>(OVERPASS, 'overpass', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: `data=${encodeURIComponent(overpassQuery(lat, lng, radius))}`
   });
   if (!Array.isArray(data.elements)) throw new UpstreamError('overpass: unexpected response');
+  // An overloaded server answers 200 with a "runtime error" remark and a partial or empty result: not worth caching.
+  if (typeof data.remark === 'string' && /runtime error|timed out|out of memory/i.test(data.remark)) throw new UpstreamError('overpass: query did not complete');
+  return parseOverpass(data.elements);
+}
+
+/** Overpass elements → places (named, categorised, with a centre point). */
+export function parseOverpass(elements: OverpassElement[]): ExternalPlace[] {
   const out: ExternalPlace[] = [];
-  for (const el of data.elements) {
+  for (const el of elements) {
     const tags = el.tags ?? {};
     const name = tags['name']?.trim();
     const pLat = el.lat ?? el.center?.lat;

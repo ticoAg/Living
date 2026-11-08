@@ -105,9 +105,11 @@ export function optTakenAt(v: unknown): string | null {
   throw invalid('拍摄时间格式应为 YYYY-MM-DDTHH:mm:ss');
 }
 
-export function optTz(v: unknown): string | null {
+/** UTC offset such as `+08:00`. With `lenient`, anything else is dropped instead of rejected (it is only descriptive). */
+export function optTz(v: unknown, lenient = false): string | null {
   if (v === null || v === undefined || v === '') return null;
   if (typeof v === 'string' && /^(Z|[+-]\d{2}(?::?\d{2})?)$/.test(v.trim())) return v.trim();
+  if (lenient) return null;
   throw invalid('时区格式应为 +08:00');
 }
 
@@ -121,16 +123,18 @@ export function optColor(v: unknown, label = '颜色'): string | null {
 export function optPalette(v: unknown): string[] | null {
   if (v === null || v === undefined) return null;
   if (!Array.isArray(v)) throw invalid('主色需要是颜色数组');
-  const out = v.filter((x): x is string => typeof x === 'string' && HEX_COLOR.test(x)).slice(0, 8);
+  const out = v.filter((x): x is string => typeof x === 'string' && HEX_COLOR.test(x)).slice(0, 5); // at most 5, most dominant first
   return out.length ? out : null;
 }
 
+/** Crop focus `[x, y]`; values are clamped into 0..1 so float noise at the edges does not fail an upload. */
 export function optFocus(v: unknown): [number, number] | null {
   if (v === null || v === undefined) return null;
-  if (!Array.isArray(v) || v.length !== 2 || v.some((n) => typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 1)) {
+  if (!Array.isArray(v) || v.length !== 2 || v.some((n) => typeof n !== 'number' || !Number.isFinite(n))) {
     throw invalid('焦点需要是 [x, y]，取值 0 到 1');
   }
-  return [v[0] as number, v[1] as number];
+  const clamp = (n: number) => Math.min(1, Math.max(0, n));
+  return [clamp(v[0] as number), clamp(v[1] as number)];
 }
 
 /** Heading in degrees, normalised to [0, 360). */

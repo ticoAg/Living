@@ -97,6 +97,7 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
           <button
             type="button"
             className="btn btn-ghost btn-icon"
+            data-act="up"
             aria-label={`上移${num}`}
             disabled={index === 0}
             onClick={() => actions.move(key, -1)}
@@ -106,6 +107,7 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
           <button
             type="button"
             className="btn btn-ghost btn-icon"
+            data-act="down"
             aria-label={`下移${num}`}
             disabled={index === total - 1}
             onClick={() => actions.move(key, 1)}
@@ -122,7 +124,13 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
           >
             <Icon name="plus" size={18} />
           </button>
-          <button type="button" className="btn btn-ghost btn-icon ed-remove" aria-label={`移除${num}`} onClick={() => actions.remove(key)}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon ed-remove"
+            data-act="remove"
+            aria-label={`移除${num}`}
+            onClick={() => actions.remove(key)}
+          >
             <Icon name="trash" size={18} />
           </button>
         </span>
@@ -174,6 +182,7 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
                     id={`${uid}-t`}
                     className="textarea ed-ta"
                     rows={1}
+                    maxLength={5000}
                     value={item.text}
                     placeholder="不填则显示照片笔记"
                     onChange={(e) => actions.patch(key, { text: e.target.value })}
@@ -200,6 +209,7 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
             id={`${uid}-t`}
             className="textarea ed-ta ed-ta-text"
             rows={3}
+            maxLength={20000}
             value={item.text}
             placeholder="写一段文字。空一行分段，网址会自动成为链接。"
             onChange={(e) => actions.patch(key, { text: e.target.value })}
@@ -232,6 +242,7 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
               id={`${uid}-t`}
               className="textarea ed-ta"
               rows={1}
+              maxLength={5000}
               value={item.text}
               placeholder="这一天的概述，显示在日期下面"
               onChange={(e) => actions.patch(key, { text: e.target.value })}

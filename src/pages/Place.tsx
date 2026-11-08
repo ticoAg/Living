@@ -28,8 +28,6 @@ export default function Place() {
   const { user } = useSession();
   const res = useApi<{ poi: Poi; nearby?: Nearby[] }>(id ? `/api/pois/${enc(id)}` : null);
   const { photos } = usePhotoList(id ? `poi=${enc(id)}` : null);
-  // everyone's photos: thumbnails and counts for the neighbouring places
-  const { photos: everyone } = usePhotoList('');
   const { tree } = useTagTree();
   const q = useQuery();
   const part = q.get('part') ?? '';
@@ -37,6 +35,8 @@ export default function Place() {
 
   const poi = res.data?.poi;
   const nearby = res.data?.nearby;
+  // everyone's photos give the neighbouring places their thumbnails; only fetched when there are neighbours
+  const { photos: everyone } = usePhotoList(nearby && nearby.length ? '' : null);
   useDocTitle(poi?.name);
   useScrollTop(id);
 

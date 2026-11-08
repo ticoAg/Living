@@ -1,8 +1,11 @@
 import type { Ctx } from './http';
 
-/** Best-effort client address for rate limiting. */
+/**
+ * Client address for rate limiting. Cloudflare always overwrites `CF-Connecting-IP`; client-supplied forwarding
+ * headers are deliberately ignored, so a caller cannot dodge the limit by rotating them. (Local dev has none: 'local'.)
+ */
 export function clientIp(c: Ctx): string {
-  return c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
+  return c.req.header('cf-connecting-ip') ?? 'local';
 }
 
 interface Counter {

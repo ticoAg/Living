@@ -17,7 +17,7 @@ sources:
 | `bio` | TEXT | 可空 | 简介 |
 | `avatar_photo_id` | TEXT | 可空，无外键 | 头像：本人某张照片的 id |
 | `role` | TEXT | 非空，默认 `'member'`，取值 `owner` `admin` `member` | 角色 |
-| `password_hash` | TEXT | 非空 | `pbkdf2$100000$<salt>$<hash>`，盐和哈希为 base64，见 [决策：认证](/architecture/decisions/0004-auth.md) |
+| `password_hash` | TEXT | 非空 | `pbkdf2$<迭代次数>$<salt>$<hash>`，盐和哈希为 base64，新密码为 2 万次迭代，见 [决策：认证](/architecture/decisions/0004-auth.md) |
 | `created_at` | TEXT | 非空，默认当前 UTC 时间 | 注册时间 |
 
 `handle` 的唯一约束自带索引，没有其他索引。

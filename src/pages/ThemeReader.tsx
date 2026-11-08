@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'wouter';
 import type { ThemeDetail, ThemeSummary } from '../../shared/types';
 import Img from '../components/Img';
@@ -127,6 +127,8 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
   );
   const shapes = useMemo<MapShapes>(() => ({ lines: model.route.length > 1 ? [{ id: 'route', coords: model.route }] : [] }), [model.route]);
   const showMap = theme.kind === 'trip' && (model.route.length > 0 || points.length > 0);
+  // A live map swallows the wheel and one-finger drags, which makes the page hard to scroll; it is opt-in.
+  const [live, setLive] = useState(false);
 
   const dates = fmtRange(theme.startDate, theme.endDate);
   const living = `/living?src=theme&theme=${encodeURIComponent(theme.id)}`;
@@ -192,7 +194,22 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
 
       {showMap && (
         <section className="rd-map-wrap" aria-label="路线">
-          <MapView ariaLabel="路线图" points={points} shapes={shapes} className="rd-map" maxZoom={15} />
+          {/* the map is created once, so switching mode remounts it */}
+          <MapView
+            key={live ? 'live' : 'still'}
+            ariaLabel="路线图"
+            points={points}
+            shapes={shapes}
+            className="rd-map"
+            maxZoom={15}
+            interactive={live}
+          />
+          <div className="rd-map-bar">
+            <span>点击地点，跳到对应的照片。</span>
+            <button type="button" className="btn btn-quiet" aria-pressed={live} onClick={() => setLive((v) => !v)}>
+              {live ? '锁定地图' : '缩放与拖动'}
+            </button>
+          </div>
         </section>
       )}
 
@@ -248,6 +265,14 @@ export default function ThemeReader() {
   const theme = unwrapTheme(data);
   useDocumentTitle(theme?.title);
   useScrollTop(id);
+
+  // The cache keeps failures too: a 404 seen while logged out must not outlive logging in.
+  const viewer = user?.id;
+  useEffect(() => {
+    if (error) reload();
+    // only when the viewer changes (or on arrival with a stale failure)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewer]);
 
   if (!theme) {
     if (error) return <Missing error={error} reload={reload} />;

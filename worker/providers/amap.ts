@@ -13,7 +13,7 @@ const AROUND_TYPES = '110000|140000|190000';
 /** AMap returns `[]` instead of a string for empty fields. */
 const s = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
-interface AmapPoi {
+export interface AmapPoi {
   id?: unknown;
   name?: unknown;
   type?: unknown;
@@ -28,7 +28,8 @@ interface AmapPlaceResponse {
   pois?: AmapPoi[];
 }
 
-function toPlaces(pois: AmapPoi[] | undefined): ExternalPlace[] {
+/** Normalises AMap POIs: GCJ-02 → WGS-84, type → category, junk (addresses, housing, schools) dropped. */
+export function parseAmapPois(pois: AmapPoi[] | undefined): ExternalPlace[] {
   const out: ExternalPlace[] = [];
   for (const p of pois ?? []) {
     const id = s(p.id);
@@ -76,7 +77,7 @@ export async function amapAround(key: string, lat: number, lng: number, radius: 
   });
   const data = await fetchJson<AmapPlaceResponse>(`${BASE}/place/around?${qs}`, 'amap around');
   check(data, 'amap around');
-  return toPlaces(data.pois);
+  return parseAmapPois(data.pois);
 }
 
 /** Keyword search (v3/place/text), at most 20 results. */
@@ -84,7 +85,7 @@ export async function amapText(key: string, keywords: string): Promise<ExternalP
   const qs = new URLSearchParams({ key, keywords, offset: '20', page: '1', extensions: 'base' });
   const data = await fetchJson<AmapPlaceResponse>(`${BASE}/place/text?${qs}`, 'amap text');
   check(data, 'amap text');
-  return toPlaces(data.pois);
+  return parseAmapPois(data.pois);
 }
 
 /** Reverse geocode to city and district (直辖市: the city is the province name). */

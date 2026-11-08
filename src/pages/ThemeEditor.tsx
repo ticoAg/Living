@@ -85,7 +85,8 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
   draftRef.current = draft;
   const dragRef = useRef<string | null>(null);
   const overRef = useRef<{ key: string; pos: 'before' | 'after' } | null>(null);
-  const pendingFocus = useRef<{ key: string; focus: boolean } | null>(null);
+  // where to put focus after the next render: a row (scrolled into view) or one of its buttons
+  const pendingFocus = useRef<{ key: string; focus: boolean; act?: 'up' | 'down' | 'remove' } | null>(null);
 
   useEffect(() => {
     // the flash message was handed over through history; do not show it again on reload
@@ -112,7 +113,8 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
   const actions = useMemo<RowActions>(
     () => ({
       patch: (key, patch) => setDraft((d) => ({ ...d, items: d.items.map((it) => (it.key === key ? ({ ...it, ...patch } as DraftItem) : it)) })),
-      move: (key, delta) =>
+      move: (key, delta) => {
+        pendingFocus.current = { key, focus: false, act: delta < 0 ? 'up' : 'down' };
         setDraft((d) => {
           const i = d.items.findIndex((it) => it.key === key);
           const j = i + delta;
@@ -120,9 +122,15 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
           const items = d.items.slice();
           [items[i], items[j]] = [items[j], items[i]];
           return { ...d, items };
-        }),
+        });
+      },
       remove: (key) => {
         setMenuKey(null);
+        const cur = draftRef.current.items;
+        const at = cur.findIndex((it) => it.key === key);
+        const neighbour = cur[at + 1] ?? cur[at - 1];
+        pendingFocus.current = neighbour ? { key: neighbour.key, focus: false, act: 'remove' } : null;
+        if (!neighbour) document.getElementById('th-add-photo')?.focus();
         setDraft((d) => {
           const items = d.items.filter((it) => it.key !== key);
           // a cover that is no longer in the theme falls back to the first photo
@@ -183,6 +191,12 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
     pendingFocus.current = null;
     const el = document.querySelector<HTMLElement>(`[data-item-key="${want.key}"]`);
     if (!el) return;
+    if (want.act) {
+      // keep keyboard focus on the same kind of button (the other direction if this one is now disabled)
+      const pick = (act: string) => el.querySelector<HTMLButtonElement>(`[data-act="${act}"]:not(:disabled)`);
+      (pick(want.act) ?? pick(want.act === 'up' ? 'down' : 'up'))?.focus();
+      return;
+    }
     el.scrollIntoView({ block: 'center' });
     if (want.focus) el.querySelector<HTMLElement>('textarea, input')?.focus({ preventScroll: true });
   }, [draft.items]);
@@ -349,287 +363,299 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
 
   return (
     <>
-      <form
-        className="ed"
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        <div className="ed-inner">
-          <header className="ed-head">
-            <h1 className="display display-l">{themeId ? '编辑主题' : '新建主题'}</h1>
-            {themeId && (
-              <Link href={`/t/${themeId}`} className="btn btn-quiet">
-                查看游记
-              </Link>
-            )}
-          </header>
-
-          <section className="ed-sec" aria-labelledby="ed-basic">
-            <h2 id="ed-basic" className="ed-h">
-              基本信息
-            </h2>
-
-            <div className="field">
-              <span className="label" id="th-kind-label">
-                类型
-              </span>
-              <div className="seg" role="group" aria-labelledby="th-kind-label">
-                {KINDS.map((k) => (
-                  <button key={k} type="button" aria-pressed={draft.kind === k} onClick={() => set('kind', k)}>
-                    {KIND_LABEL[k]}
-                  </button>
-                ))}
-              </div>
-              <p className="small muted ed-hint">{trip ? '有起止日期，按天分段，游记里画出路线。' : '不受时间约束的精选。'}</p>
-            </div>
-
-            <div className="field">
-              <label className="label" htmlFor="th-title">
-                标题
-              </label>
-              <input
-                id="th-title"
-                className="input ed-title-input"
-                value={draft.title}
-                maxLength={120}
-                autoFocus={!themeId}
-                placeholder={trip ? '例：2026 秋 · 杭州三日' : '例：西湖四季'}
-                onChange={(e) => set('title', e.target.value)}
-              />
-            </div>
-
-            <div className="field">
-              <label className="label" htmlFor="th-subtitle">
-                副标题
-              </label>
-              <input id="th-subtitle" className="input" value={draft.subtitle} maxLength={200} onChange={(e) => set('subtitle', e.target.value)} />
-            </div>
-
-            <div className="field">
-              <label className="label" htmlFor="th-intro">
-                导语
-              </label>
-              <textarea
-                id="th-intro"
-                className="textarea"
-                rows={5}
-                value={draft.intro}
-                placeholder="几句话说明这次旅程或这个专题。空一行分段。"
-                onChange={(e) => set('intro', e.target.value)}
-              />
-            </div>
-
-            {trip && (
-              <div className="ed-dates">
-                <div className="field">
-                  <label className="label" htmlFor="th-start">
-                    开始日期
-                  </label>
-                  <input
-                    id="th-start"
-                    type="date"
-                    className="input"
-                    value={draft.startDate}
-                    max={draft.endDate || undefined}
-                    onChange={(e) => set('startDate', e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <label className="label" htmlFor="th-end">
-                    结束日期
-                  </label>
-                  <input
-                    id="th-end"
-                    type="date"
-                    className="input"
-                    value={draft.endDate}
-                    min={draft.startDate || undefined}
-                    onChange={(e) => set('endDate', e.target.value)}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-quiet"
-                  disabled={!range || (range.start === draft.startDate && range.end === draft.endDate)}
-                  onClick={() => range && setDraft((d) => ({ ...d, startDate: range.start, endDate: range.end }))}
-                >
-                  取自照片
-                </button>
-              </div>
-            )}
-
-            <div className="field">
-              <span className="label" id="th-vis-label">
-                公开范围
-              </span>
-              <div className="seg" role="group" aria-labelledby="th-vis-label">
-                {VISIBILITIES.map((v) => (
-                  <button key={v} type="button" aria-pressed={draft.visibility === v} onClick={() => set('visibility', v)}>
-                    {VISIBILITY_LABEL[v]}
-                  </button>
-                ))}
-              </div>
-              <p className="small muted ed-hint">{VISIBILITY_HINT[draft.visibility]}</p>
-              {draft.visibility !== 'private' && privateCount > 0 && (
-                <p className="small ed-warn" role="note">
-                  有 {privateCount} 张照片仅自己可见，读者看不到它们。
-                </p>
+      <main>
+        <form
+          className="ed"
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          <div className="ed-inner">
+            <header className="ed-head">
+              <h1 className="display display-l">{themeId ? '编辑主题' : '新建主题'}</h1>
+              {themeId && (
+                <Link href={`/t/${themeId}`} className="btn btn-quiet">
+                  查看游记
+                </Link>
               )}
-            </div>
+            </header>
 
-            <div className="field">
-              <span className="label" id="th-cover-label">
-                封面
-              </span>
-              {coverPhotos.length === 0 ? (
-                <p className="small muted ed-hint">添加照片后，可以从中选择封面。</p>
-              ) : (
-                <div className="ed-covers" role="group" aria-labelledby="th-cover-label">
-                  <button
-                    type="button"
-                    className="ed-cover ed-cover-auto"
-                    aria-pressed={!draft.coverPhotoId}
-                    onClick={() => set('coverPhotoId', null)}
-                  >
-                    默认
-                    <br />
-                    第一张
-                  </button>
-                  {coverPhotos.map((p, i) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="ed-cover"
-                      aria-pressed={draft.coverPhotoId === p.id}
-                      aria-label={`设为封面：第 ${i + 1} 张照片`}
-                      onClick={() => set('coverPhotoId', p.id)}
-                    >
-                      <Img photo={p} ratio="4 / 3" sizes="96px" alt="" />
+            <section className="ed-sec" aria-labelledby="ed-basic">
+              <h2 id="ed-basic" className="ed-h">
+                基本信息
+              </h2>
+
+              <div className="field">
+                <span className="label" id="th-kind-label">
+                  类型
+                </span>
+                <div className="seg" role="group" aria-labelledby="th-kind-label">
+                  {KINDS.map((k) => (
+                    <button key={k} type="button" aria-pressed={draft.kind === k} onClick={() => set('kind', k)}>
+                      {KIND_LABEL[k]}
                     </button>
                   ))}
                 </div>
-              )}
-            </div>
-          </section>
-
-          <section className="ed-sec" aria-labelledby="ed-items">
-            <div className="spread">
-              <h2 id="ed-items" className="ed-h">
-                内容
-              </h2>
-              <span className="small muted mono">
-                {draft.items.length} 项 · {photoCount} 张照片
-              </span>
-            </div>
-
-            <div className="ed-tools">
-              <button type="button" className="btn" onClick={() => openPicker(null)}>
-                <Icon name="plus" size={18} />
-                添加照片
-              </button>
-              <button type="button" className="btn btn-quiet" onClick={() => append('text')}>
-                添加文字段落
-              </button>
-              <button type="button" className="btn btn-quiet" onClick={() => append('day')}>
-                添加日期分段
-              </button>
-              {trip && (
-                <button
-                  type="button"
-                  className="btn btn-quiet"
-                  disabled={arranging || !draft.startDate || !draft.endDate}
-                  onClick={() => void autoArrange()}
-                >
-                  {arranging ? '编排中…' : '按日期范围自动编排'}
-                </button>
-              )}
-            </div>
-            {trip && (!draft.startDate || !draft.endDate) && (
-              <p className="small muted ed-hint">填好起止日期后，可以把这段时间的照片按天自动排好。</p>
-            )}
-
-            {draft.items.length === 0 ? (
-              <div className="ed-empty">
-                <p>还没有内容。添加照片，或者先写一段文字。</p>
+                <p className="small muted ed-hint">{trip ? '有起止日期，按天分段，游记里画出路线。' : '不受时间约束的精选。'}</p>
               </div>
-            ) : (
-              <ol className="ed-items">
-                {draft.items.map((it, i) => (
-                  <ItemRow
-                    key={it.key}
-                    item={it}
-                    index={i}
-                    total={draft.items.length}
-                    poi={it.kind === 'photo' && it.photo?.poiId ? (poiById.get(it.photo.poiId) ?? null) : null}
-                    themeVisibility={draft.visibility}
-                    menuOpen={menuKey === it.key}
-                    dropPos={over?.key === it.key ? over.pos : null}
-                    dragging={dragKey === it.key}
-                    actions={actions}
-                  />
-                ))}
-              </ol>
-            )}
-          </section>
 
-          {themeId && (
-            <section className="ed-sec ed-danger" aria-labelledby="ed-del">
-              <h2 id="ed-del" className="ed-h">
-                删除主题
-              </h2>
-              {!confirmDelete ? (
-                <div>
-                  <button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)}>
-                    <Icon name="trash" size={18} />
-                    删除主题
+              <div className="field">
+                <label className="label" htmlFor="th-title">
+                  标题
+                </label>
+                <input
+                  id="th-title"
+                  className="input ed-title-input"
+                  value={draft.title}
+                  maxLength={100}
+                  autoFocus={!themeId}
+                  placeholder={trip ? '例：2026 秋 · 杭州三日' : '例：西湖四季'}
+                  onChange={(e) => set('title', e.target.value)}
+                />
+              </div>
+
+              <div className="field">
+                <label className="label" htmlFor="th-subtitle">
+                  副标题
+                </label>
+                <input id="th-subtitle" className="input" value={draft.subtitle} maxLength={200} onChange={(e) => set('subtitle', e.target.value)} />
+              </div>
+
+              <div className="field">
+                <label className="label" htmlFor="th-intro">
+                  导语
+                </label>
+                <textarea
+                  id="th-intro"
+                  className="textarea"
+                  rows={5}
+                  maxLength={20000}
+                  value={draft.intro}
+                  placeholder="几句话说明这次旅程或这个专题。空一行分段。"
+                  onChange={(e) => set('intro', e.target.value)}
+                />
+              </div>
+
+              {trip && (
+                <div className="ed-dates">
+                  <div className="field">
+                    <label className="label" htmlFor="th-start">
+                      开始日期
+                    </label>
+                    <input
+                      id="th-start"
+                      type="date"
+                      className="input"
+                      value={draft.startDate}
+                      max={draft.endDate || undefined}
+                      onChange={(e) => set('startDate', e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label className="label" htmlFor="th-end">
+                      结束日期
+                    </label>
+                    <input
+                      id="th-end"
+                      type="date"
+                      className="input"
+                      value={draft.endDate}
+                      min={draft.startDate || undefined}
+                      onChange={(e) => set('endDate', e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-quiet"
+                    disabled={!range || (range.start === draft.startDate && range.end === draft.endDate)}
+                    onClick={() => range && setDraft((d) => ({ ...d, startDate: range.start, endDate: range.end }))}
+                  >
+                    取自照片
                   </button>
                 </div>
-              ) : (
-                <div className="notice ed-confirm" role="alertdialog" aria-label="确认删除主题">
-                  <p>确定删除这个主题吗？照片不会被删除，但主题和其中的文字无法恢复。</p>
-                  <div className="row">
-                    <button type="button" className="btn btn-danger" disabled={deleting} onClick={() => void destroy()}>
-                      {deleting ? '删除中…' : '确认删除'}
+              )}
+
+              <div className="field">
+                <span className="label" id="th-vis-label">
+                  公开范围
+                </span>
+                <div className="seg" role="group" aria-labelledby="th-vis-label">
+                  {VISIBILITIES.map((v) => (
+                    <button key={v} type="button" aria-pressed={draft.visibility === v} onClick={() => set('visibility', v)}>
+                      {VISIBILITY_LABEL[v]}
                     </button>
-                    <button type="button" className="btn btn-quiet" disabled={deleting} onClick={() => setConfirmDelete(false)}>
-                      取消
-                    </button>
-                  </div>
+                  ))}
                 </div>
+                <p className="small muted ed-hint">{VISIBILITY_HINT[draft.visibility]}</p>
+                {draft.visibility !== 'private' && privateCount > 0 && (
+                  <p className="small ed-warn" role="note">
+                    有 {privateCount} 张照片仅自己可见，读者看不到它们。
+                  </p>
+                )}
+              </div>
+
+              <div className="field">
+                <span className="label" id="th-cover-label">
+                  封面
+                </span>
+                {coverPhotos.length === 0 ? (
+                  <p className="small muted ed-hint">添加照片后，可以从中选择封面。</p>
+                ) : (
+                  <div className="ed-covers" role="group" aria-labelledby="th-cover-label">
+                    <button
+                      type="button"
+                      className="ed-cover ed-cover-auto"
+                      aria-pressed={!draft.coverPhotoId}
+                      onClick={() => set('coverPhotoId', null)}
+                    >
+                      默认
+                      <br />
+                      第一张
+                    </button>
+                    {coverPhotos.map((p, i) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="ed-cover"
+                        aria-pressed={draft.coverPhotoId === p.id}
+                        aria-label={`设为封面：第 ${i + 1} 张照片`}
+                        onClick={() => set('coverPhotoId', p.id)}
+                      >
+                        <Img photo={p} ratio="4 / 3" sizes="96px" alt="" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="ed-sec" aria-labelledby="ed-items">
+              <div className="spread">
+                <h2 id="ed-items" className="ed-h">
+                  内容
+                </h2>
+                <span className="small muted mono">
+                  {draft.items.length} 项 · {photoCount} 张照片
+                </span>
+              </div>
+
+              <div className="ed-tools">
+                <button id="th-add-photo" type="button" className="btn" onClick={() => openPicker(null)}>
+                  <Icon name="plus" size={18} />
+                  添加照片
+                </button>
+                <button type="button" className="btn btn-quiet" onClick={() => append('text')}>
+                  添加文字段落
+                </button>
+                <button type="button" className="btn btn-quiet" onClick={() => append('day')}>
+                  添加日期分段
+                </button>
+                {trip && (
+                  <button
+                    type="button"
+                    className="btn btn-quiet"
+                    disabled={arranging || !draft.startDate || !draft.endDate}
+                    onClick={() => void autoArrange()}
+                  >
+                    {arranging ? '编排中…' : '按日期范围自动编排'}
+                  </button>
+                )}
+              </div>
+              {trip && (!draft.startDate || !draft.endDate) && (
+                <p className="small muted ed-hint">填好起止日期后，可以把这段时间的照片按天自动排好。</p>
+              )}
+
+              {draft.items.length === 0 ? (
+                <div className="ed-empty">
+                  <p>还没有内容。添加照片，或者先写一段文字。</p>
+                </div>
+              ) : (
+                <ol className="ed-items">
+                  {draft.items.map((it, i) => (
+                    <ItemRow
+                      key={it.key}
+                      item={it}
+                      index={i}
+                      total={draft.items.length}
+                      poi={it.kind === 'photo' && it.photo?.poiId ? (poiById.get(it.photo.poiId) ?? null) : null}
+                      themeVisibility={draft.visibility}
+                      menuOpen={menuKey === it.key}
+                      dropPos={over?.key === it.key ? over.pos : null}
+                      dragging={dragKey === it.key}
+                      actions={actions}
+                    />
+                  ))}
+                </ol>
               )}
             </section>
-          )}
-        </div>
 
-        <div className="ed-bar">
-          <div className="ed-bar-inner">
-            <div
-              className="ed-status"
-              role={shownMsg?.kind === 'error' ? 'alert' : 'status'}
-              data-kind={shownMsg?.kind ?? (dirty ? 'dirty' : undefined)}
-            >
-              {shownMsg ? shownMsg.text : dirty ? '有未保存的修改' : ''}
-              {shownMsg?.kind === 'ok' && themeId && (
-                <>
-                  {' '}
-                  <Link href={`/t/${themeId}`}>查看游记</Link>
-                </>
-              )}
-            </div>
-            <div className="row" style={{ gap: 8 }}>
-              <Link href={themeId ? `/t/${themeId}` : '/themes?mine=1'} className="btn btn-quiet">
-                {themeId ? '返回' : '取消'}
-              </Link>
-              <button type="submit" className="btn btn-primary" disabled={!canSave}>
-                {saving ? '保存中…' : '保存'}
-              </button>
+            {themeId && (
+              <section className="ed-sec ed-danger" aria-labelledby="ed-del">
+                <h2 id="ed-del" className="ed-h">
+                  删除主题
+                </h2>
+                {!confirmDelete ? (
+                  <div>
+                    <button id="th-delete" type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)}>
+                      <Icon name="trash" size={18} />
+                      删除主题
+                    </button>
+                  </div>
+                ) : (
+                  <div className="notice ed-confirm" role="alert">
+                    <p>确定删除这个主题吗？照片不会被删除，但主题和其中的文字无法恢复。</p>
+                    <div className="row">
+                      <button type="button" className="btn btn-danger" disabled={deleting} onClick={() => void destroy()}>
+                        {deleting ? '删除中…' : '确认删除'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-quiet"
+                        autoFocus
+                        disabled={deleting}
+                        onClick={() => {
+                          setConfirmDelete(false);
+                          requestAnimationFrame(() => document.getElementById('th-delete')?.focus());
+                        }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
+
+          <div className="ed-bar">
+            <div className="ed-bar-inner">
+              <div
+                className="ed-status"
+                role={shownMsg?.kind === 'error' ? 'alert' : 'status'}
+                data-kind={shownMsg?.kind ?? (dirty ? 'dirty' : undefined)}
+              >
+                {shownMsg ? shownMsg.text : dirty ? '有未保存的修改' : ''}
+                {shownMsg?.kind === 'ok' && themeId && (
+                  <>
+                    {' '}
+                    <Link href={`/t/${themeId}`}>查看游记</Link>
+                  </>
+                )}
+              </div>
+              <div className="row" style={{ gap: 8 }}>
+                <Link href={themeId ? `/t/${themeId}` : '/themes?mine=1'} className="btn btn-quiet">
+                  {themeId ? '返回' : '取消'}
+                </Link>
+                <button type="submit" className="btn btn-primary" disabled={!canSave}>
+                  {saving ? '保存中…' : '保存'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </form>
+        </form>
+      </main>
 
       <PhotoPicker
         open={pickerOpen}

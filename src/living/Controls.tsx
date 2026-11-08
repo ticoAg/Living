@@ -26,6 +26,15 @@ interface Props {
   onEngage: (kind: 'pointer' | 'focus', engaged: boolean) => void;
 }
 
+/** True when focus arrived by keyboard (or when the browser cannot tell). */
+function keyboardFocus(el: Element): boolean {
+  try {
+    return el.matches(':focus-visible');
+  } catch {
+    return true;
+  }
+}
+
 /** Bottom-centre pill (prev, play/pause, next, counter | settings, fullscreen, exit) and the 2 px progress line. */
 export default function Controls(p: Props) {
   const canStep = p.count > 1;
@@ -39,7 +48,7 @@ export default function Controls(p: Props) {
         onPointerEnter={(e) => e.pointerType !== 'touch' && p.onEngage('pointer', true)}
         onPointerLeave={() => p.onEngage('pointer', false)}
         // Only keyboard focus pins the bar; a button focused by a mouse click must not keep it up forever.
-        onFocus={(e) => e.target.matches(':focus-visible') && p.onEngage('focus', true)}
+        onFocus={(e) => keyboardFocus(e.target) && p.onEngage('focus', true)}
         onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && p.onEngage('focus', false)}
       >
         <button type="button" className="lv-btn" aria-label="上一张" disabled={!canStep} onClick={p.onPrev}>
@@ -68,7 +77,7 @@ export default function Controls(p: Props) {
           <Icon name="sliders" size={20} />
         </button>
         {p.fullscreenSupported && (
-          <button type="button" className="lv-btn lv-btn-fs" aria-label={p.fullscreenActive ? '退出全屏' : '全屏'} aria-pressed={p.fullscreenActive} onClick={p.onFullscreen}>
+          <button type="button" className="lv-btn lv-btn-fs" aria-label={p.fullscreenActive ? '退出全屏' : '全屏'} data-on={p.fullscreenActive} onClick={p.onFullscreen}>
             <Icon name="expand" size={18} />
           </button>
         )}

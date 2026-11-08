@@ -42,12 +42,16 @@ function renderLine(line: string): ReactNode[] {
 /** Paragraphs of lines, from raw text with any line-ending style. */
 export function toParagraphs(text: string | null | undefined): string[][] {
   if (!text) return [];
-  return text
-    .replace(/\r\n?/g, '\n')
-    .trim()
-    .split(/\n\s*\n/)
-    .map((p) => p.split('\n').map((l) => l.trimEnd()))
-    .filter((lines) => lines.some((l) => l.trim()));
+  return (
+    text
+      .replace(/\r\n?/g, '\n')
+      // drop blank lines around the text, but keep a first line's own indentation (全角空格)
+      .replace(/^\s*\n/, '')
+      .replace(/\s+$/, '')
+      .split(/\n\s*\n/)
+      .map((p) => p.split('\n').map((l) => l.trimEnd()))
+      .filter((lines) => lines.some((l) => l.trim()))
+  );
 }
 
 export default function Prose({ text, className }: { text: string | null | undefined; className?: string }) {

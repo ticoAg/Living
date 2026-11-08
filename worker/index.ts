@@ -23,7 +23,11 @@ const app = new Hono<AppEnv>({ strict: false });
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const isLoopback = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
 
-/** `Origin` must be this site. In local development the Vite dev server (another loopback port) is allowed too. */
+/**
+ * `Origin` must be this site. When the Worker is not served over HTTPS (local `wrangler dev`, which also rewrites the
+ * request host to the route's), loopback origins such as the Vite dev server are allowed too: the Secure session cookie
+ * is never sent over plain HTTP, so there is nothing to forge there.
+ */
 function originAllowed(origin: string, self: URL, siteUrl: string | undefined): boolean {
   let o: URL;
   try {
@@ -37,7 +41,7 @@ function originAllowed(origin: string, self: URL, siteUrl: string | undefined): 
   } catch {
     // misconfigured SITE_URL: ignore
   }
-  return isLoopback(self.hostname) && isLoopback(o.hostname);
+  return self.protocol !== 'https:' && isLoopback(o.hostname);
 }
 
 // Writes must come from the site itself (CSRF). Clients that send neither Origin nor Sec-Fetch-Site are not browsers.

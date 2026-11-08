@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useDeferredValue, useEffect, useMemo, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import type { PhotoSummary } from '../../shared/types';
 import { Icon } from '../components/icons';
@@ -52,9 +52,11 @@ export default function Gallery({ owner }: { owner?: string }) {
 
   const { photos, error, reload } = usePhotoList(owner ? `owner=${enc(owner)}` : '');
   const { tree, error: tagsError } = useTagTree(owner);
-  const { byId: poiById } = usePoiList(owner);
+  const { pois, byId: poiById, error: poisError } = usePoiList(owner);
 
   const tagsReady = !!tree || !!tagsError;
+  // captions need the places; wait for them (or their failure) so tiles do not change text after appearing
+  const poisReady = !!pois || !!poisError;
   const effTree = tree ?? EMPTY_TREE;
   // tag ids from a shared link that this viewer cannot see (someone else's custom tags) are ignored
   const selected = useMemo(() => rawTags.filter((id) => effTree.byId.has(id)), [rawTags, effTree]);
@@ -72,6 +74,8 @@ export default function Gallery({ owner }: { owner?: string }) {
   const shown = useMemo(() => (city ? byTag.filter((p) => p.city === city) : byTag), [byTag, city]);
   const ordered = useMemo(() => (sort === 'shuffle' ? shuffled(shown) : shown), [shown, sort]);
   const counts = useMemo(() => inclusiveCounts(shown, effTree), [shown, effTree]);
+  // chips and the count answer at once; the (large) tile list catches up right behind them
+  const listed = useDeferredValue(ordered);
   const cityHasResults = useMemo(() => new Set(byTag.map((p) => p.city)), [byTag]);
 
   useEffect(() => {
@@ -91,7 +95,7 @@ export default function Gallery({ owner }: { owner?: string }) {
   let body: ReactNode;
   if (error) {
     body = <LoadError error={error} onRetry={reload} />;
-  } else if (!photos || (rawTags.length > 0 && !tagsReady)) {
+  } else if (!photos || !poisReady || (rawTags.length > 0 && !tagsReady)) {
     body = (
       <div className="gal-masonry gal-skel" aria-hidden="true">
         {SKELETON_RATIOS.map((r, i) => (
@@ -121,7 +125,7 @@ export default function Gallery({ owner }: { owner?: string }) {
   } else {
     body = (
       <div className="gal-masonry">
-        {ordered.map((p) => (
+        {listed.map((p) => (
           <GalleryTile key={p.id} photo={p} poi={p.poiId ? poiById.get(p.poiId) : undefined} />
         ))}
       </div>

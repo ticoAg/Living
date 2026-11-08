@@ -5,7 +5,7 @@ import { useSession } from '../lib/session';
 
 /** User-facing text for a failed request. */
 export function errMsg(e: unknown, fallback = '出错了，请稍后再试'): string {
-  if (e instanceof ApiError) return e.status === 401 ? '登录已过期，请重新登录' : e.message || fallback;
+  if (e instanceof ApiError) return e.message || fallback;
   if (e instanceof DOMException && e.name === 'AbortError') return '已取消';
   if (e instanceof TypeError) return '网络不通，请检查网络后重试';
   if (e instanceof Error && e.message) return e.message;

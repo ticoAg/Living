@@ -82,9 +82,9 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
   };
 
   return (
-    <div className="pk-panel">
-      <header className="pk-head">
-        <h2 id={titleId} className="pk-title">
+    <div className="pp-panel">
+      <header className="pp-head">
+        <h2 id={titleId} className="pp-title">
           添加照片
         </h2>
         <button type="button" className="btn btn-ghost btn-icon" aria-label="关闭" onClick={onClose}>
@@ -92,14 +92,14 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
         </button>
       </header>
 
-      <div className="pk-filters">
-        <div className="pk-dates">
+      <div className="pp-filters">
+        <div className="pp-dates">
           <div className="field">
-            <label className="label" htmlFor="pk-from">
+            <label className="label" htmlFor="pp-from">
               开始日期
             </label>
             <input
-              id="pk-from"
+              id="pp-from"
               type="date"
               className="input"
               value={start}
@@ -111,11 +111,11 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
             />
           </div>
           <div className="field">
-            <label className="label" htmlFor="pk-to">
+            <label className="label" htmlFor="pp-to">
               结束日期
             </label>
             <input
-              id="pk-to"
+              id="pp-to"
               type="date"
               className="input"
               value={end}
@@ -141,29 +141,29 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
           )}
         </div>
         {groups.length > 0 && (
-          <details className="pk-tags" open={tagIds.length > 0 || undefined}>
+          <details className="pp-tags">
             <summary>
               标签
-              {tagNames.length > 0 && <span className="pk-tags-on">{tagNames.join('、')}</span>}
+              {tagNames.length > 0 && <span className="pp-tags-on">{tagNames.join('、')}</span>}
             </summary>
-            <div className="pk-taglist">
+            <div className="pp-taglist">
               {groups.map(({ root, nodes }) => (
-                <div key={root.id} className="pk-taggroup">
-                  {root.children.length > 0 && <span className="pk-taggroup-name">{root.name}</span>}
-                  <div className="pk-chips">
+                <div key={root.id} className="pp-taggroup">
+                  {root.children.length > 0 && <span className="pp-taggroup-name">{root.name}</span>}
+                  <div className="pp-chips">
                     {nodes.map((n) => (
                       <button
                         key={n.id}
                         type="button"
-                        className="chip chip-outline pk-chip"
+                        className="chip chip-outline pp-chip"
                         data-depth={n.depth}
                         aria-pressed={tagIds.includes(n.id)}
                         title={tree.path(n.id).join(' / ')}
                         onClick={() => toggleTag(n.id)}
                       >
-                        {isSwatch(n) && <span className="pk-dot" style={{ background: swatchFill(n.color) }} aria-hidden="true" />}
+                        {isSwatch(n) && <span className="pp-dot" style={{ background: swatchFill(n.color) }} aria-hidden="true" />}
                         {n.name}
-                        <span className="mono pk-chip-n">{counts.get(n.id) ?? 0}</span>
+                        <span className="mono pp-chip-n">{counts.get(n.id) ?? 0}</span>
                       </button>
                     ))}
                   </div>
@@ -174,7 +174,7 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
         )}
       </div>
 
-      <div className="pk-scroll">
+      <div className="pp-scroll">
         {photosReq.error ? (
           <div className="th-empty" role="alert">
             <p className="th-empty-title">照片加载失败</p>
@@ -188,19 +188,19 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
           <p className="loading">{photos && photos.length === 0 ? '你还没有照片，先去上传。' : '没有符合条件的照片。'}</p>
         ) : (
           <>
-            <ul className="pk-grid">
+            <ul className="pp-grid">
               {filtered.slice(0, limit).map((p) => {
                 const added = existing.has(p.id);
                 const on = selected.has(p.id);
                 const label = [fmtDay(p.takenAt), p.title ?? p.city, added ? '已在主题里' : ''].filter(Boolean).join('，') || '照片';
                 return (
                   <li key={p.id}>
-                    <button type="button" className="pk-cell" aria-pressed={on} aria-label={label} disabled={added} onClick={() => toggle(p.id)}>
+                    <button type="button" className="pp-cell" aria-pressed={on} aria-label={label} disabled={added} onClick={() => toggle(p.id)}>
                       <Img photo={p} ratio="1 / 1" sizes="(max-width: 640px) 34vw, 160px" alt="" />
-                      <span className="pk-date mono">{p.takenAt ? fmtDay(p.takenAt) : '无日期'}</span>
-                      {added && <span className="pk-added">已添加</span>}
+                      <span className="pp-date mono">{p.takenAt ? fmtDay(p.takenAt) : '无日期'}</span>
+                      {added && <span className="pp-added">已添加</span>}
                       {on && (
-                        <span className="pk-check" aria-hidden="true">
+                        <span className="pp-check" aria-hidden="true">
                           <Icon name="check" size={16} />
                         </span>
                       )}
@@ -210,7 +210,7 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
               })}
             </ul>
             {filtered.length > limit && (
-              <div className="pk-more">
+              <div className="pp-more">
                 <button type="button" className="btn" onClick={() => setLimit((n) => n + PAGE)}>
                   显示更多（还有 {filtered.length - limit} 张）
                 </button>
@@ -220,16 +220,16 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
         )}
       </div>
 
-      <footer className="pk-foot">
-        <div className="pk-stat" aria-live="polite">
+      <footer className="pp-foot">
+        <div className="pp-stat" aria-live="polite">
           <span>
             <b className="mono">{filtered?.length ?? 0}</b> 张{alreadyIn > 0 && <span className="muted">，{alreadyIn} 张已添加</span>}
           </span>
-          <span className="pk-stat-sel">
+          <span className="pp-stat-sel">
             已选 <b className="mono">{selected.size}</b>
           </span>
         </div>
-        <div className="pk-acts">
+        <div className="pp-acts">
           {addable.length > 0 && (
             <button type="button" className="btn btn-ghost" onClick={() => setSelected(new Set([...selected, ...addable.map((p) => p.id)]))}>
               全选
@@ -254,6 +254,8 @@ export default function PhotoPicker(props: Props) {
   const { open, onClose } = props;
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  // a press that starts inside the panel and ends on the backdrop (text selection, a date picker) must not close it
+  const pressedBackdrop = useRef(false);
 
   useEffect(() => {
     const d = ref.current;
@@ -265,15 +267,18 @@ export default function PhotoPicker(props: Props) {
   return (
     <dialog
       ref={ref}
-      className="pk"
+      className="pp"
       aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
       }}
       onClose={onClose}
+      onMouseDown={(e) => {
+        pressedBackdrop.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (pressedBackdrop.current && e.target === e.currentTarget) onClose();
       }}
     >
       {open && <Body existing={props.existing} from={props.from} to={props.to} onAdd={props.onAdd} onClose={onClose} titleId={titleId} />}

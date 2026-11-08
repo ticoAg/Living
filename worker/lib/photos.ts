@@ -102,7 +102,6 @@ export function toSummary(r: PhotoRow, viewer: string | null): PhotoSummary {
 export async function toDetail(db: D1Database, r: PhotoRow, viewer: string | null): Promise<PhotoDetail> {
   const g = geoFor(r, viewer);
   const hidden = g.level === 'hidden';
-  const mine = viewer === r.owner_id;
   const [poiRow, themes] = await Promise.all([
     r.poi_id && !hidden ? getPoiRow(db, r.poi_id) : Promise.resolve(null),
     // Themes the viewer may see; unlisted themes are not advertised from a photo page.
@@ -122,7 +121,7 @@ export async function toDetail(db: D1Database, r: PhotoRow, viewer: string | nul
     district: hidden ? null : (r.district ?? null),
     poi: poiRow ? toPoi(poiRow) : null,
     poiDistance: hidden ? null : (r.poi_distance ?? null),
-    poiMethod: hidden && !mine ? null : (r.poi_method ?? null),
+    poiMethod: hidden ? null : (r.poi_method ?? null),
     camera: r.camera ?? null,
     lens: r.lens ?? null,
     focal: r.focal ?? null,

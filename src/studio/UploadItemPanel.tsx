@@ -59,9 +59,11 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
           </figure>
 
           <ExifList x={{ ...item.p.exif, width: item.p.width, height: item.p.height, bytes: item.file.size }} />
-          <p className="small muted up-variants">
-            已生成 {(['s', 'm', 'l'] as const).map((k) => `${item.p!.variants[k].w}×${item.p!.variants[k].h}（${fmtBytes(item.p!.variants[k].blob.size)}）`).join(' · ')}，不含 EXIF。
-          </p>
+          {item.publish.state !== 'done' && (
+            <p className="small muted up-variants">
+              已生成 {(['s', 'm', 'l'] as const).map((k) => `${item.p!.variants[k].w}×${item.p!.variants[k].h}（${fmtBytes(item.p!.variants[k].blob.size)}）`).join(' · ')}，不含 EXIF。
+            </p>
+          )}
 
           <section className="up-section" aria-label="地点">
             <h3 className="up-sub serif">地点</h3>

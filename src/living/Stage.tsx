@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { PhotoSummary } from '../../shared/types';
 import Img from '../components/Img';
+import { useLatest } from './hooks';
+import { STAGE_SIZES } from './preload';
 import type { Fit, Fx } from './settings';
 
 /** Crossfade length. Matches the spec: fade = 1.4 s. */
@@ -62,12 +64,14 @@ interface Props {
   everySec: number;
   /** freeze the slow zoom while paused */
   paused: boolean;
-  /** srcset hint: the picture always spans the viewport */
-  sizes?: string;
+  /** a photo finished loading and is now on screen */
+  onShown?: () => void;
+  /** a photo's image could not be loaded */
+  onBroken?: (id: string) => void;
 }
 
 /** Two (briefly three) stacked layers keyed by photo id; the newest is on top. */
-export default function Stage({ photo, fit, fx, everySec, paused, sizes = '100vw' }: Props) {
+export default function Stage({ photo, fit, fx, everySec, paused, onShown, onBroken }: Props) {
   const [st, setSt] = useState<StageState>({ id: null, z: 0, layers: [] });
   const id = photo?.id ?? null;
   if (st.id !== id) setSt(advance(st, photo));
@@ -77,6 +81,16 @@ export default function Stage({ photo, fit, fx, everySec, paused, sizes = '100vw
     fxRef.current = fx;
   });
   const onReady = useCallback((photoId: string) => setSt((s) => markReady(s, photoId, fxRef.current === 'cut')), []);
+  const shownRef = useLatest(onShown);
+  const brokenRef = useLatest(onBroken);
+  const onLoaded = useCallback(
+    (photoId: string) => {
+      onReady(photoId);
+      shownRef.current?.();
+    },
+    [onReady, shownRef]
+  );
+  const onFailed = useCallback((photoId: string) => brokenRef.current?.(photoId), [brokenRef]);
 
   // Give up waiting for a photo that does not load.
   const waiting = st.layers.find((l) => !l.ready)?.photo.id ?? null;
@@ -98,7 +112,7 @@ export default function Stage({ photo, fit, fx, everySec, paused, sizes = '100vw
   return (
     <div className="lv-layers" aria-hidden="true">
       {st.layers.map((l) => (
-        <Layer key={l.photo.id} rec={l} fit={fit} fx={fx} everySec={everySec} paused={paused} sizes={sizes} onReady={onReady} />
+        <Layer key={l.photo.id} rec={l} fit={fit} fx={fx} everySec={everySec} paused={paused} onLoaded={onLoaded} onFailed={onFailed} />
       ))}
     </div>
   );
@@ -110,11 +124,11 @@ interface LayerProps {
   fx: Fx;
   everySec: number;
   paused: boolean;
-  sizes: string;
-  onReady: (id: string) => void;
+  onLoaded: (id: string) => void;
+  onFailed: (id: string) => void;
 }
 
-function Layer({ rec, fit, fx, everySec, paused, sizes, onReady }: LayerProps) {
+function Layer({ rec, fit, fx, everySec, paused, onLoaded, onFailed }: LayerProps) {
   const ref = useRef<HTMLDivElement>(null);
   // Commit the opacity:0 style once, so that the later change to 1 runs as a transition.
   useLayoutEffect(() => {
@@ -122,8 +136,23 @@ function Layer({ rec, fit, fx, everySec, paused, sizes, onReady }: LayerProps) {
   }, []);
 
   const { photo } = rec;
+  // Img does not report failures, so watch its <img> directly.
+  useEffect(() => {
+    const img = ref.current?.querySelector('img');
+    if (!img) return;
+    const fail = () => onFailed(photo.id);
+    if (img.complete && img.naturalWidth === 0 && img.currentSrc) fail();
+    img.addEventListener('error', fail);
+    return () => img.removeEventListener('error', fail);
+  }, [photo.id, onFailed]);
+
   const visible = rec.ready && !rec.out;
   const drift = fx === 'drift';
+  // A new zoom length (or turning the zoom on) must restart the animation. Swapping between two
+  // identical keyframe names does that without remounting the image.
+  const zoomSig = `${drift}:${everySec}`;
+  const [zoom, setZoom] = useState({ sig: zoomSig, n: 0 });
+  if (zoom.sig !== zoomSig) setZoom({ sig: zoomSig, n: zoom.n + 1 });
   const style = {
     zIndex: rec.z,
     opacity: visible ? 1 : 0,
@@ -137,9 +166,8 @@ function Layer({ rec, fit, fx, everySec, paused, sizes, onReady }: LayerProps) {
 
   return (
     <div ref={ref} className="lv-layer" style={style} data-photo={photo.id} data-ready={rec.ready} data-out={rec.out}>
-      {/* Re-keyed when the zoom settings change so the animation restarts with the new length. */}
-      <div key={`${drift}:${everySec}`} className="lv-drift" data-drift={drift} data-paused={paused} style={driftStyle}>
-        <Img photo={photo} fit={fit} ratio="fill" sizes={sizes} alt="" eager onLoad={() => onReady(photo.id)} />
+      <div className="lv-drift" data-drift={drift} data-seq={zoom.n % 2} data-paused={paused} style={driftStyle}>
+        <Img photo={photo} fit={fit} ratio="fill" sizes={STAGE_SIZES} alt="" eager onLoad={() => onLoaded(photo.id)} />
       </div>
     </div>
   );

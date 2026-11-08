@@ -25,6 +25,9 @@ export interface Draft {
   items: DraftItem[];
 }
 
+/** What the API accepts in one theme (PUT /api/themes/:id/items). */
+export const MAX_ITEMS = 1000;
+
 let seq = 0;
 export const nextKey = () => `k${++seq}`;
 
@@ -94,6 +97,7 @@ export function itemsPayload(items: readonly DraftItem[]): PutThemeItemsBody['it
 export function validate(d: Draft): { text: string; field: string } | null {
   if (!d.title.trim()) return { text: '请填写标题', field: 'th-title' };
   if (d.kind === 'trip' && d.startDate && d.endDate && d.endDate < d.startDate) return { text: '结束日期不能早于开始日期', field: 'th-end' };
+  if (itemsPayload(d.items).length > MAX_ITEMS) return { text: `一个主题最多 ${MAX_ITEMS} 个条目，请先移除一些`, field: 'th-add-photo' };
   const undated = d.items.findIndex((it) => it.kind === 'day' && !it.day);
   if (undated >= 0) return { text: `第 ${undated + 1} 项是日期分段，请选择日期`, field: `th-day-${d.items[undated].key}` };
   return null;

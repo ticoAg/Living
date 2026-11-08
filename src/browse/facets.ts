@@ -17,9 +17,12 @@ interface Taggable {
   takenAt: string | null;
 }
 
-/** Season of a photo: the preset season tag (or a child of it), else the northern-hemisphere month. */
-export function seasonOf(p: Taggable, tree: TagTree | undefined): string {
-  const set = tree ? tree.expand(p.tagIds) : new Set(p.tagIds);
+/**
+ * Season of a photo: the preset season tag (or a child of it), else the northern-hemisphere month.
+ * Pass `expanded` (tree.expand of the photo's tags) when it is already at hand.
+ */
+export function seasonOf(p: Taggable, tree: TagTree | undefined, expanded?: ReadonlySet<string>): string {
+  const set = expanded ?? (tree ? tree.expand(p.tagIds) : new Set(p.tagIds));
   for (const s of SEASONS) if (set.has(s.id)) return s.id;
   const m = p.takenAt ? Number(p.takenAt.slice(5, 7)) : 0;
   if (m >= 3 && m <= 5) return 'spring';

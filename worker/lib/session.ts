@@ -26,6 +26,9 @@ export function toSessionUser(r: UserRow): SessionUser {
 
 /** Creates the KV session and sets the cookie. */
 export async function startSession(c: Ctx, userId: string): Promise<void> {
+  // A fresh token per sign-in; retire the one this browser presented, if any.
+  const previous = getCookie(c, SESSION_COOKIE);
+  if (previous && TOKEN_RE.test(previous)) await c.env.KV.delete(`sess:${previous}`).catch(() => {});
   const token = randomToken(32);
   await c.env.KV.put(`sess:${token}`, JSON.stringify({ userId, createdAt: nowIso() }), { expirationTtl: SESSION_TTL });
   setCookie(c, SESSION_COOKIE, token, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: SESSION_TTL });

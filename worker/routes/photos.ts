@@ -32,7 +32,7 @@ photos.get('/', async (c) => {
   const ownerHandle = c.req.query('owner');
   const poi = c.req.query('poi');
   const idsParam = c.req.query('ids');
-  const wantMine = c.req.query('mine') === '1';
+  const wantMine = ['1', 'true'].includes(c.req.query('mine') ?? '');
   if (wantMine && !viewer) throw unauthenticated();
 
   let ids: string[] | null = null;
@@ -62,8 +62,11 @@ photos.get('/', async (c) => {
 
   const res = await prepQ(
     db,
+    // Newest capture first; photos without a capture time (NULL sorts last when descending) fall back to upload order.
+    // rowid is insertion order, so ties follow upload time and the (visibility|owner_id, taken_at) indexes serve the
+    // ordering without a sort, stopping at the limit.
     `SELECT ${SUMMARY_COLS} FROM ${PHOTO_FROM} WHERE ${where.join(' AND ')}
-     ORDER BY p.taken_at DESC, p.uploaded_at DESC, p.id DESC LIMIT ${LIST_LIMIT}`,
+     ORDER BY p.taken_at DESC, p.rowid DESC LIMIT ${LIST_LIMIT}`,
     q
   ).all<PhotoRow>();
 
@@ -119,10 +122,10 @@ photos.post('/', async (c) => {
   const kinds = {} as Record<(typeof sizes)[number], { ext: 'webp' | 'jpg'; type: string }>;
   for (const k of sizes) {
     const part = form.get(k);
-    if (!isFile(part) || part.size === 0) throw invalid(`缺少尺寸图 ${k}`);
-    if (part.size > MAX_VARIANT_BYTES) throw tooLarge(`尺寸图 ${k} 太大`);
+    if (!isFile(part) || part.size === 0) throw invalid(`缺少尺寸图「${k}」`);
+    if (part.size > MAX_VARIANT_BYTES) throw tooLarge(`尺寸图「${k}」太大`);
     files[k] = part;
-    kinds[k] = await variantKind(part, `尺寸图 ${k}`);
+    kinds[k] = await variantKind(part, `尺寸图「${k}」`);
   }
 
   // Same owner + same bytes → 409 with the existing photo.

@@ -158,6 +158,14 @@ export function providerFor(env: Env, lat: number, lng: number): 'amap' | 'osm' 
   return env.AMAP_KEY && !outOfChina(lat, lng) ? 'amap' : 'osm';
 }
 
+/** Merge local and provider places (dedupe), score them against the photo, best first. */
+export function rank(local: RawPlace[], external: RawPlace[], at: { lat: number; lng: number; heading: number | null }): MatchCandidate[] {
+  return [...local, ...dedupe(local, external, at)]
+    .map((p) => score(p, at))
+    .sort((a, b) => a.score - b.score || Number(b.source === 'local') - Number(a.source === 'local') || a.name.localeCompare(b.name))
+    .slice(0, MAX_CANDIDATES);
+}
+
 export async function matchPlaces(env: Env, userId: string, input: MatchInput): Promise<MatchResponse> {
   const { lat, lng, radius } = input;
   const provider = providerFor(env, lat, lng);
@@ -173,12 +181,7 @@ export async function matchPlaces(env: Env, userId: string, input: MatchInput): 
   if (!geo.ok) console.warn(`match: ${provider} reverse geocode failed`, geo.error instanceof Error ? geo.error.message : geo.error);
 
   const area: Geocode = geo.ok ? geo.value : { city: null, district: null };
-  const remote = external.ok ? dedupe(local, external.value.map((e) => fromExternal(e, area)), { lat, lng }) : [];
-
-  const candidates = [...local, ...remote]
-    .map((p) => score(p, input))
-    .sort((a, b) => a.score - b.score || Number(b.source === 'local') - Number(a.source === 'local') || a.name.localeCompare(b.name))
-    .slice(0, MAX_CANDIDATES);
+  const candidates = rank(local, external.ok ? external.value.map((e) => fromExternal(e, area)) : [], input);
 
   // Without a geocoder answer, the nearest local place still tells which city/district this is.
   const nearest = candidates.find((c) => c.city || c.district);

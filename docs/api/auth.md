@@ -20,7 +20,7 @@ tags: [api, account]
 - `password`：至少 8 个字符。`displayName`：1–40 字符。
 - `needsSetup` 时必须提供角色为 `owner` 的有效邀请码。之后按 `registration`：`invite` 需要有效邀请码；`open` 不需要（提供则按邀请码角色）；`closed` 返回 403。
 - 邀请码有效 = 存在、未使用、未过期；使用后写入 `used_by`、`used_at`，用户角色取邀请码的 `role`。
-- 密码存储：`pbkdf2$100000$<salt base64>$<hash base64>`，SHA-256，32 字节输出。
+- 密码存储：`pbkdf2$<迭代次数>$<salt base64>$<hash base64>`，SHA-256，32 字节输出；新密码用 2 万次迭代，校验接受最多 10 万次。
 - 新用户不会复制预置标签；预置标签通过 `owner_id IS NULL` 对所有人可见。
 
 # POST /api/auth/login

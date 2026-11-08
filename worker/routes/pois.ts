@@ -9,7 +9,7 @@ import { likeContains, prepQ, Sql } from '../lib/sql';
 import { has, optNum, optText, reqStr, strArray } from '../lib/validate';
 import { photoList, photoLocation } from '../lib/visibility';
 import { amapText } from '../providers/amap';
-import { dedupe, fromExternal, fromPoiRow, matchPlaces, providerFor, reverse, score, type RawPlace } from '../providers/match';
+import { dedupe, fromExternal, fromPoiRow, matchPlaces, score, type RawPlace } from '../providers/match';
 import { kvCached, settle } from '../providers/http';
 import { nominatimSearch } from '../providers/osm';
 
@@ -18,6 +18,7 @@ export const pois = new Hono<AppEnv>({ strict: false });
 const NEARBY_METERS = 5000;
 const NEARBY_LIMIT = 8;
 const SEARCH_LIMIT = 20;
+const SEARCH_CACHE_TTL = 24 * 60 * 60; // seconds; searches are open-ended, so keep the cache short
 
 /** Visible-photo POIs: the viewer's own photos, or public photos whose location is not hidden. */
 function visiblePhotos(q: Sql, viewer: string | null): string {
@@ -67,13 +68,13 @@ pois.get('/search', async (c) => {
   // AMap with a key; otherwise OSM Nominatim. A provider failure just leaves the local results.
   const useAmap = Boolean(c.env.AMAP_KEY);
   const key = `poi:q:${useAmap ? 'amap' : 'osm'}:${q.normalize('NFKC').toLowerCase()}`;
-  const external = await settle(kvCached(c.env.KV, key, () => (useAmap ? amapText(c.env.AMAP_KEY as string, q) : nominatimSearch(q))));
+  const external = await settle(
+    kvCached(c.env.KV, key, () => (useAmap ? amapText(c.env.AMAP_KEY as string, q) : nominatimSearch(q)), SEARCH_CACHE_TTL)
+  );
   let remote: RawPlace[] = [];
   if (external.ok) {
-    // City/district for places that carry none: the reverse geocode of the reference point, when we have one.
-    const geo = at ? await settle(reverse(c.env, providerFor(c.env, at.lat, at.lng), at.lat, at.lng)) : null;
-    const fallback = geo?.ok ? geo.value : { city: null, district: null };
-    remote = dedupe(local, external.value.map((e) => fromExternal(e, fallback)), at ?? undefined);
+    // Provider results carry their own city/district; no reference-point fallback (they may be anywhere).
+    remote = dedupe(local, external.value.map((e) => fromExternal(e, { city: null, district: null })), at ?? undefined);
   } else {
     console.warn('search: provider failed', external.error instanceof Error ? external.error.message : external.error);
   }

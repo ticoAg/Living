@@ -1,5 +1,5 @@
 import { CategoryIcon } from '../components/icons';
-import type { CaptionData } from './caption';
+import type { CaptionData } from './captionText';
 import type { Pos, Size } from './settings';
 
 interface Props {

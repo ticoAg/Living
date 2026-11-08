@@ -79,15 +79,25 @@ export const coordsOf = (it: Item): { lat: number; lng: number } | null =>
 
 const TWO_HOURS = 2 * 3600 * 1000;
 
-/** Capture instant in ms (wall clock shifted by the recorded offset when there is one). */
+const instants = new WeakMap<Processed, number | null>();
+
+/** Capture instant in ms (wall clock shifted by the recorded offset when there is one). Cached per file. */
 function instant(it: Item): number | null {
-  const x = it.p?.exif;
-  if (!x?.takenAt) return null;
-  const wall = Date.parse(`${x.takenAt}Z`);
-  if (!Number.isFinite(wall)) return null;
-  const m = x.tz ? /^([+-])(\d{2}):(\d{2})$/.exec(x.tz) : null;
-  const offset = m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : 0;
-  return wall - offset;
+  const p = it.p;
+  if (!p) return null;
+  const hit = instants.get(p);
+  if (hit !== undefined) return hit;
+  const x = p.exif;
+  let out: number | null = null;
+  if (x.takenAt) {
+    const wall = Date.parse(`${x.takenAt}Z`);
+    if (Number.isFinite(wall)) {
+      const m = x.tz ? /^([+-])(\d{2}):(\d{2})$/.exec(x.tz) : null;
+      out = wall - (m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000 : 0);
+    }
+  }
+  instants.set(p, out);
+  return out;
 }
 
 /** Nearest batch photo (±2 h) satisfying `usable`. */

@@ -31,10 +31,13 @@ html.lv-active body { overflow: hidden; overscroll-behavior: none; }
 .lv-layers { position: absolute; inset: 0; }
 .lv-layer { position: absolute; inset: 0; opacity: 0; transition: opacity var(--lv-fade, 1.4s) ease; will-change: opacity; }
 .lv-drift { position: absolute; inset: 0; }
-/* Ken Burns: scale 1 → 1.08 over the interval, then hold */
-.lv-drift[data-drift='true'] { animation: lv-drift var(--lv-drift, 10s) linear both; }
+/* Ken Burns: scale 1 → 1.08 over the interval, then hold. Two identical keyframes: switching the
+   name (data-seq) restarts the animation when the interval changes. */
+.lv-drift[data-drift='true'] { animation: lv-drift-a var(--lv-drift, 10s) linear both; }
+.lv-drift[data-drift='true'][data-seq='1'] { animation-name: lv-drift-b; }
 .lv-drift[data-paused='true'] { animation-play-state: paused; }
-@keyframes lv-drift { from { transform: scale(1); } to { transform: scale(1.08); } }
+@keyframes lv-drift-a { from { transform: scale(1); } to { transform: scale(1.08); } }
+@keyframes lv-drift-b { from { transform: scale(1); } to { transform: scale(1.08); } }
 /* The layer does the fading; keep Img's own placeholder grey and 0.5 s fade out of the picture. */
 .lv .img { background-color: transparent; }
 .lv .img > img { transition: none; }
@@ -62,7 +65,7 @@ html.lv-active body { overflow: hidden; overscroll-behavior: none; }
 .lv-caption {
   --k: 1;
   position: absolute;
-  bottom: clamp(24px, 3.6vw, 52px);
+  bottom: calc(clamp(24px, 3.6vw, 52px) + env(safe-area-inset-bottom, 0px));
   max-width: min(720px, calc(100% - var(--lv-side) - 2 * var(--lv-gutter)));
   display: flex;
   flex-direction: column;

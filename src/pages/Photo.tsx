@@ -138,14 +138,15 @@ export default function PhotoPage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.map-frame'))) return;
+      const t = e.target;
+      // typing in a field or panning the map with the arrow keys must not turn the page
+      if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.map-frame'))) return;
       if (e.key === 'ArrowLeft' && prevId) {
         e.preventDefault();
-        navigate(`/p/${prevId}`);
+        navigate(`/p/${prevId}`, { replace: true });
       } else if (e.key === 'ArrowRight' && nextId) {
         e.preventDefault();
-        navigate(`/p/${nextId}`);
+        navigate(`/p/${nextId}`, { replace: true });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -267,7 +268,7 @@ export default function PhotoPage() {
           </Link>
           <div className="pho-step">
             {prevId ? (
-              <Link href={`/p/${prevId}`} className="btn btn-ghost btn-icon" aria-label="上一张">
+              <Link href={`/p/${prevId}`} replace className="btn btn-ghost btn-icon" aria-label="上一张">
                 <Icon name="left" />
               </Link>
             ) : (
@@ -279,7 +280,7 @@ export default function PhotoPage() {
               {idx >= 0 ? `${idx + 1} / ${ids.length}` : ''}
             </span>
             {nextId ? (
-              <Link href={`/p/${nextId}`} className="btn btn-ghost btn-icon" aria-label="下一张">
+              <Link href={`/p/${nextId}`} replace className="btn btn-ghost btn-icon" aria-label="下一张">
                 <Icon name="right" />
               </Link>
             ) : (

@@ -129,7 +129,7 @@ themes.get('/', async (c) => {
   const viewer = await viewerId(c);
   const db = c.env.DB;
   const ownerHandle = c.req.query('owner');
-  const mine = c.req.query('mine') === '1';
+  const mine = ['1', 'true'].includes(c.req.query('mine') ?? '');
   if (mine && !viewer) throw unauthenticated();
 
   const q = new Sql();

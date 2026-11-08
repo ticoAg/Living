@@ -19,18 +19,14 @@ export function applySuffix(category: PoiCategory, name: string): PoiCategory {
   return (last && SUFFIX_CATEGORY[last]) || category;
 }
 
-export interface Mapped {
-  category: PoiCategory;
-}
-
 /** Substring rules, first match wins. Applied to AMap's `type` ("风景名胜;公园广场;公园"). */
 const AMAP_RULES: [RegExp, PoiCategory][] = [
   [/桥/, '桥'],
   [/寺庙|道观|教堂|清真寺|宗教|佛教|道教|基督教|伊斯兰/, '寺'],
   [/塔/, '塔'],
-  [/岛|岛屿/, '岛'],
+  [/岛/, '岛'],
   [/湖|水库|河流|水系/, '湖'],
-  [/山峰|山岳|山地|山丘|山/, '山'],
+  [/山/, '山'],
   [/海滩|海岸|海湾|海滨|沙滩|岬/, '海岸'],
   [/动物园|植物园|公园|花园|园林|游乐园|主题乐园/, '园'],
   [/城市广场|广场|步行街|商业街|古镇|老街|历史街区/, '街区'],
