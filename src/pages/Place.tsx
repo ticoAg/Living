@@ -25,7 +25,7 @@ type Nearby = Poi & { distance: number };
 
 /** /place/:id — one place: map with its matching radius and every shot position, filters, photos, neighbours. */
 export default function Place() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   const { user } = useSession();
   const res = useApi<{ poi: Poi; nearby?: Nearby[] }>(id ? `/api/pois/${enc(id)}` : null);
   const { photos } = usePhotoList(id ? `poi=${enc(id)}` : null);

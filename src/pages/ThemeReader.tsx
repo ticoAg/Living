@@ -259,7 +259,7 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
 }
 
 export default function ThemeReader() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   const { user } = useSession();
   const { data, error, reload } = useApi<unknown>(id ? `/api/themes/${encodeURIComponent(id)}` : null);
   const theme = unwrapTheme(data);

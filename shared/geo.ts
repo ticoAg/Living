@@ -66,7 +66,7 @@ export function outOfChina(lat: number, lng: number): boolean {
 }
 
 const A = 6378245.0;
-const EE = 0.00669342162296594323;
+const EE = 0.006693421622965943;
 function tLat(x: number, y: number) {
   let r = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
   r += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;

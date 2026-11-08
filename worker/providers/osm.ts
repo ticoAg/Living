@@ -120,7 +120,7 @@ export async function nominatimReverse(lat: number, lng: number): Promise<Geocod
     addressdetails: '1',
     'accept-language': 'zh-CN'
   });
-  const data = await fetchJson<{ address?: NominatimAddress; error?: string }>(`${NOMINATIM}/reverse?${qs}`, 'nominatim reverse');
+  const data = await fetchJson<{ address?: NominatimAddress; error?: string }>(`${NOMINATIM}/reverse?${qs.toString()}`, 'nominatim reverse');
   // "Unable to geocode" (open sea, no data) is a valid empty answer, not an outage.
   if (data.error) return { city: null, district: null };
   return geocodeFromAddress(data.address ?? {});
@@ -142,7 +142,7 @@ interface NominatimHit {
 /** Name search via Nominatim (used when no AMap key is configured). */
 export async function nominatimSearch(q: string): Promise<ExternalPlace[]> {
   const qs = new URLSearchParams({ format: 'jsonv2', q, limit: '10', addressdetails: '1', 'accept-language': 'zh-CN' });
-  const data = await fetchJson<NominatimHit[]>(`${NOMINATIM}/search?${qs}`, 'nominatim search');
+  const data = await fetchJson<NominatimHit[]>(`${NOMINATIM}/search?${qs.toString()}`, 'nominatim search');
   if (!Array.isArray(data)) throw new UpstreamError('nominatim search: unexpected response');
   const out: ExternalPlace[] = [];
   for (const h of data) {

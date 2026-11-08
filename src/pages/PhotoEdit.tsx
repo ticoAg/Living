@@ -306,6 +306,6 @@ function Editor({ id }: { id: string }) {
 }
 
 export default function PhotoEdit() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   return <Editor key={id} id={id} />;
 }

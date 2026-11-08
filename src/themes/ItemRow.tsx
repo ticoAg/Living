@@ -9,15 +9,15 @@ import { fmtDayHeading } from './util';
 
 /** Callbacks shared by every row. The object is created once, so rows only re-render when their own data changes. */
 export interface RowActions {
-  patch(key: string, patch: { text?: string; day?: string }): void;
-  move(key: string, delta: -1 | 1): void;
-  remove(key: string): void;
-  toggleMenu(key: string): void;
-  insert(key: string, kind: 'text' | 'day' | 'photo'): void;
-  dragStart(key: string): void;
-  dragOver(key: string, pos: 'before' | 'after'): void;
-  drop(): void;
-  dragEnd(): void;
+  patch: (key: string, patch: { text?: string; day?: string }) => void;
+  move: (key: string, delta: -1 | 1) => void;
+  remove: (key: string) => void;
+  toggleMenu: (key: string) => void;
+  insert: (key: string, kind: 'text' | 'day' | 'photo') => void;
+  dragStart: (key: string) => void;
+  dragOver: (key: string, pos: 'before' | 'after') => void;
+  drop: () => void;
+  dragEnd: () => void;
 }
 
 interface Props {

@@ -102,7 +102,7 @@ function PoiStrip({ poiId, name, category, currentId }: { poiId: string; name: s
 }
 
 export default function PhotoPage() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { user } = useSession();
 

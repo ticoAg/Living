@@ -75,7 +75,7 @@ export async function amapAround(key: string, lat: number, lng: number, radius: 
     page: '1',
     extensions: 'base'
   });
-  const data = await fetchJson<AmapPlaceResponse>(`${BASE}/place/around?${qs}`, 'amap around');
+  const data = await fetchJson<AmapPlaceResponse>(`${BASE}/place/around?${qs.toString()}`, 'amap around');
   check(data, 'amap around');
   return parseAmapPois(data.pois);
 }
@@ -83,7 +83,7 @@ export async function amapAround(key: string, lat: number, lng: number, radius: 
 /** Keyword search (v3/place/text), at most 20 results. */
 export async function amapText(key: string, keywords: string): Promise<ExternalPlace[]> {
   const qs = new URLSearchParams({ key, keywords, offset: '20', page: '1', extensions: 'base' });
-  const data = await fetchJson<AmapPlaceResponse>(`${BASE}/place/text?${qs}`, 'amap text');
+  const data = await fetchJson<AmapPlaceResponse>(`${BASE}/place/text?${qs.toString()}`, 'amap text');
   check(data, 'amap text');
   return parseAmapPois(data.pois);
 }
@@ -93,7 +93,7 @@ export async function amapRegeo(key: string, lat: number, lng: number): Promise<
   const [gLat, gLng] = wgs84ToGcj02(lat, lng);
   const qs = new URLSearchParams({ key, location: `${gLng.toFixed(6)},${gLat.toFixed(6)}`, extensions: 'base' });
   const data = await fetchJson<{ status?: string; info?: string; regeocode?: { addressComponent?: Record<string, unknown> } }>(
-    `${BASE}/geocode/regeo?${qs}`,
+    `${BASE}/geocode/regeo?${qs.toString()}`,
     'amap regeo'
   );
   if (data.status !== '1') throw new UpstreamError(`amap regeo: ${data.info ?? 'status ' + String(data.status)}`);

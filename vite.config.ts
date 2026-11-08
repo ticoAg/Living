@@ -1,14 +1,31 @@
-import { defineConfig } from 'vite';
+import { cloudflare } from '@cloudflare/vite-plugin';
 import react from '@vitejs/plugin-react';
+import { defineConfig, lazyPlugins } from 'vite-plus';
 
-// `npm run dev` serves the SPA; API and media requests go to `npm run dev:api` (wrangler dev).
 export default defineConfig({
-  plugins: [react()],
-  server: {
-    proxy: {
-      '/api': 'http://127.0.0.1:8787',
-      '/media': 'http://127.0.0.1:8787'
-    }
+  // The Cloudflare plugin runs worker/index.ts in workerd next to the SPA, with the bindings from wrangler.jsonc.
+  // `vp build` writes dist/client and dist/living; `wrangler deploy` picks them up through .wrangler/deploy.
+  plugins: lazyPlugins(() => [react(), cloudflare()]),
+  build: { chunkSizeWarningLimit: 1400 },
+  fmt: {
+    singleQuote: true,
+    printWidth: 140,
+    trailingComma: 'none',
+    // CSS keeps its one-rule-per-line layout; docs are hand-written OKF Markdown.
+    ignorePatterns: ['**/*.css', 'docs/**', 'dist/**', 'package-lock.json']
   },
-  build: { outDir: 'dist', chunkSizeWarningLimit: 1400 }
+  lint: {
+    ignorePatterns: ['dist/**', '.wrangler/**'],
+    jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
+    rules: {
+      'vite-plus/prefer-vite-plus-imports': 'error',
+      // Length limits count Unicode code points on both client and server, which is what spreading a string gives.
+      'typescript/no-misused-spread': 'off'
+    },
+    options: { typeAware: true, typeCheck: true }
+  },
+  test: {
+    include: ['{src,worker,shared}/**/*.test.ts'],
+    environment: 'node'
+  }
 });

@@ -5,7 +5,7 @@ export function norm(v: unknown): SqlValue {
   if (v === undefined || v === null) return null;
   if (typeof v === 'boolean') return v ? 1 : 0;
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  return String(v);
+  return typeof v === 'string' ? v : (JSON.stringify(v) ?? null);
 }
 
 /**

@@ -183,7 +183,7 @@ export default function AdminSection({ user }: { user: SessionUser }) {
             {invites.map((i) => {
               const used = !!i.usedAt || !!i.usedBy;
               const dead = expired(i);
-              const who = i.usedByHandle ?? (i.usedBy && !/^u_/.test(i.usedBy) ? i.usedBy : null);
+              const who = i.usedByHandle ?? (i.usedBy && !i.usedBy.startsWith('u_') ? i.usedBy : null);
               return (
                 <li key={i.code} className="se-invite" data-state={used ? 'used' : dead ? 'expired' : 'open'}>
                   <div className="se-invite-row">
