@@ -36,6 +36,8 @@ interface Props {
   fit?: boolean;
   maxZoom?: number;
   interactive?: boolean;
+  /** require Ctrl/⌘ + scroll or two fingers to move the map, so an embedded map does not trap page scrolling */
+  cooperativeGestures?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -65,7 +67,7 @@ function restyle(map: MLMap) {
 const fc = (features: Feature[]): FeatureCollection => ({ type: 'FeatureCollection', features });
 const poly = (ring: [number, number][], props: Record<string, unknown> = {}): Feature => ({ type: 'Feature', properties: props, geometry: { type: 'Polygon', coordinates: [ring] } });
 
-export default function MapView({ ariaLabel, points = [], shapes, center, zoom = 13, fit = true, maxZoom = 16, interactive = true, className, style }: Props) {
+export default function MapView({ ariaLabel, points = [], shapes, center, zoom = 13, fit = true, maxZoom = 16, interactive = true, cooperativeGestures = false, className, style }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Marker[]>([]);
@@ -85,6 +87,7 @@ export default function MapView({ ariaLabel, points = [], shapes, center, zoom =
           center: center ? [center[1], center[0]] : [120.15, 30.25],
           zoom,
           interactive,
+          cooperativeGestures,
           attributionControl: { compact: true },
           localIdeographFontFamily: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif"
         });

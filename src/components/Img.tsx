@@ -34,10 +34,11 @@ interface Props {
   /** box aspect ratio, e.g. '1 / 1'; defaults to the photo's own; 'fill' fills the parent */
   ratio?: string;
   onLoad?: () => void;
+  onError?: () => void;
 }
 
 /** Responsive photo with a ThumbHash placeholder that fades to the real image. */
-export default function Img({ photo, sizes = '(max-width: 640px) 50vw, (max-width: 1100px) 33vw, 25vw', fit = 'cover', alt, className, style, eager, ratio, onLoad }: Props) {
+export default function Img({ photo, sizes = '(max-width: 640px) 50vw, (max-width: 1100px) 33vw, 25vw', fit = 'cover', alt, className, style, eager, ratio, onLoad, onError }: Props) {
   const [loaded, setLoaded] = useState(false);
   const v = photo.variants;
   const srcSet = `${mediaUrl(v.s.key)} ${v.s.w}w, ${mediaUrl(v.m.key)} ${v.m.w}w, ${mediaUrl(v.l.key)} ${v.l.w}w`;
@@ -63,6 +64,7 @@ export default function Img({ photo, sizes = '(max-width: 640px) 50vw, (max-widt
           setLoaded(true);
           onLoad?.();
         }}
+        onError={onError}
         style={{
           objectFit: fit,
           objectPosition: photo.focus ? `${photo.focus[0] * 100}% ${photo.focus[1] * 100}%` : undefined

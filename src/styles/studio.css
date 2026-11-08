@@ -42,6 +42,7 @@
 .up-drop { position: relative; display: flex; align-items: center; gap: 18px; padding: 30px clamp(16px, 3vw, 36px); border: 1.5px dashed var(--rule-2); border-radius: 4px; background: var(--sheet); cursor: pointer; transition: border-color 0.15s, background 0.15s; }
 .up-drop:hover, .up-drop[data-active='true'] { border-color: var(--ink); background: var(--mat); }
 .up-drop:focus-within { outline: 2px solid var(--hydro); outline-offset: 2px; }
+.up-drop:not([data-compact='true']) { flex-direction: column; justify-content: center; min-height: min(44vh, 340px); text-align: center; }
 .up-drop[data-compact='true'] { padding: 14px 20px; }
 .up-drop-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .up-drop-title { font-size: 20px; letter-spacing: 0.2em; }

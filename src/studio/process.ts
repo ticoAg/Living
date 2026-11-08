@@ -419,13 +419,22 @@ export function kmeansPalette(rgba: ArrayLike<number>, k = 5, maxIter = 16): Pal
     sum[j * 3 + 2] += rgb[i * 3 + 2];
     cnt[j]++;
   }
-  const out: PaletteColor[] = [];
+  const found: PaletteColor[] = [];
   for (let j = 0; j < kk; j++) {
     if (!cnt[j]) continue;
-    out.push({ hex: toHex(sum[j * 3] / cnt[j], sum[j * 3 + 1] / cnt[j], sum[j * 3 + 2] / cnt[j]), weight: cnt[j] / n });
+    found.push({ hex: toHex(sum[j * 3] / cnt[j], sum[j * 3 + 1] / cnt[j], sum[j * 3 + 2] / cnt[j]), weight: cnt[j] / n });
   }
-  out.sort((a, b) => b.weight - a.weight);
-  return out;
+  found.sort((a, b) => b.weight - a.weight);
+
+  // A flat-coloured picture splits into several clusters of the same colour (edge pixels, noise): fold those together.
+  const out: { color: PaletteColor; lab: [number, number, number] }[] = [];
+  for (const c of found) {
+    const lab = srgbToLab(...fromHex(c.hex));
+    const twin = out.find((o) => Math.hypot(o.lab[0] - lab[0], o.lab[1] - lab[1], o.lab[2] - lab[2]) < 5);
+    if (twin) twin.color.weight += c.weight;
+    else out.push({ color: { ...c }, lab });
+  }
+  return out.map((o) => o.color);
 }
 
 /** Hue (0..360), HSV saturation and value (0..1), and chroma (max-min, 0..1) of a hex colour. */

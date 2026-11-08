@@ -10,6 +10,7 @@ sources:
 # 格式
 
 - JSON，键名 camelCase；数据库列为 snake_case，由 Worker 转换。
+- 读取单个资源（`GET /api/photos/:id`、`/api/themes/:id`、`/api/users/:handle`、`/api/site`）直接返回对象本身；列表包在复数键里（`{ "photos": [...] }`）；写操作返回包装后的对象（`{ "photo": ... }`、`{ "theme": ... }`、`{ "tag": ... }`）。
 - 时间：拍摄时间 `takenAt` 为本地时间 `YYYY-MM-DDTHH:mm:ss`（不带时区，时区另存 `tz`，如 `+08:00`）；其他时间为 UTC ISO 8601。
 - ID：带前缀的 ULID：`u_` 用户、`ph_` 照片、`poi_` 地点、`th_` 主题、`it_` 主题条目、`t_` 用户标签、`pz_` 隐私区域；预置标签用可读的英文 id（如 `lake`）。
 

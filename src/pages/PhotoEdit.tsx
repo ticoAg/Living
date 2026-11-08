@@ -11,7 +11,7 @@ import PhotoFields from '../studio/PhotoFields';
 import { diffDraft, draftOf, unwrapPhoto, type Draft } from '../studio/photo-draft';
 import PlacePicker, { PlaceSummary } from '../studio/PlacePicker';
 import { ConfirmBar, PageHead } from '../studio/ui';
-import { errMsg, fmtStamp, useRequireLogin, useTitle } from '../studio/util';
+import { errMsg, fmtStamp, useLeaveGuard, useRequireLogin, useTitle } from '../studio/util';
 import '../styles/studio.css';
 
 // /studio/photo/:id — change title, note, tags, place, privacy and focus of one of your photos, or delete it.
@@ -128,15 +128,7 @@ function Editor({ id }: { id: string }) {
   const title = base?.title || base?.poi?.name || '编辑照片';
   useTitle(title);
 
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  useLeaveGuard(dirty, '有没保存的修改，离开后会丢掉。确定离开吗？');
 
   const patch = useCallback((p: Partial<Draft>) => {
     setMsg(null);

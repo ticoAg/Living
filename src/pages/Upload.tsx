@@ -10,7 +10,7 @@ import UploadDetails from '../studio/UploadDetails';
 import UploadItemPanel from '../studio/UploadItemPanel';
 import UploadQueue from '../studio/UploadQueue';
 import { applyMatch, buildForm, coordsOf, freshMatch, isBulkReady, newItem, statusOf, type Item, type StatusKey } from '../studio/upload-model';
-import { errMsg, useRequireLogin, useTitle } from '../studio/util';
+import { errMsg, useLeaveGuard, useRequireLogin, useTitle } from '../studio/util';
 import '../styles/studio.css';
 
 // /upload — drop photos, let the browser read and resize them, confirm places, publish.
@@ -361,15 +361,7 @@ export default function Upload() {
 
   // Unpublished photos live only in this tab.
   const unsaved = items.some((i) => i.stage !== 'error' && i.publish.state !== 'done' && i.publish.state !== 'duplicate');
-  useEffect(() => {
-    if (!unsaved) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [unsaved]);
+  useLeaveGuard(unsaved, '还有没发布的照片，离开这个页面会丢掉它们。确定离开吗？');
 
   if (!ready) return <p className="loading">加载中</p>;
 

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, type CSSProperties } from 'react';
 import { Link, useParams } from 'wouter';
 import type { PhotoSummary, Poi } from '../../shared/types';
-import { dms } from '../../shared/geo';
+import { circleRing, dms } from '../../shared/geo';
 import { enc, usePhotoList, useTagTree } from '../browse/api';
 import ChipGroup from '../browse/ChipGroup';
 import { setBrowseList } from '../browse/context';
 import { DAY_PARTS, partOf, seasonOf, SEASONS } from '../browse/facets';
-import { useDocTitle, useScrollTop } from '../browse/hooks';
+import { useBoxSize, useDocTitle, useScrollTop } from '../browse/hooks';
 import { livingPlace } from '../browse/links';
+import { fitViewport } from '../browse/mapfit';
 import PlaceTile from '../browse/PlaceTile';
 import { byTakenDesc } from '../browse/sort';
 import { EmptyState, LoadError, Loading, spanText } from '../browse/ui';
@@ -77,6 +78,15 @@ export default function Place() {
         .map((p) => ({ id: p.id, lat: p.lat!, lng: p.lng!, heading: p.heading!, radius: len, muted: !visibleIds.has(p.id) }))
     };
   }, [poi, shot, visibleIds]);
+
+  // The map's starting view contains the matching circle and every shot position. It is computed here
+  // (MapView would refit on every filter toggle) so chips never undo the visitor's pan and zoom.
+  const [mapBox, mapSize] = useBoxSize<HTMLDivElement>();
+  const viewport = useMemo(() => {
+    if (!poi || !mapSize) return null;
+    const ring = circleRing(poi.lat, poi.lng, poi.radius, 16).map(([ln, la]): [number, number] => [la, ln]);
+    return fitViewport([...ring, ...shot.map((p): [number, number] => [p.lat!, p.lng!])], mapSize, { padding: 40, maxZoom: 18 });
+  }, [poi, shot, mapSize]);
 
   const thumbs = useMemo(() => {
     const first = new Map<string, PhotoSummary>();
@@ -168,7 +178,22 @@ export default function Place() {
             </div>
           </dl>
         </div>
-        <MapView className="plc-map" ariaLabel={`${poi.name}周边：匹配半径与拍摄位置`} points={points} shapes={shapes} maxZoom={18} />
+        <div ref={mapBox} className="plc-map">
+          {photos && viewport ? (
+            <MapView
+              key={poi.id}
+              className="plc-frame"
+              ariaLabel={`${poi.name}周边：匹配半径与拍摄位置`}
+              points={points}
+              shapes={shapes}
+              fit={false}
+              center={viewport.center}
+              zoom={viewport.zoom}
+            />
+          ) : (
+            <Loading label="地图加载中" />
+          )}
+        </div>
       </section>
 
       {rows.length > 1 && (

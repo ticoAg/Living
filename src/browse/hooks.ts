@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 
 /** Set the tab title while the page is mounted. */
 export function useDocTitle(title: string | null | undefined): void {
@@ -19,12 +19,14 @@ export function useScrollTop(dep: unknown): void {
   }, [dep]);
 }
 
-/** Measured size of an element; null until the first layout. */
-export function useBoxSize<T extends HTMLElement>(): [RefObject<T | null>, { w: number; h: number } | null] {
-  const ref = useRef<T>(null);
+/**
+ * Measured size of an element; null until it has been laid out. Returns a callback ref, so it also works for
+ * an element that only appears after loading (pages return early while their data is on the way).
+ */
+export function useBoxSize<T extends HTMLElement>(): [(el: T | null) => void, { w: number; h: number } | null] {
+  const [el, setEl] = useState<T | null>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   useLayoutEffect(() => {
-    const el = ref.current;
     if (!el) return;
     const measure = () => {
       const r = el.getBoundingClientRect();
@@ -35,6 +37,6 @@ export function useBoxSize<T extends HTMLElement>(): [RefObject<T | null>, { w: 
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-  return [ref, size];
+  }, [el]);
+  return [setEl, size];
 }

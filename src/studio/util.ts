@@ -106,3 +106,35 @@ export function fmtStamp(t: string | null | undefined): string {
   if (!t) return '';
   return `${t.slice(0, 10).replace(/-/g, '.')} ${t.slice(11, 16)}`;
 }
+
+/**
+ * Warn before work is lost: on closing or reloading the tab, and on clicking an in-app link to another page.
+ * (The back button cannot be intercepted.)
+ */
+export function useLeaveGuard(active: boolean, message: string) {
+  useEffect(() => {
+    if (!active) return;
+    const beforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin) return; // leaving the site: beforeunload asks
+      if (url.pathname === location.pathname && url.search === location.search) return; // same page or an anchor
+      if (!window.confirm(message)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    document.addEventListener('click', onClick, true);
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      document.removeEventListener('click', onClick, true);
+    };
+  }, [active, message]);
+}

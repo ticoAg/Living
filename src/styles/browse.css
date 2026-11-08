@@ -161,7 +161,9 @@ a.pho-strip-all:hover { color: var(--ink); }
 .plc-stats dd { margin: 0; }
 .plc-stat-n { font: 500 40px / 1 var(--latin); font-variant-numeric: lining-nums tabular-nums; }
 .plc-stats dd.mono { padding-bottom: 4px; font-size: 18px; line-height: 1.2; }
-.plc-map { flex: 999 1 560px; min-width: 0; max-width: 880px; aspect-ratio: 4 / 3; align-self: flex-start; }
+.plc-map { position: relative; flex: 999 1 560px; min-width: 0; max-width: 880px; aspect-ratio: 4 / 3; align-self: flex-start; border: 1px solid #C9CDC6; background: var(--land); }
+.plc-map .plc-frame { position: absolute; inset: 0; border: 0; }
+.plc-map > .loading { padding: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
 .plc-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin-top: -8px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
 .plc-filters > .bw-chips:first-child { margin-left: -10px; }
 .plc-shown { margin-left: auto; font-size: 13px; color: var(--ink-2); }
