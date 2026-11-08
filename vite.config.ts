@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     include: ['{src,worker,shared}/**/*.test.ts'],
-    environment: 'node'
+    environment: 'node',
+    passWithNoTests: true
   }
 }));
