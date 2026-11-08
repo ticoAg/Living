@@ -59,6 +59,21 @@ sources:
 
 格式与 lint 的设置都在 `vite.config.ts` 的 `fmt` 和 `lint` 里：单引号、不加尾随逗号、行宽 140；CSS 保持一条规则一行，`docs/` 不格式化。类型检查按就近的 `tsconfig.json` 进行：`worker/` 用 `worker/tsconfig.json`（Workers 类型），其余用根目录的 `tsconfig.json`。
 
+# 单元测试
+
+纯逻辑有单元测试：坐标换算、标签树、输入校验、地点匹配、可见性与位置隐私等。测试文件与源码放在一起，命名为 `*.test.ts`，范围见 `vite.config.ts` 的 `test.include`：
+
+```bash
+npm test                 # 跑一遍
+npx vp test watch        # 监听模式，改动后自动重跑
+npx vp test shared/geo   # 只跑路径里含 shared/geo 的测试文件
+```
+
+- 测试在 Node 里运行，不需要先构建或启动开发服务器：`mode` 为 `test` 时 `vite.config.ts` 不加载 Cloudflare 插件。
+- 不碰真实的 D1、R2、KV 和外部服务。`worker/test-utils.ts` 提供内存里的 D1、KV 替身，`fetch` 在测试里用 `vi.stubGlobal` 替换。
+- 涉及日期的测试用本地日期字段构造（如 `new Date(2026, 10, 8)`），结果不随机器时区变化。
+- `npm run build` 会先跑检查和测试，有一项失败就不会构建。
+
 # 重置本地数据
 
 删除 `.wrangler/state/` 会清空本地的 D1、R2 和 KV，然后重做第 2、3 步：
