@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { distance } from '../../shared/geo';
-import { POI_CATEGORIES, type MatchCandidate, type Poi } from '../../shared/types';
+import { POI_CATEGORIES, POI_LIMITS, type MatchCandidate, type PoiDetail } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { forbidden, invalid, listCache, notFound, paramId, readJson } from '../lib/http';
-import { getPoiRow, parseNewPoi, findOrCreatePoi, poiCols, toPoi, type PoiRow } from '../lib/poi';
-import { isStaff, requireUser, viewerId } from '../lib/session';
+import { canEditPoi, getPoiRow, parseNewPoi, findOrCreatePoi, poiCols, toPoi, toPoiDetail, type PoiRow } from '../lib/poi';
+import { currentUser, requireUser, viewerId } from '../lib/session';
 import { likeContains, prepQ, Sql } from '../lib/sql';
 import { has, optNum, optText, reqStr, strArray } from '../lib/validate';
 import { photoList, photoLocation, poiOffered } from '../lib/visibility';
@@ -145,7 +145,7 @@ pois.get('/:id', async (c) => {
   const dLng = NEARBY_METERS / (111_320 * Math.max(0.01, Math.cos((row.lat * Math.PI) / 180)));
   const q = new Sql();
   const where = visiblePhotos(q, viewer);
-  const [own, near] = await Promise.all([
+  const [own, near, user] = await Promise.all([
     (() => {
       const q2 = new Sql();
       return prepQ(c.env.DB, `SELECT COUNT(*) AS n FROM photos p WHERE p.poi_id = ${q2.p(id)} AND ${visiblePhotos(q2, viewer)}`, q2).first<{
@@ -159,7 +159,8 @@ pois.get('/:id', async (c) => {
          AND po.lng BETWEEN ${q.p(row.lng - dLng)} AND ${q.p(row.lng + dLng)} AND ${where}
        GROUP BY po.id`,
       q
-    ).all<PoiRow & { n: number }>()
+    ).all<PoiRow & { n: number }>(),
+    viewer ? currentUser(c) : null
   ]);
 
   const nearby = near.results
@@ -170,7 +171,7 @@ pois.get('/:id', async (c) => {
     .map((p) => ({ ...p, distance: Math.round(p.distance) }));
 
   listCache(c, viewer);
-  const poi: Poi = toPoi(row, own?.n ?? 0);
+  const poi: PoiDetail = toPoiDetail(row, canEditPoi(user, row), own?.n ?? 0);
   return c.json({ poi, nearby });
 });
 
@@ -178,19 +179,21 @@ pois.patch('/:id', async (c) => {
   const user = await requireUser(c);
   const row = await getPoiRow(c.env.DB, paramId(c));
   if (!row) throw notFound('地点不存在');
-  if (row.created_by !== user.id && !isStaff(user)) throw forbidden('只有地点的创建者或管理员可以修改地点');
+  if (!canEditPoi(user, row)) throw forbidden('只有地点的创建者或管理员可以修改地点');
   const body = await readJson(c);
 
   let { name, category, radius } = row;
   let aliases = row.aliases;
-  if (has(body, 'name')) name = reqStr(body, 'name', '地点名称', 1, 80);
+  if (has(body, 'name')) name = reqStr(body, 'name', '地点名称', 1, POI_LIMITS.nameMax);
   if (has(body, 'category')) {
     if (typeof body.category !== 'string' || !(POI_CATEGORIES as readonly string[]).includes(body.category)) {
       throw invalid(`地点类别需要是：${POI_CATEGORIES.join('、')}`);
     }
     category = body.category;
   }
-  if (has(body, 'radius')) radius = optNum(body.radius, '匹配半径', { min: 10, max: 5000 }) ?? row.radius;
+  if (has(body, 'radius')) {
+    radius = optNum(body.radius, '匹配半径', { min: POI_LIMITS.radiusMin, max: POI_LIMITS.radiusMax }) ?? row.radius;
+  }
   if (has(body, 'aliases')) {
     const raw = body.aliases;
     const list =
@@ -199,12 +202,12 @@ pois.patch('/:id', async (c) => {
             .split(/[,，;；、\n]/)
             .map((s) => s.trim())
             .filter(Boolean)
-        : strArray(raw, '别名', 20, 80);
-    aliases = list.length ? JSON.stringify(list.map((s) => optText(s, '别名', 80)).filter(Boolean)) : null;
+        : strArray(raw, '别名', POI_LIMITS.aliasCount, POI_LIMITS.aliasMax);
+    aliases = list.length ? JSON.stringify(list.map((s) => optText(s, '别名', POI_LIMITS.aliasMax)).filter(Boolean)) : null;
   }
 
   await c.env.DB.prepare('UPDATE pois SET name = ?1, category = ?2, radius = ?3, aliases = ?4 WHERE id = ?5')
     .bind(name, category, radius, aliases, row.id)
     .run();
-  return c.json({ poi: toPoi({ ...row, name, category, radius, aliases }) });
+  return c.json({ poi: toPoiDetail({ ...row, name, category, radius, aliases }, true) });
 });

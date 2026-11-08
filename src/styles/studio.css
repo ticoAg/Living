@@ -1,6 +1,6 @@
-/* Studio area: upload, photo editor, tag manager, account pages. Tokens and primitives come from base.css.
+/* Studio area: upload, photo editor, place editor, tag manager, account pages. Tokens and primitives come from base.css.
    Prefixes: sf- shared form bits · up- upload · pk- place picker · mp- match plot · ex- capture facts ·
-   tp- tag picker · pe- photo editor · tm- tag manager · au- login/register · se- settings. */
+   tp- tag picker · pe- photo editor · pl- place editor · tm- tag manager · au- login/register · se- settings. */
 
 /* ------------------------------------------------------------------ shared */
 .sf-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; padding: 40px 0 24px; }
@@ -239,6 +239,39 @@
 @media (min-width: 960px) {
   .pe-grid { grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr); gap: 48px; }
   .pe-side { position: sticky; top: calc(var(--header-h) + 16px); }
+}
+
+/* ------------------------------------------------------------------ place editor */
+.pl-form { display: flex; flex-direction: column; gap: 32px; }
+.pl-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 36px; align-items: start; }
+.pl-fields { display: flex; flex-direction: column; gap: 28px; }
+.pl-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.pl-cat { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid #BFC4BE; border-radius: 2px; font: 500 15px var(--serif); cursor: pointer; }
+.pl-cat:hover { background: var(--mat); }
+.pl-cat:focus-within { outline: 2px solid var(--hydro); outline-offset: 2px; }
+.pl-cat[data-checked='true'] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.pl-cat[data-disabled] { opacity: 0.5; cursor: not-allowed; }
+.pl-aliases { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pl-alias { display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; padding-left: 12px; border: 1px solid #BFC4BE; border-radius: 2px; font: 500 15px / 1.4 var(--serif); }
+.pl-alias > span { min-width: 0; padding: 8px 0; overflow-wrap: anywhere; }
+.pl-alias button { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--ink-2); cursor: pointer; }
+.pl-alias button:hover:not(:disabled) { color: var(--danger); }
+.pl-alias button:disabled { opacity: 0.4; cursor: not-allowed; }
+.pl-add { display: flex; gap: 8px; }
+.pl-add .input { flex: 1; min-width: 0; }
+.pl-radius { display: flex; flex-direction: column; gap: 12px; }
+.pl-radius-row { display: flex; align-items: center; gap: 16px; }
+.pl-radius-row .pk-range { flex: 1; width: auto; min-width: 0; }
+.pl-radius-n { flex: none; display: inline-flex; align-items: center; gap: 8px; }
+.pl-radius-n .input { width: 88px; text-align: right; }
+.pl-map { width: 100%; aspect-ratio: 4 / 3; }
+/* the place is a hydro ring, as on the place and photo pages, so it reads differently from a camera's dot */
+.pl-map .map-pt-photo { width: 13px; height: 13px; background: var(--paper); border: 2.5px solid var(--hydro); box-shadow: none; }
+.pl-coord { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.pl-error { margin: 0; flex-basis: 100%; }
+@media (min-width: 960px) {
+  .pl-grid { grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr); gap: 48px; }
+  .pl-radius { position: sticky; top: calc(var(--header-h) + 16px); }
 }
 
 /* ------------------------------------------------------------------ tag manager */

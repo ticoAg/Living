@@ -10,7 +10,12 @@ tags: [api, places]
 
 # GET /api/pois/:id
 
-`{ "poi": Poi, "nearby": (Poi & { "distance": number })[] }`：附近 5 公里内、有可见照片的地点，按距离最多 8 个。
+`{ "poi": PoiDetail, "nearby": (Poi & { "distance": number })[] }`：附近 5 公里内、有可见照片的地点，按距离最多 8 个。`PoiDetail` 是 `Poi` 加上给编辑用的两项：
+
+- `canEdit`：请求者能不能修改这个地点，即创建者、站长或管理员；未登录或没有权限时为 `false`。
+- `aliases`：别名数组，只在 `canEdit` 为 `true` 时返回。
+
+接口不返回创建者的用户 id。自建地点的坐标就是创建者拍照的位置，返回 id 会把一个人和这个位置联系起来，哪怕他的那张照片是隐藏的。
 
 # POST /api/pois/match（登录）
 
@@ -35,4 +40,13 @@ tags: [api, places]
 
 # PATCH /api/pois/:id（创建者或管理员）
 
-`{ "name"?, "category"?, "radius"?, "aliases"? }` → `{ "poi": Poi }`。
+`UpdatePoiBody`：`{ "name"?, "category"?, "radius"?, "aliases"? }` → `{ "poi": PoiDetail }`（`canEdit` 为 `true`，不含 `count`）。没写的字段保持原样。
+
+| 字段 | 规则 |
+|---|---|
+| `name` | 1 到 80 个字符，去掉首尾空白 |
+| `category` | `POI_CATEGORIES` 之一 |
+| `radius` | 数字，10 到 5000（米） |
+| `aliases` | 字符串数组，最多 20 个、每个最多 80 个字符，重复的合并；空数组清空。也可以传一个字符串，按 `,` `，` `;` `；` `、` 和换行拆开 |
+
+错误：401 未登录；403 既不是创建者也不是站长、管理员；404 地点不存在；400 字段不合规，`message` 说明是哪一项。限值在 `shared/types.ts` 的 `POI_LIMITS`，[编辑页](/product/features/places.md#编辑) 用同一份在发送前检查。

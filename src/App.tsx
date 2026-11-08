@@ -6,7 +6,7 @@ import { SessionProvider } from './lib/session';
 // Route table. Each page module is owned by one area (see /docs/architecture/frontend.md):
 // browse — Explore, Profile, Photo, Place, MapPage, IndexPage
 // living — Living
-// studio — Upload, PhotoEdit, TagsManager, Login, Register, Settings
+// studio — Upload, PhotoEdit, PlaceEdit, TagsManager, Login, Register, Settings
 // themes — Themes, ThemeReader, ThemeEditor
 const page = (load: () => Promise<{ default: ComponentType }>) => lazy(load);
 const Explore = page(() => import('./pages/Explore'));
@@ -18,6 +18,7 @@ const IndexPage = page(() => import('./pages/IndexPage'));
 const Living = page(() => import('./pages/Living'));
 const Upload = page(() => import('./pages/Upload'));
 const PhotoEdit = page(() => import('./pages/PhotoEdit'));
+const PlaceEdit = page(() => import('./pages/PlaceEdit'));
 const TagsManager = page(() => import('./pages/TagsManager'));
 const Login = page(() => import('./pages/Login'));
 const Register = page(() => import('./pages/Register'));
@@ -41,6 +42,7 @@ function Routes() {
       <Route path="/living" component={Living} />
       <Route path="/upload" component={Upload} />
       <Route path="/studio/photo/:id" component={PhotoEdit} />
+      <Route path="/studio/place/:id" component={PlaceEdit} />
       <Route path="/studio/tags" component={TagsManager} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
