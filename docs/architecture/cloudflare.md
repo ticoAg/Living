@@ -1,7 +1,7 @@
 ---
 type: Infrastructure
 title: Cloudflare 资源
-description: Living 在 Cloudflare 账号 6f12e69d… 下使用的 Worker、D1、R2、KV、自定义域名、构建配置与每小时的定时任务。
+description: Living 在 Cloudflare 账号 6f12e69d… 下使用的 Worker、D1、R2、KV、域名路由、构建配置与每小时的定时任务。
 tags: [architecture, cloudflare]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/wrangler.jsonc
@@ -19,10 +19,10 @@ sources:
 | R2 | `living-photos` | — | `MEDIA` |
 | KV | `living-kv` | `37fae53ace6d479380c48980477aa176` | `KV` |
 | 静态资源 | `./dist` | — | `ASSETS` |
-| 域名 | `living.ticoag.fun`（Worker 自定义域名，DNS 自动托管） | 区域 `c823bc358d7a051de8df8cb19c6d2736` | — |
+| 域名 | `living.ticoag.fun`，Worker 路由 `living.ticoag.fun/*`；DNS 记录（A）在区域里手动维护 | 区域 `c823bc358d7a051de8df8cb19c6d2736` | — |
 | Git 连接 | GitHub `ticoAg/Living` | 连接 `698a6c91-dcf8-461c-a196-797ace8fc0c9` | — |
 
-`workers.dev` 与预览地址关闭，只通过自定义域名访问。可观测性（Workers Logs）开启。
+`workers.dev` 与预览地址关闭，只通过这个域名访问。路由写在 `wrangler.jsonc` 的 `routes`（带 `zone_id`），每次部署照此更新；不用自定义域名（`custom_domain`），因为它要求由 Worker 托管 DNS 记录，主机名已有手动记录时部署会报错 `100117`。可观测性（Workers Logs）开启。
 
 # 定时任务
 
