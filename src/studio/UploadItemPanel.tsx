@@ -2,7 +2,7 @@ import type { Poi } from '../../shared/types';
 import ExifList from './ExifList';
 import PlacePicker from './PlacePicker';
 import type { PlaceChoice } from './match';
-import { customAtFor, coordsOf, placeOf, type Item } from './upload-model';
+import { customAtFor, coordsOf, PHASE_TEXT, placeOf, type Item } from './upload-model';
 import { StatusChip } from './UploadQueue';
 import { fmtBytes, useObjectUrl } from './util';
 
@@ -41,7 +41,11 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
       )}
       {(item.stage === 'queued' || item.stage === 'processing') && (
         <p className="muted up-wait" role="status">
-          {item.stage === 'queued' ? '排队中，前面的照片处理完就轮到它。' : '正在读取信息并生成三种尺寸…'}
+          {item.stage === 'queued'
+            ? '排队中，前面的照片处理完就轮到它。'
+            : item.phase
+              ? PHASE_TEXT[item.phase].long
+              : '正在读取信息并生成三种尺寸…'}
         </p>
       )}
 
