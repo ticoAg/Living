@@ -1,6 +1,7 @@
 # Directory Update Log
 
 ## 2026-11-08
+* **Update**: MapLibre GL 升级到 6（修复 GHSA-jrc7-96c5-q579），Worker 由 Vite 单独构建，见 [前端分区](/architecture/frontend.md)。
 * **Update**: Safari 以外的浏览器也能上传 HEIC：浏览器解不开时，用 libheif 的 WebAssembly 构建在 Worker 里解码，只在需要时加载，见 [上传](/product/features/upload.md) 和 [决策：浏览器端处理图片](/architecture/decisions/0002-client-side-images.md)。
 * **Update**: 地图页把相近的地点合并成带数字的聚合标记，点击放大展开，见 [地图](/product/features/map.md)；被筛掉的标记改由 MapLibre 设置透明度，地点页上的淡化终于生效。
 * **Update**: 地点可以编辑：创建者和站长、管理员在 `/studio/place/:id` 修改名称、类别、别名和匹配半径；接口只返回 `canEdit`，不返回创建者，见 [地点](/product/features/places.md) 和 [地点接口](/api/pois.md)。

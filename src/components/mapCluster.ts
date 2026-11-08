@@ -288,7 +288,7 @@ export function createClusterLayer(lib: Lib, map: MLMap): ClusterLayer {
       const next = pointFeatures(points);
       if (!sameFeatures(features, next)) {
         features = next;
-        (map.getSource(SOURCE) as GeoJSONSource).setData({ type: 'FeatureCollection', features: next });
+        void (map.getSource(SOURCE) as GeoJSONSource).setData({ type: 'FeatureCollection', features: next });
       }
       // the places on screen take the new state at once (a click shows its selection without waiting for the
       // worker); clusters follow when the clustering has caught up, and so does a place whose shape changed
