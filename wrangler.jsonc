@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "living",
+  "main": "worker/index.ts",
+  "account_id": "6f12e69d95b961f8dcfc1fa867859b75",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // The SPA is served from static assets; the Worker only runs first for the API and media.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/media/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "living",
+      "database_id": "4024f786-2178-4cb7-ac52-040715a2798b",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "living-photos" }],
+  "kv_namespaces": [{ "binding": "KV", "id": "37fae53ace6d479380c48980477aa176" }],
+  "routes": [{ "pattern": "living.ticoag.fun", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": { "SITE_NAME": "Living", "SITE_URL": "https://living.ticoag.fun" }
+}

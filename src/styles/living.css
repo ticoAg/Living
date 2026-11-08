@@ -1,0 +1,207 @@
+/* Living mode — fullscreen slideshow. Dark ground from the --night tokens in base.css.
+   Layout values follow the design canvas (Living · 播放, Living · 设置). Classes are prefixed lv-. */
+
+html.lv-active,
+html.lv-active body { background: var(--night); }
+html.lv-active body { overflow: hidden; overscroll-behavior: none; }
+
+.lv {
+  --lv-gutter: clamp(20px, 3.2vw, 48px);
+  --lv-edge: clamp(16px, 2.6vw, 32px);
+  /* width taken by the settings drawer; captions, clock and control bar keep to the rest */
+  --lv-side: 0px;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--night);
+  color: var(--night-ink);
+  font-family: var(--sans);
+  -webkit-tap-highlight-color: transparent;
+}
+.lv[data-drawer='open'] { --lv-side: min(400px, 100%); }
+.lv :focus-visible { outline: 2px solid var(--night-ink); outline-offset: 2px; }
+.lv button { touch-action: manipulation; }
+
+/* ---- Stage: stacked photo layers ----
+   The stage is its own stacking context (z-index: 0), so the layers' z-indexes never climb over the
+   captions and controls that follow it. */
+
+.lv-stage { position: absolute; z-index: 0; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.lv[data-ui='off'] .lv-stage { cursor: none; }
+.lv-layers { position: absolute; inset: 0; }
+.lv-layer { position: absolute; inset: 0; opacity: 0; transition: opacity var(--lv-fade, 1.4s) ease; will-change: opacity; }
+.lv-drift { position: absolute; inset: 0; }
+/* Ken Burns: scale 1 → 1.08 over the interval, then hold. Two identical keyframes: switching the
+   name (data-seq) restarts the animation when the interval changes. */
+.lv-drift[data-drift='true'] { animation: lv-drift-a var(--lv-drift, 10s) linear both; }
+.lv-drift[data-drift='true'][data-seq='1'] { animation-name: lv-drift-b; }
+.lv-drift[data-paused='true'] { animation-play-state: paused; }
+@keyframes lv-drift-a { from { transform: scale(1); } to { transform: scale(1.08); } }
+@keyframes lv-drift-b { from { transform: scale(1); } to { transform: scale(1.08); } }
+/* The layer does the fading; keep Img's own placeholder grey and 0.5 s fade out of the picture. */
+.lv .img { background-color: transparent; }
+.lv .img > img { transition: none; }
+
+/* Night dimming and legibility scrims */
+.lv-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); pointer-events: none; }
+.lv-scrim { position: absolute; left: 0; pointer-events: none; }
+.lv-scrim-bottom { bottom: 0; right: var(--lv-side); height: 46%; background: linear-gradient(to top, rgba(14, 15, 14, 0.66), rgba(14, 15, 14, 0)); transition: opacity 0.8s ease, right 0.3s ease; }
+.lv-scrim-bottom[data-visible='false'] { opacity: 0; }
+.lv-scrim-top { top: 0; right: 0; height: 26%; background: linear-gradient(to bottom, rgba(14, 15, 14, 0.5), rgba(14, 15, 14, 0)); }
+
+/* ---- Wordmark, summary, clock ---- */
+
+.lv-brand { position: absolute; left: var(--lv-gutter); top: calc(clamp(20px, 3.2vw, 44px) + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 8px; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); transition: opacity 0.3s ease; }
+.lv-brand[data-hidden='true'] { opacity: 0; }
+.lv-wordmark { font: 500 16px var(--latin); letter-spacing: 0.42em; }
+.lv-summary { font: 400 12px var(--mono); font-variant-numeric: tabular-nums; color: #D3D6D0; }
+
+.lv-clock { position: absolute; right: calc(var(--lv-side) + var(--lv-gutter)); top: calc(clamp(16px, 2.8vw, 36px) + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); transition: right 0.3s ease; }
+.lv-clock-time { font: 300 clamp(44px, 5vw, 76px) / 1 var(--latin); font-variant-numeric: lining-nums tabular-nums; }
+.lv-clock-date { font-size: 14px; color: #daddd6; }
+
+/* ---- Caption ---- */
+
+.lv-caption {
+  --k: 1;
+  position: absolute;
+  bottom: calc(clamp(24px, 3.6vw, 52px) + env(safe-area-inset-bottom, 0px));
+  max-width: min(720px, calc(100% - var(--lv-side) - 2 * var(--lv-gutter)));
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.8s ease, bottom 0.3s ease, left 0.3s ease, right 0.3s ease;
+}
+.lv-caption[data-size='s'] { --k: 0.82; }
+.lv-caption[data-size='l'] { --k: 1.25; }
+.lv-caption[data-bar='up'] { bottom: calc(var(--lv-edge) + 80px + env(safe-area-inset-bottom, 0px)); }
+.lv-caption[data-visible='false'] { opacity: 0; }
+.lv-caption[data-pos='bl'] { --lv-justify: flex-start; left: var(--lv-gutter); align-items: flex-start; text-align: left; }
+.lv-caption[data-pos='bc'] { --lv-justify: center; left: 0; right: var(--lv-side); max-width: none; align-items: center; text-align: center; }
+.lv-caption[data-pos='br'] { --lv-justify: flex-end; right: calc(var(--lv-side) + var(--lv-gutter)); align-items: flex-end; text-align: right; }
+.lv-caption-body { display: flex; flex-direction: column; gap: 10px; align-items: inherit; }
+.lv-caption-body[data-animate='true'] { animation: lv-cap-in 0.9s ease both; }
+@keyframes lv-cap-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.lv-cap-big { display: flex; align-items: center; justify-content: var(--lv-justify, flex-start); gap: 12px; font: 600 calc(var(--k) * clamp(28px, 3.2vw, 46px)) / 1.15 var(--serif); letter-spacing: 0.3em; }
+.lv-cap-sub { font: 500 calc(var(--k) * 20px) / 1.4 var(--serif); letter-spacing: 0.12em; }
+.lv-cap-meta, .lv-cap-geo { display: flex; flex-wrap: wrap; justify-content: var(--lv-justify, flex-start); gap: 4px 18px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.lv-cap-meta { font-size: calc(var(--k) * 14px); }
+.lv-cap-geo { font-size: calc(var(--k) * 12.5px); color: #e1e3de; }
+.lv-cap-tags { font: 400 calc(var(--k) * 15px) / 1.5 var(--serif); letter-spacing: 0.1em; }
+.lv[data-night='true'] .lv-caption-body,
+.lv[data-night='true'] .lv-clock,
+.lv[data-night='true'] .lv-brand { filter: brightness(0.75); }
+
+/* ---- Control bar and progress line ---- */
+
+.lv-bar {
+  position: absolute;
+  z-index: 4;
+  left: calc((100% - var(--lv-side)) / 2);
+  bottom: calc(var(--lv-edge) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  max-width: calc(100% - 16px);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(22, 23, 21, 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s ease, left 0.3s ease;
+}
+/* Auto-hidden: invisible and click-through, yet still reachable with Tab (focus brings it back). */
+.lv-bar[data-hidden='true'] { opacity: 0; pointer-events: none; }
+.lv-bar[data-hidden='true']:focus-within { opacity: 1; pointer-events: auto; }
+.lv-btn { flex: none; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--night-ink); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.lv-btn:hover:not(:disabled) { background: rgba(236, 237, 232, 0.12); }
+.lv-btn:disabled { opacity: 0.35; cursor: default; }
+.lv-btn[data-on='true'], .lv-btn[aria-pressed='true'] { background: var(--night-ink); color: var(--night); }
+.lv-btn-main { background: var(--night-ink); color: var(--night); }
+.lv-btn-main:hover:not(:disabled) { background: #fff; }
+.lv-counter { min-width: 64px; padding: 0 4px; text-align: center; font: 12px var(--mono); font-variant-numeric: tabular-nums; color: #d3d6d0; white-space: nowrap; }
+.lv-bar-sep { flex: none; width: 1px; height: 20px; margin: 0 2px; background: rgba(236, 237, 232, 0.2); }
+
+.lv-progress { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(236, 237, 232, 0.14); pointer-events: none; transition: opacity 0.3s ease; }
+.lv-progress[data-hidden='true'] { opacity: 0; }
+.lv-progress-bar { width: 100%; height: 100%; background: rgba(236, 237, 232, 0.72); transform: scaleX(0); transform-origin: 0 50%; animation: lv-progress var(--lv-every, 10s) linear both; animation-play-state: paused; }
+.lv-progress-bar[data-running='true'] { animation-play-state: running; }
+@keyframes lv-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---- Empty and error states ---- */
+
+.lv-center { position: absolute; z-index: 3; left: calc((100% - var(--lv-side)) / 2); top: 50%; transform: translate(-50%, -50%); max-width: calc(100% - 2 * var(--lv-gutter)); display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; transition: left 0.3s ease; }
+.lv-center-title { margin: 0; font: 500 22px / 1.5 var(--serif); letter-spacing: 0.12em; }
+.lv-center-note { margin: 0; font-size: 14px; color: var(--night-ink-2); }
+.lv-center-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.lv-outline { align-self: flex-start; min-height: 44px; padding: 0 16px; border: 1px solid var(--night-ink); border-radius: 3px; background: transparent; color: var(--night-ink); font-size: 14px; cursor: pointer; }
+.lv-center .lv-outline { align-self: center; }
+.lv-outline:hover { background: rgba(236, 237, 232, 0.1); }
+
+/* ---- Settings drawer ---- */
+
+.lv-drawer {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(400px, 100%);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3d39 transparent;
+  padding: 22px 24px calc(32px + env(safe-area-inset-bottom, 0px));
+  background: var(--night-2);
+  border-left: 1px solid var(--night-line);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 0.28s ease, visibility 0s linear 0.28s;
+}
+.lv-drawer[data-open='true'] { transform: none; visibility: visible; transition: transform 0.28s ease, visibility 0s; }
+.lv-drawer-head { display: flex; align-items: center; justify-content: space-between; }
+.lv-drawer-head h2 { margin: 0; font: 600 20px / 1.3 var(--serif); letter-spacing: 0.4em; }
+.lv-btn-close { margin-right: -10px; }
+
+.lv-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: start; gap: 10px; }
+.lv-row-label { padding-top: 13px; font-size: 13px; color: var(--night-ink-2); }
+.lv-row-label-top { padding-top: 4px; }
+.lv-row-body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.lv-rule { height: 1px; background: var(--night-line); }
+
+.lv-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.lv-chip { min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #3a3d39; border-radius: 2px; background: transparent; color: var(--night-ink); font-size: 14px; cursor: pointer; }
+.lv-chip:hover { border-color: var(--night-ink-2); }
+.lv-chip[aria-pressed='true'] { background: var(--night-ink); border-color: var(--night-ink); color: var(--night); }
+.lv-chip-tag { min-width: 44px; padding: 0 10px; justify-content: center; font: 500 14px var(--serif); }
+.lv-chip-narrow { min-width: 44px; justify-content: center; }
+.lv-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(236, 237, 232, 0.4); }
+.lv-tag-groups { display: flex; flex-direction: column; gap: 10px; }
+.lv-tag-group { display: flex; flex-direction: column; gap: 2px; }
+.lv-tag-cap { font-size: 12px; letter-spacing: 0.12em; color: var(--night-ink-2); }
+.lv-note, .lv-count { font: 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--night-ink-2); }
+
+.lv-link { font: 12px / 1.6 var(--mono); color: #d3d6d0; word-break: break-all; user-select: all; -webkit-user-select: all; }
+.lv-copy-note { min-height: 1.2em; font-size: 12px; color: var(--night-ink-2); }
+
+/* Narrow screens: the drawer takes the full width; fullscreen is a phone non-feature, so give the bar its room. */
+@media (max-width: 420px) {
+  .lv-btn-fs { display: none; }
+  .lv-counter { min-width: 52px; }
+  .lv-drawer { padding-left: 16px; padding-right: 16px; }
+}
+
+/* base.css shortens every animation and transition to nothing under reduced motion. The photo
+   crossfade (the replacement for the slow zoom) and the progress line carry meaning, so they keep
+   their length; the slow zoom itself is switched off in the page. */
+@media (prefers-reduced-motion: reduce) {
+  .lv .lv-layer { transition-duration: var(--lv-fade, 1.4s) !important; }
+  .lv .lv-progress-bar { animation-duration: var(--lv-every, 10s) !important; }
+}
