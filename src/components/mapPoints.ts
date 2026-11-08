@@ -1,6 +1,6 @@
 import type { MarkerOptions } from 'maplibre-gl';
 
-// The DOM of a point marker (.map-pt), shared by MapView's plain markers and its cluster layer.
+// The DOM of a point marker (.map-pt) for MapView's plain markers.
 
 export interface MapPoint {
   id: string;
@@ -59,18 +59,3 @@ export const pointMarkerOptions = (p: MapPoint): Pick<MarkerOptions, 'anchor' | 
   offset: p.label ? [-13, 0] : [0, 0],
   opacity: p.muted ? MUTED_OPACITY : '1'
 });
-
-/** Points with the same shape can be updated in place with `patchPoint`; a different shape needs a new element. */
-export const pointShape = (p: MapPoint) => `${p.onClick ? 'b' : 's'}${p.count != null ? 'n' : 'p'}${p.label ? 'l' : ''}`;
-
-/** Brings an element made by `pointElement` up to date with the point (same `pointShape`). */
-export function patchPoint(el: HTMLElement, p: MapPoint): void {
-  const selected = String(!!p.selected);
-  const muted = String(!!p.muted);
-  if (el.dataset.selected !== selected) el.dataset.selected = selected;
-  if (el.dataset.muted !== muted) el.dataset.muted = muted;
-  if (p.onClick) el.setAttribute('aria-label', ariaLabel(p));
-  const dot = el.firstElementChild;
-  if (dot && p.count != null && dot.textContent !== String(p.count)) dot.textContent = String(p.count);
-  if (p.label && el.lastElementChild && el.lastElementChild.textContent !== p.label) el.lastElementChild.textContent = p.label;
-}

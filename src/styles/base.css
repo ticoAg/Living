@@ -139,10 +139,39 @@ h1, h2, h3 { text-wrap: balance; }
 .map-pt[data-selected='true'] .map-pt-dot { background: var(--ink); color: var(--paper); }
 .map-pt-label { font: 600 14px var(--serif); letter-spacing: 0.08em; white-space: nowrap; text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper), 0 0 6px var(--paper); }
 .map-pt-photo { width: 12px; height: 12px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
-.map-pt-cluster { justify-content: center; min-width: 44px; min-height: 44px; border-radius: 22px; }
-.map-pt-cluster .map-pt-dot { min-width: 32px; height: 32px; border-radius: 16px; font-size: 13px; box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px var(--ink), 0 2px 6px rgba(28, 32, 30, 0.24); }
-.map-pt-cluster[data-size='m'] .map-pt-dot { min-width: 38px; height: 38px; border-radius: 19px; }
-.map-pt-cluster[data-size='l'] .map-pt-dot { min-width: 44px; height: 44px; border-radius: 22px; font-size: 14px; }
-.map-pt-cluster:not([data-selected='true']):hover .map-pt-dot { background: var(--mat); }
+/* Album markers (components/mapAlbums.ts): a round photo on paper, sheets stacked behind it when it holds several,
+   a caption of name and count overlapping its foot. MapLibre positions the button absolutely: no position here. */
+.map-album { --d: 58px; display: flex; flex-direction: column; align-items: center; padding: 0; border: 0; background: none; cursor: pointer; color: var(--ink); font: inherit; -webkit-tap-highlight-color: transparent; }
+.map-album[data-size='xl'] { --d: 70px; }
+.map-album[data-size='l'] { --d: 64px; }
+.map-album[data-size='s'] { --d: 54px; }
+.map-album[data-size='xs'] { --d: 44px; }
+.map-album::before, .map-album::after { content: ''; position: absolute; top: 0; left: calc(50% - var(--d) / 2); width: var(--d); height: var(--d); box-sizing: border-box; border-radius: 50%; background: var(--sheet); border: 1.5px solid var(--rule-2); box-shadow: 0 1px 3px rgba(28, 32, 30, 0.18); visibility: hidden; }
+.map-album::before { transform: translateX(10px); }
+.map-album::after { transform: translateX(5px); }
+.map-album[data-stack='1']::after, .map-album[data-stack='2']::before, .map-album[data-stack='2']::after { visibility: visible; }
+.map-album-disc { position: relative; z-index: 1; width: var(--d); height: var(--d); box-sizing: border-box; border-radius: 50%; overflow: hidden; border: 2.5px solid var(--sheet); background: var(--mat) center / cover no-repeat; box-shadow: 0 0 0 1px rgba(28, 32, 30, 0.3), 0 2px 6px rgba(28, 32, 30, 0.28); transition: box-shadow 0.15s ease; }
+.map-album-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.6s ease; }
+.map-album-img[data-on='true'] { opacity: 1; }
+.map-album-dots { position: absolute; left: 0; right: 0; bottom: 7px; display: flex; justify-content: center; gap: 3px; pointer-events: none; }
+.map-album-dots i { width: 4px; height: 4px; border-radius: 50%; background: rgba(250, 250, 248, 0.5); box-shadow: 0 0 2px rgba(0, 0, 0, 0.45); }
+.map-album-dots i[data-on='true'] { background: #FFF; }
+.map-album-nav { position: absolute; top: 50%; width: 18px; height: 30px; margin-top: -15px; display: none; align-items: center; justify-content: center; color: #FFF; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.7)); }
+.map-album-nav[data-dir='-1'] { left: 0; }
+.map-album-nav[data-dir='1'] { right: 0; }
+@media (hover: hover) { .map-album[data-turns='true']:hover .map-album-nav { display: flex; } }
+.map-album-tag { position: relative; z-index: 2; display: flex; align-items: center; gap: 4px; max-width: 108px; height: 22px; margin-top: -10px; padding: 0 7px; box-sizing: border-box; border-radius: 11px; background: var(--sheet); border: 1px solid var(--rule-2); box-shadow: 0 1px 3px rgba(28, 32, 30, 0.2); white-space: nowrap; }
+.map-album-tag svg { flex: none; color: var(--ink-2); }
+.map-album-tag[data-named='true'] svg { display: none; }
+.map-album-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 600 12px/1.2 var(--serif); letter-spacing: 0.06em; }
+.map-album[data-size='xl'] .map-album-name { letter-spacing: 0.14em; }
+.map-album-n { flex: none; font: 500 11px/1 var(--mono); color: var(--ink-2); }
+.map-album:hover .map-album-disc { box-shadow: 0 0 0 1px rgba(28, 32, 30, 0.45), 0 3px 10px rgba(28, 32, 30, 0.34); }
+.map-album[data-selected='true'] .map-album-disc { border-color: var(--ink); box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink), 0 2px 6px rgba(28, 32, 30, 0.3); }
+.map-album[data-selected='true'] .map-album-tag { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.map-album[data-selected='true'] .map-album-n, .map-album[data-selected='true'] .map-album-tag svg { color: var(--paper); }
+.map-album[data-muted='true'] .map-album-img { filter: grayscale(0.8); }
+.map-album:focus-visible { outline: none; }
+.map-album:focus-visible .map-album-disc { outline: 2px solid var(--hydro); outline-offset: 3px; }
 
 .loading { padding: 80px 0; text-align: center; color: var(--ink-2); }

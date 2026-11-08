@@ -4,7 +4,8 @@ import type { PhotoSummary } from '../../shared/types';
 import { mediaUrl } from '../lib/api';
 
 const placeholders = new Map<string, string>();
-function placeholder(hash: string | null): string | undefined {
+/** The ThumbHash as a data URL for a blurred stand-in while the photo loads; cached per hash. */
+export function placeholder(hash: string | null): string | undefined {
   if (!hash) return undefined;
   let url = placeholders.get(hash);
   if (!url) {
