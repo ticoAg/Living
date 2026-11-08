@@ -16,7 +16,7 @@ tags: [api, places]
 
 请求 `MatchRequest` → `MatchResponse`。
 
-1. 站内候选：`pois` 中距离 ≤ `max(radius, poi.radius)` 的地点；`radius` 默认 300，最大 1000。
+1. 站内候选：`pois` 中距离 ≤ `max(radius, poi.radius)` 且对请求者开放的地点（别人的自建地点要有公开且位置未隐藏的照片在用，见 [pois 的隐私](/data/pois.md#隐私)）；`radius` 默认 300，最大 1000。
 2. 外部候选：有 `AMAP_KEY` 且坐标在中国境内时调用高德 `v3/place/around`（坐标先转 GCJ-02，结果转回 WGS-84，按距离排序，最多 25 个）；否则 Overpass（`nwr(around:R)` 查询带名称的 tourism、historic、leisure=park/garden、natural、man_made=bridge/tower/pier、bridge、amenity=place_of_worship/cafe/restaurant/library/arts_centre/theatre、place=square/village/neighbourhood/island）。
 3. 与站内候选去重：相同 `source + sourceId`，或同名且相距 < 80 米。
 4. 类别：由高德类型或 OSM 标签映射，再按名称后缀（桥 湖 山 寺 塔 岛 村 园 亭 堤）修正；取值见 `shared/types.ts` 的 `POI_CATEGORIES`。
@@ -27,7 +27,7 @@ tags: [api, places]
 
 # GET /api/pois/search?q=&lat=&lng=（登录）
 
-按名称搜索：站内 `name`/`aliases` 包含 `q`，加上高德 `v3/place/text`（有 Key 时）。返回 `{ "results": MatchCandidate[] }`，有坐标时附距离并按距离排序，最多 20 个。
+按名称搜索：站内 `name`/`aliases` 包含 `q` 且对请求者开放的地点（规则同上），加上高德 `v3/place/text`（有 Key 时）。返回 `{ "results": MatchCandidate[] }`，有坐标时附距离并按距离排序，最多 20 个。
 
 # POST /api/pois（登录）
 
