@@ -59,7 +59,8 @@ export default function SwapMap({ viewKey, viewport, ...props }: MapProps & { vi
         const top = i === layers.length - 1;
         const pending = stacked && top && !fading;
         return (
-          <div key={l.id} className="swapmap-layer" data-layer={l.id} data-pending={pending ? 'true' : undefined} aria-hidden={top ? undefined : true}>
+          // the outgoing map and the not-yet-shown incoming one take no focus and are hidden from assistive tech
+          <div key={l.id} className="swapmap-layer" data-layer={l.id} data-pending={pending ? 'true' : undefined} inert={!top || pending ? true : undefined}>
             <MapView {...props} className="swapmap-frame" fit={false} center={l.viewport?.center} zoom={l.viewport?.zoom ?? 11} />
           </div>
         );

@@ -34,8 +34,13 @@ function load(path: string): Promise<void> {
 export function invalidate(prefix: string) {
   for (const key of Array.from(cache.keys())) {
     if (key.startsWith(prefix)) {
-      cache.delete(key);
-      if (listeners.get(key)?.size) void load(key);
+      if (listeners.get(key)?.size) {
+        // keep showing the previous data while the refetch runs
+        cache.set(key, { data: cache.get(key)?.data });
+        void load(key);
+      } else {
+        cache.delete(key);
+      }
     }
   }
 }

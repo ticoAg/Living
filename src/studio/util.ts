@@ -37,6 +37,9 @@ export function safeNext(raw: string | null | undefined): string | null {
   return raw;
 }
 
+/** A path for `?next=`: everything is escaped except `/`, so it reads `/login?next=/upload`. */
+export const encodeNext = (path: string) => encodeURIComponent(path).replace(/%2F/gi, '/');
+
 /** Studio pages need an account: wait for the session, then send guests to /login?next=<here>. */
 export function useRequireLogin() {
   const { user, loading } = useSession();
@@ -45,7 +48,7 @@ export function useRequireLogin() {
   useEffect(() => {
     if (!loading && !user) {
       const here = search ? `${path}?${search}` : path;
-      navigate(`/login?next=${encodeURIComponent(here)}`, { replace: true });
+      navigate(`/login?next=${encodeNext(here)}`, { replace: true });
     }
   }, [loading, user, path, search, navigate]);
   return { user, loading, ready: !loading && !!user };

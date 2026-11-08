@@ -266,6 +266,10 @@ export default function Upload() {
       const open = (i: Item) => i.publish.state !== 'done' && i.publish.state !== 'duplicate';
       const nxt = list.slice(at + 1).find(open) ?? list.find(open);
       setSelectedId((cur) => (cur === id && nxt ? nxt.id : cur));
+      // One column on a phone: bring the next photo's preview back into view.
+      if (nxt && window.matchMedia('(max-width: 759px)').matches) {
+        requestAnimationFrame(() => document.querySelector('.up-col-match')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+      }
     },
     [publishOne]
   );

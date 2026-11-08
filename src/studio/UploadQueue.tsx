@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { Icon } from '../components/icons';
 import { fmtBytes, fmtStamp } from './util';
 import { statusOf, type Item, type Status } from './upload-model';
@@ -28,8 +28,13 @@ interface RowProps {
 
 // Memoised: typing in the details form re-renders the page, but only the edited item's row changes.
 const Row = memo(function Row({ it, statusKey, statusLabel, selected, onSelect, onRemove }: RowProps) {
+  const ref = useRef<HTMLLIElement>(null);
+  // After "publish" moves on to the next photo, keep its row in view (the strip on phones scrolls sideways).
+  useEffect(() => {
+    if (selected) ref.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [selected]);
   return (
-    <li className="up-q" data-selected={selected} data-status={statusKey}>
+    <li ref={ref} className="up-q" data-selected={selected} data-status={statusKey}>
       <button type="button" className="up-q-main" aria-current={selected ? 'true' : undefined} onClick={() => onSelect(it.id)}>
         <span className="up-thumb" aria-hidden="true">
           {it.thumbUrl ? <img src={it.thumbUrl} alt="" /> : <Icon name={it.stage === 'error' ? 'close' : 'upload'} size={20} />}

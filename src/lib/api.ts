@@ -1,7 +1,7 @@
 import type { ApiErrorBody } from '../../shared/types';
 
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) {
+  constructor(public status: number, public code: string, message: string, public body: Partial<ApiErrorBody> = {}) {
     super(message);
   }
 }
@@ -40,7 +40,7 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   }
   if (!res.ok) {
     const e = (data ?? {}) as Partial<ApiErrorBody>;
-    throw new ApiError(res.status, e.error ?? `http_${res.status}`, e.message ?? '请求失败，请稍后再试');
+    throw new ApiError(res.status, e.error ?? `http_${res.status}`, e.message ?? '请求失败，请稍后再试', e);
   }
   return data as T;
 }

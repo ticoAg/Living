@@ -5,6 +5,7 @@ import { CategoryIcon, Icon } from '../components/icons';
 import { invalidate } from '../lib/useApi';
 import MatchPlot from './MatchPlot';
 import {
+  DEFAULT_RADIUS,
   MAX_RADIUS,
   METHOD_LABEL,
   MIN_RADIUS,
@@ -263,7 +264,7 @@ export interface PlacePickerProps {
 export default function PlacePicker({ coords, heading, match, onRadius, onRetry, value, onChange, extras = [], onCreated, customAt, privacyZone, hideCurrent, disabled }: PlacePickerProps) {
   const id = useId();
   const [active, setActive] = useState<string | null>(null);
-  const radius = match?.radius ?? 300;
+  const radius = match?.radius ?? DEFAULT_RADIUS;
   const candidates = match?.res?.candidates ?? [];
   const res = match?.res ?? null;
 

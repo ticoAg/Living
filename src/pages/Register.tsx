@@ -3,7 +3,7 @@ import { Link, useLocation, useSearch } from 'wouter';
 import type { SessionUser } from '../../shared/types';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
-import { errMsg, safeNext, useTitle } from '../studio/util';
+import { encodeNext, errMsg, safeNext, useTitle } from '../studio/util';
 import '../styles/studio.css';
 
 // /register — invite code (when the site wants one), handle, display name, password.
@@ -65,7 +65,7 @@ export default function Register() {
     }
   }
 
-  const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : '/login';
+  const loginHref = next ? `/login?next=${encodeNext(next)}` : '/login';
 
   return (
     <main className="page-narrow au">
