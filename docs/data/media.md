@@ -63,4 +63,4 @@ R2 免费额度是 10 GB 存储，无出站流量费，见 [Cloudflare 资源](/
 
 # 本地开发
 
-`wrangler dev` 用本机模拟的 R2，数据在 `.wrangler/state/`，与线上互不影响，见 [本地开发](/runbooks/local-dev.md)。
+开发服务器（`npm run dev`）用本机模拟的 R2，数据在 `.wrangler/state/`，与线上互不影响，见 [本地开发](/runbooks/local-dev.md)。
