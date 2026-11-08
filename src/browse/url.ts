@@ -13,7 +13,12 @@ export function useQuery(): URLSearchParams {
 }
 
 export const splitIds = (v: string | null | undefined): string[] =>
-  v ? v.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  v
+    ? v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
 
 /** key=value pairs joined with &, commas kept readable. */
 export function serializeQuery(entries: Iterable<readonly [string, string | null | undefined]>): string {

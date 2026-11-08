@@ -195,7 +195,14 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
                 const label = [fmtDay(p.takenAt), p.title ?? p.city, added ? '已在主题里' : ''].filter(Boolean).join('，') || '照片';
                 return (
                   <li key={p.id}>
-                    <button type="button" className="pp-cell" aria-pressed={on} aria-label={label} disabled={added} onClick={() => toggle(p.id)}>
+                    <button
+                      type="button"
+                      className="pp-cell"
+                      aria-pressed={on}
+                      aria-label={label}
+                      disabled={added}
+                      onClick={() => toggle(p.id)}
+                    >
                       <Img photo={p} ratio="1 / 1" sizes="(max-width: 640px) 34vw, 160px" alt="" />
                       <span className="pp-date mono">{p.takenAt ? fmtDay(p.takenAt) : '无日期'}</span>
                       {added && <span className="pp-added">已添加</span>}
@@ -231,7 +238,11 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
         </div>
         <div className="pp-acts">
           {addable.length > 0 && (
-            <button type="button" className="btn btn-ghost" onClick={() => setSelected(new Set([...selected, ...addable.map((p) => p.id)]))}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setSelected(new Set([...selected, ...addable.map((p) => p.id)]))}
+            >
               全选
             </button>
           )}

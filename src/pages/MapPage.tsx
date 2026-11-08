@@ -80,7 +80,7 @@ export default function MapPage() {
     // endpoint's own count is only a fallback while that list is unavailable
     return pois
       .filter((p) => (photos ? (total.get(p.id) ?? 0) > 0 : (p.count ?? 0) > 0))
-      .map((p) => ({ ...p, n: photos ? now.get(p.id) ?? 0 : p.count ?? 0 }));
+      .map((p) => ({ ...p, n: photos ? (now.get(p.id) ?? 0) : (p.count ?? 0) }));
   }, [pois, photos, facts, matching]);
 
   const cities = useMemo(() => {
@@ -127,12 +127,22 @@ export default function MapPage() {
   const viewport = useMemo(() => {
     if (!size) return null;
     const of = city ? markers.filter((m) => m.city === city) : markers;
-    return fitViewport((of.length ? of : markers).map((m) => [m.lat, m.lng]), size, { padding: 56, right: 96, maxZoom: 15 });
+    return fitViewport(
+      (of.length ? of : markers).map((m) => [m.lat, m.lng]),
+      size,
+      { padding: 56, right: 96, maxZoom: 15 }
+    );
     // `markers` is left out of the dependencies on purpose: it changes with every filter, while the view follows only the data set and the city
   }, [size, city, pois]);
 
   const panelPhotos = useMemo<PhotoSummary[]>(
-    () => (selected ? matching.filter((f) => f.p.poiId === selected.id).map((f) => f.p).sort(byTakenDesc) : []),
+    () =>
+      selected
+        ? matching
+            .filter((f) => f.p.poiId === selected.id)
+            .map((f) => f.p)
+            .sort(byTakenDesc)
+        : [],
     [selected, matching]
   );
   useEffect(() => {
@@ -169,7 +179,13 @@ export default function MapPage() {
                 全部
               </button>
               {cities.map((c) => (
-                <button key={c} type="button" className="gal-city" aria-pressed={city === c} onClick={() => replaceQuery({ city: city === c ? null : c })}>
+                <button
+                  key={c}
+                  type="button"
+                  className="gal-city"
+                  aria-pressed={city === c}
+                  onClick={() => replaceQuery({ city: city === c ? null : c })}
+                >
                   {c}
                 </button>
               ))}

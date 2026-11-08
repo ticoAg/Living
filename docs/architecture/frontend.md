@@ -6,7 +6,7 @@ tags: [architecture, frontend]
 ---
 # 技术
 
-React 19、wouter 路由、Vite 构建；MapLibre 按需加载；exifr、thumbhash、suncalc 只在上传页加载。
+React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vite-plus.md)（Vite 8 与 Rolldown 构建，Vitest、Oxlint、Oxfmt）；MapLibre 按需加载；exifr、thumbhash、suncalc 只在上传页加载。
 
 # 路由与归属
 

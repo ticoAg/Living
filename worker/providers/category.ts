@@ -10,7 +10,18 @@ export const isAreaCategory = (category: string): boolean => AREA_CATEGORIES.has
 
 export const radiusOf = (category: string): number => CATEGORY_RADIUS[category] ?? 120;
 
-const SUFFIX_CATEGORY: Record<string, PoiCategory> = { 桥: '桥', 湖: '湖', 山: '山', 寺: '寺', 塔: '塔', 岛: '岛', 村: '村', 园: '园', 亭: '亭', 堤: '堤' };
+const SUFFIX_CATEGORY: Record<string, PoiCategory> = {
+  桥: '桥',
+  湖: '湖',
+  山: '山',
+  寺: '寺',
+  塔: '塔',
+  岛: '岛',
+  村: '村',
+  园: '园',
+  亭: '亭',
+  堤: '堤'
+};
 
 /** Name-suffix override (桥 湖 山 寺 塔 岛 村 园 亭 堤). Shops keep their category: "XX园" the restaurant is not a park. */
 export function applySuffix(category: PoiCategory, name: string): PoiCategory {
@@ -76,7 +87,15 @@ export function categoryFromOsm(tags: Tags, name: string): PoiCategory | null {
   else if (amenity === 'arts_centre') c = '美术馆';
   else if (amenity === 'library' || amenity === 'theatre') c = '建筑';
   else if (tourism === 'museum' || tourism === 'gallery') c = '美术馆';
-  else if (tourism === 'attraction' || tourism === 'viewpoint' || tourism === 'artwork' || tourism === 'zoo' || tourism === 'theme_park' || tourism === 'aquarium') c = '景';
+  else if (
+    tourism === 'attraction' ||
+    tourism === 'viewpoint' ||
+    tourism === 'artwork' ||
+    tourism === 'zoo' ||
+    tourism === 'theme_park' ||
+    tourism === 'aquarium'
+  )
+    c = '景';
   else if (historic) c = '景';
   else if (place === 'island' || place === 'islet') c = '岛';
   else if (place === 'village' || place === 'hamlet') c = '村';

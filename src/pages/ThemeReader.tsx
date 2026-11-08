@@ -122,7 +122,8 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
   }, []);
 
   const points = useMemo<MapPoint[]>(
-    () => model.places.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, label: p.name, onClick: () => scrollToItem(model.firstAt.get(p.id)) })),
+    () =>
+      model.places.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, label: p.name, onClick: () => scrollToItem(model.firstAt.get(p.id)) })),
     [model, scrollToItem]
   );
   const shapes = useMemo<MapShapes>(() => ({ lines: model.route.length > 1 ? [{ id: 'route', coords: model.route }] : [] }), [model.route]);
@@ -259,7 +260,7 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
 }
 
 export default function ThemeReader() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   const { user } = useSession();
   const { data, error, reload } = useApi<unknown>(id ? `/api/themes/${encodeURIComponent(id)}` : null);
   const theme = unwrapTheme(data);

@@ -1,20 +1,20 @@
 ---
 type: Runbook
 title: 本地开发
-description: 安装依赖、建本地 D1、写入站长邀请码，用 wrangler 和 Vite 在本机跑起完整站点。
+description: 安装依赖、建本地 D1、写入站长邀请码，用 Vite+ 一条命令在本机跑起前端、Worker 和本地 D1、R2、KV。
 tags: [runbook, dev]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/package.json
     title: 脚本
   - resource: https://github.com/ticoAg/Living/blob/main/vite.config.ts
-    title: 开发代理
+    title: Vite+ 配置
   - resource: https://github.com/ticoAg/Living/blob/main/wrangler.jsonc
     title: Wrangler 配置
 ---
 # 前提
 
-- Node.js 20 或更高，以及 npm。
-- 不需要登录 Cloudflare。`wrangler dev` 默认用本机模拟的 D1、R2、KV，数据保存在 `.wrangler/state/`（已在 `.gitignore` 里），不会碰线上数据。
+- Node.js 22.18 以上或 24（`.node-version` 写的是 24），以及 npm。工具链是 [Vite+](/architecture/decisions/0006-vite-plus.md)，作为开发依赖装在项目里，不需要全局安装 `vp`。
+- 不需要登录 Cloudflare。开发服务器用本机模拟的 D1、R2、KV，数据保存在 `.wrangler/state/`（已在 `.gitignore` 里），不会碰线上数据。
 
 # 第一次启动
 
@@ -36,36 +36,28 @@ sources:
    npx wrangler d1 execute living --local --command "INSERT INTO invites (code, role, note) VALUES ('<code>','owner','bootstrap')"
    ```
 
-4. 构建一次前端，生成 `dist/`。`wrangler.jsonc` 的 `assets.directory`（`./dist`）必须存在，否则下一步会报错退出：
-
-   ```bash
-   npx vite build
-   ```
-
-5. 启动 Worker（接口、媒体和静态资源），监听 8787：
-
-   ```bash
-   npm run dev:api
-   ```
-
-6. 另开一个终端启动前端，监听 5173，并把 `/api` 和 `/media` 代理到 8787（见 `vite.config.ts`）：
+4. 启动开发服务器，监听 5173。Cloudflare 的 Vite 插件在同一个进程里用 workerd 运行 `worker/index.ts`，页面、`/api`、`/media` 和本地 D1、R2、KV 都由它提供：
 
    ```bash
    npm run dev
    ```
 
-7. 打开 <http://localhost:5173/register>，邀请码填第 3 步的 `<code>`。注册的第一个账号就是站长；之后在"设置"里生成普通邀请码，见 [站点管理](/product/features/admin.md)。
+5. 打开 <http://localhost:5173/register>，邀请码填第 3 步的 `<code>`。注册的第一个账号就是站长；之后在"设置"里生成普通邀请码，见 [站点管理](/product/features/admin.md)。
 
 # 日常
 
 | 做什么 | 怎么做 |
 |---|---|
-| 改前端 | 保存即热更新（Vite，5173） |
-| 改 Worker | wrangler 自动重载（8787） |
-| 看最新的前端构建 | 重新 `npx vite build`，直接访问 8787 看到的是 `dist/` 里上次构建的产物；日常开发用 5173 |
-| 类型检查 | `npm run typecheck`，分别检查 `src` 加 `shared` 与 `worker` 加 `shared` |
-| 完整构建 | `npm run build`，类型检查加 `vite build`，与线上构建命令相同 |
+| 改前端 | 保存即热更新 |
+| 改 Worker | 保存后开发服务器自动重载 Worker |
+| 检查 | `npm run check`，即 `vp check`：格式、Oxlint（含类型感知规则）和类型检查一起跑 |
+| 自动修复 | `npx vp check --fix`，格式化并应用能自动修复的 lint 规则 |
+| 测试 | `npm test`，即 `vp test`（Vitest）；监听模式用 `npx vp test watch` |
+| 完整构建 | `npm run build`，即 `vp check --no-fmt`、`vp test`、`vp build`，与线上构建命令相同 |
+| 预览构建产物 | `npm run build` 后 `npx vp preview`，在 workerd 里运行构建出的 Worker |
 | 新增迁移 | `npx wrangler d1 migrations create living <描述>`，写好后 `npm run db:migrate:local`，规则见 [部署](/runbooks/deploy.md) |
+
+格式与 lint 的设置都在 `vite.config.ts` 的 `fmt` 和 `lint` 里：单引号、不加尾随逗号、行宽 140；CSS 保持一条规则一行，`docs/` 不格式化。类型检查按就近的 `tsconfig.json` 进行：`worker/` 用 `worker/tsconfig.json`（Workers 类型），其余用根目录的 `tsconfig.json`。
 
 # 重置本地数据
 
@@ -84,15 +76,15 @@ npm run db:migrate:local
 AMAP_KEY=你的高德 Web 服务 Key
 ```
 
-重启 `npm run dev:api` 生效。Key 的申请见 [密钥与初始化](/runbooks/secrets.md)。
+重启 `npm run dev` 生效。Key 的申请见 [密钥与初始化](/runbooks/secrets.md)。
 
 # 常见问题
 
 | 现象 | 原因与处理 |
 |---|---|
-| `wrangler dev` 报 `assets.directory` 不存在 | 还没构建，执行 `npx vite build` |
-| 在 5173 上请求 `/api` 连接被拒绝 | Worker 没启动，先 `npm run dev:api` |
+| `npm install` 或 `vp` 提示 Node 版本不支持 | Vite+ 需要 Node `^22.18.0`、`^24.11.0` 或 26 以上，换成 `.node-version` 里的 24 |
 | 注册提示邀请码无效 | 邀请码没写进本地库，或写进了线上库（命令里要带 `--local`）；用 `npx wrangler d1 execute living --local --command "SELECT code, role, used_at FROM invites"` 查看 |
 | 登录后马上回到未登录 | 用 `http://localhost:5173` 访问，不要用局域网 IP：会话 Cookie 带 `Secure`，浏览器只对 `localhost` 这样的可信来源在 http 下保存它 |
-| 改了 `dev:api` 的端口后前端请求失败 | 同步修改 `vite.config.ts` 里的代理地址 |
+| `/api` 报表不存在 | 本地库还没迁移，执行 `npm run db:migrate:local` |
+| `npm run build` 停在检查或测试 | 先修 `npm run check` 和 `npm test` 报的问题；只是格式问题用 `npx vp check --fix` |
 | 地点匹配没有候选 | 本地要访问外部服务：OpenStreetMap 的 Overpass 和 Nominatim，或高德；离线时只有站内地点 |

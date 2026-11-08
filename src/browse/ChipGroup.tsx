@@ -23,7 +23,14 @@ export default function ChipGroup({
       {chips.map((c) => {
         const pressed = selected.includes(c.id);
         return (
-          <button key={c.id} type="button" className="chip" aria-pressed={pressed} disabled={!pressed && c.disabled} onClick={() => onPick(c.id)}>
+          <button
+            key={c.id}
+            type="button"
+            className="chip"
+            aria-pressed={pressed}
+            disabled={!pressed && c.disabled}
+            onClick={() => onPick(c.id)}
+          >
             {c.label}
           </button>
         );

@@ -94,7 +94,17 @@ tags.post('/', async (c) => {
 
   const id = newId.tag();
   const sort = await nextSort(db, user.id, parentId);
-  await prep(db, 'INSERT INTO tags (id, owner_id, parent_id, name, color, sort, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)', id, user.id, parentId, name, color, sort, nowIso()).run();
+  await prep(
+    db,
+    'INSERT INTO tags (id, owner_id, parent_id, name, color, sort, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
+    id,
+    user.id,
+    parentId,
+    name,
+    color,
+    sort,
+    nowIso()
+  ).run();
   return c.json({ tag: toTag({ id, name, parent_id: parentId, owner_id: user.id, color, sort }, 0) }, 201);
 });
 
@@ -140,7 +150,15 @@ tags.patch('/:id', async (c) => {
   if (has(body, 'sort')) sort = optNum(body.sort, '排序', { int: true, min: -1_000_000, max: 1_000_000 }) ?? tag.sort;
   if (nameChanged || parentChanged) await assertNameFree(db, tag.owner_id, parentId, name, tag.id);
 
-  await prep(db, 'UPDATE tags SET name = ?1, parent_id = ?2, color = ?3, sort = ?4 WHERE id = ?5', name, parentId, color, sort, tag.id).run();
+  await prep(
+    db,
+    'UPDATE tags SET name = ?1, parent_id = ?2, color = ?3, sort = ?4 WHERE id = ?5',
+    name,
+    parentId,
+    color,
+    sort,
+    tag.id
+  ).run();
   const viewer = user.id;
   return c.json({ tag: toTag({ ...tag, name, parent_id: parentId, color, sort }, await tagCount(db, viewer, tag.id)) });
 });

@@ -45,7 +45,14 @@ const Row = memo(function Row({ it, statusKey, statusLabel, selected, onSelect, 
           <Chip status={{ key: statusKey, label: statusLabel }} progress={it.publish.progress} />
         </span>
       </button>
-      <button type="button" className="up-q-x" aria-label={`移除 ${it.file.name}`} title="移除" disabled={it.publish.state === 'sending'} onClick={() => onRemove(it.id)}>
+      <button
+        type="button"
+        className="up-q-x"
+        aria-label={`移除 ${it.file.name}`}
+        title="移除"
+        disabled={it.publish.state === 'sending'}
+        onClick={() => onRemove(it.id)}
+      >
         <Icon name="close" size={16} />
       </button>
     </li>
@@ -65,7 +72,15 @@ export default function UploadQueue({ items, statuses, selectedId, onSelect, onR
   return (
     <ol className="up-queue" aria-label="上传队列">
       {items.map((it, i) => (
-        <Row key={it.id} it={it} statusKey={statuses[i].key} statusLabel={statuses[i].label} selected={it.id === selectedId} onSelect={onSelect} onRemove={onRemove} />
+        <Row
+          key={it.id}
+          it={it}
+          statusKey={statuses[i].key}
+          statusLabel={statuses[i].label}
+          selected={it.id === selectedId}
+          onSelect={onSelect}
+          onRemove={onRemove}
+        />
       ))}
     </ol>
   );

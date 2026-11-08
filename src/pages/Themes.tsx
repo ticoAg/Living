@@ -60,7 +60,9 @@ export default function Themes() {
     body = (
       <div className="th-empty">
         <p className="th-empty-title">{wantMine ? '你还没有主题' : '还没有公开的主题'}</p>
-        <p className="muted">{wantMine ? '把照片编成一次旅程或一个专题。' : user ? '把你的照片编成第一个主题。' : '登录后可以创建自己的主题。'}</p>
+        <p className="muted">
+          {wantMine ? '把照片编成一次旅程或一个专题。' : user ? '把你的照片编成第一个主题。' : '登录后可以创建自己的主题。'}
+        </p>
         {user && (
           <Link href="/themes/new" className="btn btn-primary">
             <Icon name="plus" size={18} />

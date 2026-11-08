@@ -40,7 +40,17 @@ privacyZones.post('/', async (c) => {
   if ((count?.n ?? 0) >= MAX_ZONES) throw invalid(`隐私区域最多 ${MAX_ZONES} 个`);
 
   const id = newId.zone();
-  await prep(db, 'INSERT INTO privacy_zones (id, owner_id, name, lat, lng, radius, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)', id, user.id, name, lat, lng, radius, nowIso()).run();
+  await prep(
+    db,
+    'INSERT INTO privacy_zones (id, owner_id, name, lat, lng, radius, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
+    id,
+    user.id,
+    name,
+    lat,
+    lng,
+    radius,
+    nowIso()
+  ).run();
   return c.json({ zone: toZone({ id, name, lat, lng, radius }) }, 201);
 });
 

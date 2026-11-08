@@ -82,10 +82,12 @@ function layout(candidates: MatchCandidate[], k: number): Pt[] {
       p.y = C + (dy / d) * lim;
     }
   }
-  pts.filter((p) => p.area).forEach((p, i) => {
-    p.x = 22 + i * (MARKER * 2 + 6);
-    p.y = SIZE - 16;
-  });
+  pts
+    .filter((p) => p.area)
+    .forEach((p, i) => {
+      p.x = 22 + i * (MARKER * 2 + 6);
+      p.y = SIZE - 16;
+    });
   return pts;
 }
 
@@ -119,7 +121,10 @@ export default function MatchPlot({ radius, heading, candidates, selectedKey, ac
     (heading != null ? `镜头朝向 ${Math.round(heading)} 度，` : '无镜头朝向，') +
     `${candidates.length} 个候选地点。`;
 
-  const ordered = [...pts].sort((a, b) => Number(a.c.key === selectedKey) - Number(b.c.key === selectedKey) || Number(a.c.key === activeKey) - Number(b.c.key === activeKey));
+  const ordered = [...pts].sort(
+    (a, b) =>
+      Number(a.c.key === selectedKey) - Number(b.c.key === selectedKey) || Number(a.c.key === activeKey) - Number(b.c.key === activeKey)
+  );
 
   return (
     <svg className="mp" viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={label}>
@@ -129,15 +134,22 @@ export default function MatchPlot({ radius, heading, candidates, selectedKey, ac
       {rings.map((r) => (
         <g key={r}>
           <circle className="mp-ring" cx={C} cy={C} r={r * k} />
-          <text className="mp-ring-label" x={C + 3} y={C + r * k + 10}>{r}{r === rings[rings.length - 1] ? ' m' : ''}</text>
+          <text className="mp-ring-label" x={C + 3} y={C + r * k + 10}>
+            {r}
+            {r === rings[rings.length - 1] ? ' m' : ''}
+          </text>
         </g>
       ))}
       {cone && <path className="mp-cone" d={cone} />}
       {cone && <line className="mp-heading" x1={C} y1={C} x2={hx} y2={hy} />}
       <circle className="mp-radius" cx={C} cy={C} r={radius * k} />
-      <text className="mp-radius-label" x={rx + 4} y={ry - 3}>{radius} m</text>
+      <text className="mp-radius-label" x={rx + 4} y={ry - 3}>
+        {radius} m
+      </text>
       <path className="mp-north" d={`M ${C} 5 l -4 9 h 8 z`} />
-      <text className="mp-north-label" x={C + 8} y="13">N</text>
+      <text className="mp-north-label" x={C + 8} y="13">
+        N
+      </text>
 
       {ordered.map((p) => {
         const pickable = isPickable(p.c, radius);
@@ -159,9 +171,17 @@ export default function MatchPlot({ radius, heading, candidates, selectedKey, ac
             onMouseLeave={() => onActive?.(null)}
           >
             {p.area ? <rect x={-MARKER} y={-MARKER} width={MARKER * 2} height={MARKER * 2} rx="5" /> : <circle r={MARKER} />}
-            <text textAnchor="middle" dominantBaseline="central">{p.rank}</text>
+            <text textAnchor="middle" dominantBaseline="central">
+              {p.rank}
+            </text>
             {(selected || active) && (
-              <text className="mp-name" x={p.x < C ? -MARKER - 5 : MARKER + 5} y="1" textAnchor={p.x < C ? 'end' : 'start'} dominantBaseline="central">
+              <text
+                className="mp-name"
+                x={p.x < C ? -MARKER - 5 : MARKER + 5}
+                y="1"
+                textAnchor={p.x < C ? 'end' : 'start'}
+                dominantBaseline="central"
+              >
                 {p.c.name}
               </text>
             )}

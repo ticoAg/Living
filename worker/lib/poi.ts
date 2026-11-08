@@ -75,7 +75,10 @@ export async function findOrCreatePoi(db: D1Database, input: NewPoi, userId: str
   const source = input.source ?? 'custom';
   const sourceId = input.sourceId ?? null;
   if (sourceId) {
-    const existing = await db.prepare(`SELECT ${POI_COLS} FROM pois WHERE source = ?1 AND source_id = ?2`).bind(source, sourceId).first<PoiRow>();
+    const existing = await db
+      .prepare(`SELECT ${POI_COLS} FROM pois WHERE source = ?1 AND source_id = ?2`)
+      .bind(source, sourceId)
+      .first<PoiRow>();
     if (existing) return existing;
   }
   const id = newId.poi();
@@ -83,8 +86,18 @@ export async function findOrCreatePoi(db: D1Database, input: NewPoi, userId: str
     db,
     `INSERT OR IGNORE INTO pois (id, name, category, city, district, lat, lng, radius, source, source_id, created_by, created_at)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
-    id, input.name, input.category, input.city ?? null, input.district ?? null, input.lat, input.lng,
-    defaultRadius(input.category), source, sourceId, userId, nowIso()
+    id,
+    input.name,
+    input.category,
+    input.city ?? null,
+    input.district ?? null,
+    input.lat,
+    input.lng,
+    defaultRadius(input.category),
+    source,
+    sourceId,
+    userId,
+    nowIso()
   ).run();
   // A concurrent request may have created the same (source, sourceId) first: read back by key.
   const row = sourceId

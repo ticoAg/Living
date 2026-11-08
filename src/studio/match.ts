@@ -100,7 +100,7 @@ export function choiceFromPoi(poi: Poi, method: PoiMethod, from?: { lat: number;
 export function placeFields(choice: PlaceChoice | null) {
   return {
     poiId: choice?.poiId ?? null,
-    newPoi: choice?.poiId ? null : choice?.newPoi ?? null,
+    newPoi: choice?.poiId ? null : (choice?.newPoi ?? null),
     poiDistance: choice?.distance != null ? Math.round(choice.distance) : null,
     poiMethod: choice ? choice.method : null
   };

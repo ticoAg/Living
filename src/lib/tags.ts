@@ -105,4 +105,4 @@ export function inclusiveCounts(items: readonly { tagIds: string[] }[], tree: Ta
 /** Tags carrying a colour render as swatches (the 色调 group). */
 export const isSwatch = (t: Tag) => !!t.color;
 export const swatchFill = (color: string | null) =>
-  color === 'mono' ? 'linear-gradient(90deg, #1C201E 50%, #FAFAF8 50%)' : color ?? 'transparent';
+  color === 'mono' ? 'linear-gradient(90deg, #1C201E 50%, #FAFAF8 50%)' : (color ?? 'transparent');

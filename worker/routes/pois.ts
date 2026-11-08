@@ -54,7 +54,9 @@ pois.get('/search', async (c) => {
   const lat = c.req.query('lat') !== undefined ? Number(c.req.query('lat')) : null;
   const lng = c.req.query('lng') !== undefined ? Number(c.req.query('lng')) : null;
   const at =
-    lat !== null && lng !== null && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng, heading: null } : null;
+    lat !== null && lng !== null && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+      ? { lat, lng, heading: null }
+      : null;
 
   const like = likeContains(q);
   const q1 = new Sql();
@@ -74,7 +76,11 @@ pois.get('/search', async (c) => {
   let remote: RawPlace[] = [];
   if (external.ok) {
     // Provider results carry their own city/district; no reference-point fallback (they may be anywhere).
-    remote = dedupe(local, external.value.map((e) => fromExternal(e, { city: null, district: null })), at ?? undefined);
+    remote = dedupe(
+      local,
+      external.value.map((e) => fromExternal(e, { city: null, district: null })),
+      at ?? undefined
+    );
   } else {
     console.warn('search: provider failed', external.error instanceof Error ? external.error.message : external.error);
   }
@@ -140,7 +146,9 @@ pois.get('/:id', async (c) => {
   const [own, near] = await Promise.all([
     (() => {
       const q2 = new Sql();
-      return prepQ(c.env.DB, `SELECT COUNT(*) AS n FROM photos p WHERE p.poi_id = ${q2.p(id)} AND ${visiblePhotos(q2, viewer)}`, q2).first<{ n: number }>();
+      return prepQ(c.env.DB, `SELECT COUNT(*) AS n FROM photos p WHERE p.poi_id = ${q2.p(id)} AND ${visiblePhotos(q2, viewer)}`, q2).first<{
+        n: number;
+      }>();
     })(),
     prepQ(
       c.env.DB,
@@ -183,7 +191,13 @@ pois.patch('/:id', async (c) => {
   if (has(body, 'radius')) radius = optNum(body.radius, '匹配半径', { min: 10, max: 5000 }) ?? row.radius;
   if (has(body, 'aliases')) {
     const raw = body.aliases;
-    const list = typeof raw === 'string' ? raw.split(/[,，;；、\n]/).map((s) => s.trim()).filter(Boolean) : strArray(raw, '别名', 20, 80);
+    const list =
+      typeof raw === 'string'
+        ? raw
+            .split(/[,，;；、\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : strArray(raw, '别名', 20, 80);
     aliases = list.length ? JSON.stringify(list.map((s) => optText(s, '别名', 80)).filter(Boolean)) : null;
   }
 

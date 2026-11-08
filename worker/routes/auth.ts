@@ -13,7 +13,9 @@ import { getRegistration } from './site';
 export const auth = new Hono<AppEnv>({ strict: false });
 
 const HANDLE_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}$/;
-const RESERVED = new Set('admin api media living login register settings studio themes upload map index place t p www root owner'.split(' '));
+const RESERVED = new Set(
+  'admin api media living login register settings studio themes upload map index place t p www root owner'.split(' ')
+);
 
 interface InviteRow {
   code: string;
@@ -32,7 +34,10 @@ auth.post('/register', async (c) => {
   const db = c.env.DB;
 
   const [{ n: userCount }, registration] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>().then((r) => r ?? { n: 0 }),
+    db
+      .prepare('SELECT COUNT(*) AS n FROM users')
+      .first<{ n: number }>()
+      .then((r) => r ?? { n: 0 }),
     getRegistration(db)
   ]);
   const needsSetup = userCount === 0;
@@ -77,12 +82,25 @@ auth.post('/register', async (c) => {
        SELECT ?1, ?2, ?3, ?4, ?5, ?6
        WHERE (?7 IS NULL OR EXISTS (SELECT 1 FROM invites WHERE code = ?7 AND used_by IS NULL AND used_at IS NULL AND (expires_at IS NULL OR expires_at > ?6)))
          AND (?8 = 0 OR NOT EXISTS (SELECT 1 FROM users))`,
-      id, handle, displayName, role, passwordHash, now, invite?.code ?? null, needsSetup ? 1 : 0
+      id,
+      handle,
+      displayName,
+      role,
+      passwordHash,
+      now,
+      invite?.code ?? null,
+      needsSetup ? 1 : 0
     )
   ];
   if (invite) {
     statements.push(
-      prep(db, 'UPDATE invites SET used_by = ?1, used_at = ?2 WHERE code = ?3 AND used_by IS NULL AND EXISTS (SELECT 1 FROM users WHERE id = ?1)', id, now, invite.code)
+      prep(
+        db,
+        'UPDATE invites SET used_by = ?1, used_at = ?2 WHERE code = ?3 AND used_by IS NULL AND EXISTS (SELECT 1 FROM users WHERE id = ?1)',
+        id,
+        now,
+        invite.code
+      )
     );
   }
   try {

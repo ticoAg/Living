@@ -27,10 +27,19 @@ export function Seg<T extends string>({
   const id = useId();
   return (
     <div className="field">
-      <span className="label" id={id}>{label}</span>
+      <span className="label" id={id}>
+        {label}
+      </span>
       <div className="seg sf-seg" role="group" aria-labelledby={id}>
         {options.map((o) => (
-          <button key={o.value} type="button" aria-pressed={value === o.value} title={o.hint} disabled={disabled} onClick={() => onChange(o.value)}>
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={value === o.value}
+            title={o.hint}
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+          >
             {o.label}
           </button>
         ))}
@@ -57,7 +66,9 @@ export function Toggle({
   return (
     <label className="sf-toggle" data-disabled={disabled || undefined}>
       <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
-      <span className="sf-toggle-track" aria-hidden="true"><span /></span>
+      <span className="sf-toggle-track" aria-hidden="true">
+        <span />
+      </span>
       <span className="sf-toggle-text">
         {label}
         {hint && <span className="small muted">{hint}</span>}
@@ -86,8 +97,12 @@ export function ConfirmBar({
     <div className="sf-confirm" role="alert">
       <p className="sf-confirm-text">{prompt}</p>
       <div className="row">
-        <button type="button" className="btn btn-danger" onClick={onConfirm} disabled={busy}>{busy ? '处理中…' : confirmLabel}</button>
-        <button type="button" className="btn btn-quiet" onClick={onCancel} disabled={busy}>{cancelLabel}</button>
+        <button type="button" className="btn btn-danger" onClick={onConfirm} disabled={busy}>
+          {busy ? '处理中…' : confirmLabel}
+        </button>
+        <button type="button" className="btn btn-quiet" onClick={onCancel} disabled={busy}>
+          {cancelLabel}
+        </button>
       </div>
     </div>
   );

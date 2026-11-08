@@ -11,12 +11,12 @@ sources:
 ---
 # 自动部署（默认）
 
-推送或合并到 `main` 会触发 Workers Builds：安装依赖，执行 `npm run build`，再执行部署命令 `npx wrangler d1 migrations apply living --remote && npx wrangler deploy`。触发条件、构建缓存和各项设置见 [构建与发布](/architecture/ci-cd.md)。
+推送或合并到 `main` 会触发 Workers Builds：安装依赖，执行 `npm run build`（检查、测试、构建），再执行部署命令 `npx wrangler d1 migrations apply living --remote && npx wrangler deploy`。触发条件、构建缓存和各项设置见 [构建与发布](/architecture/ci-cd.md)。
 
 发布前：
 
-1. 本地 `npm run typecheck` 通过；有新迁移时 `npm run db:migrate:local` 并在本地试一遍，见 [本地开发](/runbooks/local-dev.md)。
-2. 提 PR，合并到 `main`。
+1. 本地 `npm run check` 和 `npm test` 通过；有新迁移时 `npm run db:migrate:local` 并在本地试一遍，见 [本地开发](/runbooks/local-dev.md)。
+2. 提 PR，等 GitHub Actions 的检查通过后合并到 `main`。
 3. 在控制台看构建结果（见下一节）。
 
 发布后验证：
@@ -29,7 +29,7 @@ curl -s https://living.ticoag.fun/api/site
 
 失败时的行为：
 
-- 类型检查或 `vite build` 失败：不会部署，线上仍是上一个版本。
+- lint、类型检查、测试或 `vp build` 失败：不会部署，线上仍是上一个版本。
 - 迁移失败：部署命令在这一步停止，Worker 不会更新。修复方法是新增一个迁移，不要改已经应用过的迁移文件。
 
 # 查看日志
@@ -50,7 +50,8 @@ npm run build
 CLOUDFLARE_API_TOKEN=… npm run deploy
 ```
 
-- `npm run deploy` 即 `wrangler d1 migrations apply living --remote && wrangler deploy`，必须先 `npm run build` 生成 `dist/`。
+- `npm run deploy` 先执行 `npm run build`，再执行 `wrangler d1 migrations apply living --remote && wrangler deploy`。
+- `vp build` 生成 `dist/client/`（静态资源）和 `dist/living/`（Worker 与生成的 `wrangler.json`），并写入 `.wrangler/deploy/config.json`，之后的 `wrangler` 命令通过它读取构建出的配置，迁移目录仍指向 `migrations/`。没有构建就执行 `wrangler deploy` 会报错。
 - `account_id` 已写在 `wrangler.jsonc`，不需要 `CLOUDFLARE_ACCOUNT_ID`。
 - 令牌需要账号级的 Workers Scripts 编辑和 D1 编辑权限；首次部署或修改自定义域名、路由时，还要该区域的 Workers Routes 编辑权限。令牌只通过环境变量传入，不要写进仓库。
 
@@ -97,7 +98,7 @@ npx wrangler d1 time-travel restore living --timestamp=<unix 秒或 RFC3339 时�
 
 | 现象 | 处理 |
 |---|---|
-| 构建失败，报类型错误 | 本地 `npm run typecheck`，修好再推 |
+| 构建失败，报 lint、类型或测试错误 | 本地 `npm run check` 和 `npm test`，修好再推 |
 | 构建报 Worker 名称不一致 | 控制台里的 Worker 名必须与 `wrangler.jsonc` 的 `name`（`living`）一致 |
 | 依赖或构建产物像是旧的 | 控制台 Settings › Build › Build cache，点 Clear Cache 后重新构建 |
 | `/api`、`/media` 返回 429，页面能打开 | 免费版每天 10 万次 Worker 调用用完了，UTC 0 点重置，见 [决策：单个 Worker](/architecture/decisions/0001-single-worker.md) |

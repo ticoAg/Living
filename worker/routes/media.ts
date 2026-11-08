@@ -14,7 +14,12 @@ const PUBLIC_CACHE = 'public, max-age=31536000, immutable';
 const PRIVATE_CACHE = 'private, no-store';
 
 /** Serves an R2 object with ETag/304 support. `onlyIf` lets R2 evaluate If-None-Match without reading the body. */
-async function serve(c: Ctx, key: string, cacheControl: string, extra: Record<string, string> = {}): Promise<{ res: Response; full: boolean }> {
+async function serve(
+  c: Ctx,
+  key: string,
+  cacheControl: string,
+  extra: Record<string, string> = {}
+): Promise<{ res: Response; full: boolean }> {
   const obj = await c.env.MEDIA.get(key, { onlyIf: c.req.raw.headers });
   if (!obj) throw notFound('文件不存在');
   const headers = new Headers({

@@ -24,7 +24,14 @@ export default function Settings() {
 
   return (
     <main className="page-narrow se">
-      <PageHead title="设置" caption={<>@{user.handle} · {ROLE[user.role] ?? user.role}</>} />
+      <PageHead
+        title="设置"
+        caption={
+          <>
+            @{user.handle} · {ROLE[user.role] ?? user.role}
+          </>
+        }
+      />
 
       <nav className="se-nav" aria-label="设置分区">
         <a href="#profile">个人资料</a>
@@ -39,11 +46,17 @@ export default function Settings() {
         <ZonesSection />
         {staff && <AdminSection user={user} />}
         <div className="se-out">
-          <button type="button" className="btn btn-quiet" onClick={() => {
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => {
               // leave first, so the login guard does not bounce the guest back to /login?next=/settings
               navigate('/');
               void logout();
-            }}>退出登录</button>
+            }}
+          >
+            退出登录
+          </button>
         </div>
       </div>
     </main>

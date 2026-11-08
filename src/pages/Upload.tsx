@@ -9,7 +9,17 @@ import { PageHead } from '../studio/ui';
 import UploadDetails from '../studio/UploadDetails';
 import UploadItemPanel from '../studio/UploadItemPanel';
 import UploadQueue from '../studio/UploadQueue';
-import { applyMatch, buildForm, coordsOf, freshMatch, isBulkReady, newItem, statusOf, type Item, type StatusKey } from '../studio/upload-model';
+import {
+  applyMatch,
+  buildForm,
+  coordsOf,
+  freshMatch,
+  isBulkReady,
+  newItem,
+  statusOf,
+  type Item,
+  type StatusKey
+} from '../studio/upload-model';
 import { errMsg, useLeaveGuard, useRequireLogin, useTitle } from '../studio/util';
 import '../styles/studio.css';
 
@@ -315,9 +325,10 @@ export default function Upload() {
   );
 
   const clearPublished = useCallback(() => {
-    for (const it of itemsRef.current) if ((it.publish.state === 'done' || it.publish.state === 'duplicate') && it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+    for (const it of itemsRef.current)
+      if ((it.publish.state === 'done' || it.publish.state === 'duplicate') && it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
     update((prev) => prev.filter((i) => i.publish.state !== 'done' && i.publish.state !== 'duplicate'));
-    setSelectedId((cur) => (cur && itemsRef.current.some((i) => i.id === cur) ? cur : itemsRef.current[0]?.id ?? null));
+    setSelectedId((cur) => (cur && itemsRef.current.some((i) => i.id === cur) ? cur : (itemsRef.current[0]?.id ?? null)));
   }, [update]);
 
   const onPlace = useCallback((id: string, choice: PlaceChoice | null) => patch(id, { place: choice, cleared: choice == null }), [patch]);
@@ -359,7 +370,10 @@ export default function Upload() {
     for (const s of statuses) c.set(s.key, (c.get(s.key) ?? 0) + 1);
     return c;
   }, [statuses]);
-  const bulkCount = useMemo(() => items.filter((it, i) => it.stage === 'ready' && it.publish.state === 'idle' && statuses[i].key === 'matched').length, [items, statuses]);
+  const bulkCount = useMemo(
+    () => items.filter((it, i) => it.stage === 'ready' && it.publish.state === 'idle' && statuses[i].key === 'matched').length,
+    [items, statuses]
+  );
   const publishedCount = (counts.get('published') ?? 0) + (counts.get('duplicate') ?? 0);
   const othersOpen = selected ? items.filter((i) => i.id !== selected.id && i.stage === 'ready' && !settled(i)).length : 0;
 
@@ -370,7 +384,14 @@ export default function Upload() {
   if (!ready) return <p className="loading">加载中</p>;
 
   return (
-    <main className="page up" onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} data-dragging={dragging}>
+    <main
+      className="page up"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      data-dragging={dragging}
+    >
       <PageHead title="上传" caption="照片在浏览器里处理，确认后才会发到站点。关掉页面，没发布的照片不会入库。" />
 
       <label className="up-drop" data-active={dragging} data-compact={items.length > 0}>
@@ -392,7 +413,9 @@ export default function Upload() {
         <div className="up-grid">
           <aside className="up-col up-col-queue" aria-label="队列">
             <div className="up-queue-head">
-              <h2 className="up-h serif">队列 <span className="mono">{items.length}</span></h2>
+              <h2 className="up-h serif">
+                队列 <span className="mono">{items.length}</span>
+              </h2>
               <div className="up-summary small" aria-label="状态统计">
                 {SUMMARY.filter((s) => counts.get(s.key)).map((s) => (
                   <span key={s.key} className="up-chip" data-status={s.key}>
@@ -434,7 +457,15 @@ export default function Upload() {
           </section>
 
           <section className="up-col up-col-details" aria-label="整理">
-            <UploadDetails key={selected.id} item={selected} all={items} onPatch={onPatch} onPublish={(id) => void publishAndAdvance(id)} onApplyRest={applyRest} unpublishedOthers={othersOpen} />
+            <UploadDetails
+              key={selected.id}
+              item={selected}
+              all={items}
+              onPatch={onPatch}
+              onPublish={(id) => void publishAndAdvance(id)}
+              onApplyRest={applyRest}
+              unpublishedOthers={othersOpen}
+            />
           </section>
         </div>
       )}

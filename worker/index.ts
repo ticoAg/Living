@@ -89,11 +89,24 @@ app.notFound((c) => {
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {
-    return c.json({ error: err.code, message: err.message, ...err.extra }, err.status as ContentfulStatusCode, { 'Cache-Control': 'no-store' });
+    return c.json({ error: err.code, message: err.message, ...err.extra }, err.status as ContentfulStatusCode, {
+      'Cache-Control': 'no-store'
+    });
   }
   if (err instanceof HTTPException) {
     const status = err.status as ContentfulStatusCode;
-    const error = status === 400 ? 'invalid_input' : status === 401 ? 'unauthenticated' : status === 403 ? 'forbidden' : status === 404 ? 'not_found' : status === 413 ? 'too_large' : 'invalid_input';
+    const error =
+      status === 400
+        ? 'invalid_input'
+        : status === 401
+          ? 'unauthenticated'
+          : status === 403
+            ? 'forbidden'
+            : status === 404
+              ? 'not_found'
+              : status === 413
+                ? 'too_large'
+                : 'invalid_input';
     return c.json({ error, message: err.message || '请求有误' }, status, { 'Cache-Control': 'no-store' });
   }
   console.error('unhandled error', c.req.method, new URL(c.req.url).pathname, err instanceof Error ? (err.stack ?? err.message) : err);
