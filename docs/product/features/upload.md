@@ -20,8 +20,8 @@ sources:
 1. 拖入或选择多张照片（JPEG、PNG、WebP、AVIF、HEIC；单张不超过 50 MB）。iPhone 默认拍出的 HEIC 在所有浏览器里都能上传，见 [HEIC 与 HEIF](#heic-与-heif)。
 2. 浏览器端逐张处理：读取 EXIF（时间、时区、GPS、海拔、朝向、相机、镜头、焦距、光圈、快门、ISO）；按方向旋正；生成长边 480 / 1600 / 2560 的 WebP（不支持时用 JPEG）；生成 ThumbHash；提取 5 个主色；计算 SHA-256 用于去重。生成的图不含 EXIF。
 3. 有 GPS 的照片请求 [地点匹配](/product/features/poi-matching.md)，自动选中第一名；拿不准时标记"待确认"。
-4. 没有 GPS 的照片，按拍摄时间找同批里前后 2 小时内最近的一张有地点的照片，给出"按时间推断"；也可以搜索地点或新建自定义地点。
-5. 每张照片可填标题、[笔记](/product/features/photo-notes.md)、[标签](/product/features/hierarchical-tags.md)（含自动建议）、公开范围、位置精度、是否进入 Living、加入哪些 [主题](/product/features/themes.md)。
+4. 没有 GPS 的照片，按拍摄时间找同批里前后 2 小时内最近的一张有地点的照片，给出"按时间推断"；也可以搜索地点或新建自定义地点。有 GPS 的照片可以在附近地点列表里选，或搜索附近的地点。
+5. 每张照片可填标题、[笔记](/product/features/photo-notes.md)、[标签](/product/features/hierarchical-tags.md)（含自动建议）、公开范围、位置精度、加入哪些 [主题](/product/features/themes.md)。是否进入 Living 和收藏不在上传时选：默认进入 Living、不收藏，发布后在照片编辑页修改。
 6. 发布：上传原图和三种尺寸到 R2，写入 D1。可逐张发布，也可"发布全部已匹配"。
 
 # HEIC 与 HEIF

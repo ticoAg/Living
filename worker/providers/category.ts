@@ -107,3 +107,56 @@ export function categoryFromOsm(tags: Tags, name: string): PoiCategory | null {
   if (!c) return null;
   return applySuffix(c, name);
 }
+
+const LODGING: ReadonlySet<string> = new Set([
+  'hotel',
+  'hostel',
+  'motel',
+  'guest_house',
+  'apartment',
+  'chalet',
+  'camp_site',
+  'caravan_site',
+  'alpine_hut',
+  'wilderness_hut'
+]);
+const FOOD_AND_DRINK: ReadonlySet<string> = new Set([
+  'cafe',
+  'restaurant',
+  'fast_food',
+  'bar',
+  'pub',
+  'ice_cream',
+  'food_court',
+  'biergarten'
+]);
+
+/**
+ * `categoryFromOsm`, widened for a list of everything named nearby: shops, hotels, stations, offices and named
+ * buildings get a category too instead of being dropped. Signposts, maps and boundary stones still are.
+ */
+export function categoryFromOsmAny(tags: Tags, name: string): PoiCategory | null {
+  if (!name) return null;
+  const { tourism, historic, amenity, shop, building, office, railway, aeroway, leisure, waterway, highway, landuse } = tags;
+  if (tourism === 'information' || historic === 'boundary_stone') return null;
+  if (tourism && LODGING.has(tourism)) return applySuffix('建筑', name);
+  const strict = categoryFromOsm(tags, name);
+  if (strict) return strict;
+
+  let c: PoiCategory | null = null;
+  if (amenity) c = FOOD_AND_DRINK.has(amenity) ? '店' : '建筑';
+  else if (shop) c = '店';
+  else if (
+    railway === 'station' ||
+    railway === 'halt' ||
+    tags['public_transport'] === 'station' ||
+    aeroway === 'aerodrome' ||
+    aeroway === 'terminal'
+  )
+    c = '建筑';
+  else if (building || office) c = '建筑';
+  else if (leisure) c = '景';
+  else if (waterway === 'river' || waterway === 'canal') c = '湖';
+  else if (highway === 'pedestrian' || landuse === 'residential') c = '街区';
+  return c ? applySuffix(c, name) : null;
+}

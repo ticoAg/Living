@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { CATEGORY_RADIUS } from '../../shared/geo';
 import { POI_CATEGORIES } from '../../shared/types';
-import { applySuffix, categoryFromAmap, categoryFromOsm, isAreaCategory, radiusOf } from './category';
+import { applySuffix, categoryFromAmap, categoryFromOsm, categoryFromOsmAny, isAreaCategory, radiusOf } from './category';
 
 describe('isAreaCategory', () => {
   it('is true for the categories whose places are areas', () => {
@@ -252,5 +252,47 @@ describe('categoryFromOsm', () => {
     expect(categoryFromOsm({ historic: 'archaeological_site' }, '灵隐寺')).toBe('寺');
     expect(categoryFromOsm({ amenity: 'cafe' }, '某某园')).toBe('店');
     expect(categoryFromOsm({ amenity: 'restaurant' }, '山外山')).toBe('店');
+  });
+});
+
+describe('categoryFromOsmAny', () => {
+  it('agrees with categoryFromOsm wherever that has an answer', () => {
+    for (const tags of [
+      { man_made: 'bridge' },
+      { natural: 'peak' },
+      { leisure: 'park' },
+      { amenity: 'place_of_worship' },
+      { historic: 'ruins' }
+    ]) {
+      expect(categoryFromOsmAny(tags, '某处')).toBe(categoryFromOsm(tags, '某处'));
+    }
+  });
+
+  it('files the ordinary places a nearby list should show', () => {
+    expect(categoryFromOsmAny({ amenity: 'fast_food' }, '某店')).toBe('店');
+    expect(categoryFromOsmAny({ amenity: 'hospital' }, '某院')).toBe('建筑');
+    expect(categoryFromOsmAny({ shop: 'mall' }, '某处')).toBe('店');
+    expect(categoryFromOsmAny({ railway: 'station' }, '某站')).toBe('建筑');
+    expect(categoryFromOsmAny({ building: 'yes' }, '某楼')).toBe('建筑');
+    expect(categoryFromOsmAny({ office: 'company' }, '某处')).toBe('建筑');
+    expect(categoryFromOsmAny({ leisure: 'marina' }, '某处')).toBe('景');
+    expect(categoryFromOsmAny({ waterway: 'canal' }, '内金水河')).toBe('湖');
+    expect(categoryFromOsmAny({ landuse: 'residential' }, '某小区')).toBe('街区');
+  });
+
+  it('calls hotels buildings, not sights', () => {
+    expect(categoryFromOsm({ tourism: 'hotel' }, '望湖宾馆')).toBe('景');
+    expect(categoryFromOsmAny({ tourism: 'hotel' }, '望湖宾馆')).toBe('建筑');
+  });
+
+  it('still drops signs, maps, boundary stones, ordinary roads and unnamed things', () => {
+    expect(categoryFromOsmAny({ tourism: 'information' }, '导览图')).toBeNull();
+    expect(categoryFromOsmAny({ historic: 'boundary_stone' }, '界碑')).toBeNull();
+    expect(categoryFromOsmAny({ highway: 'primary' }, '北山街')).toBeNull();
+    expect(categoryFromOsmAny({ shop: 'bakery' }, '')).toBeNull();
+  });
+
+  it('lets the name decide when it ends in a telling word', () => {
+    expect(categoryFromOsmAny({ building: 'yes' }, '保俶塔')).toBe('塔');
   });
 });

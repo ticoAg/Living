@@ -15,7 +15,7 @@ Worker `living` (Hono)
   ├─ D1  `living`         用户、照片、标签、地点、主题、邀请、设置
   ├─ R2  `living-photos`  原图 o/{ownerId}/{photoId}.{ext}，尺寸图 v/{photoId}/{s|m|l}.{webp|jpg}
   ├─ KV  `living-kv`      会话 sess:*、限流 rl:*、地点与逆地理缓存 poi:* geo:*
-  └─ 外部：高德 Web 服务（可选）、OpenStreetMap Overpass / Nominatim
+  └─ 外部：高德 Web 服务（可选）、OpenStreetMap Photon / Nominatim（Overpass 作后备）
 地图瓦片：OpenFreeMap（浏览器直连）
 ```
 

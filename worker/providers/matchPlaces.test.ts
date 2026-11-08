@@ -74,13 +74,40 @@ const elementAt = (bearing: number, meters: number, id: number, tags: Record<str
 
 const CHINA_ADDRESS = { address: { country_code: 'cn', city: '西湖区', state_district: '杭州市' } };
 
-/** An OpenStreetMap world: Overpass and Nominatim answer with the given bodies (or fail when given a status). */
-function osm(overpass: { elements: unknown[] } | number, nominatim: unknown = CHINA_ADDRESS) {
+type Element = ReturnType<typeof elementAt>;
+
+/** The same places as Photon reports them: a GeoJSON point and the main OSM tag. */
+const photonOf = (elements: Element[]) => ({
+  type: 'FeatureCollection',
+  features: elements.map((e) => {
+    const [key, value] = Object.entries(e.tags).find(([k]) => k !== 'name') ?? ['', ''];
+    return {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [e.lon, e.lat] },
+      properties: { osm_type: 'N', osm_id: e.id, osm_key: key, osm_value: value, name: e.tags['name'] }
+    };
+  })
+});
+
+/**
+ * An OpenStreetMap world: Photon and Overpass both know `places` (or fail when given a status), Nominatim answers the
+ * reverse geocode with `nominatim`.
+ */
+function osm(places: { elements: Element[] } | number, nominatim: unknown = CHINA_ADDRESS) {
   return (url: URL) => {
-    const body = url.hostname.includes('overpass') ? overpass : nominatim;
+    const body =
+      url.hostname === 'photon.komoot.io'
+        ? typeof places === 'number'
+          ? places
+          : photonOf(places.elements)
+        : url.hostname.includes('overpass')
+          ? places
+          : nominatim;
     return typeof body === 'number' ? new Response('error', { status: body }) : Response.json(body);
   };
 }
+
+const hosts = (calls: URL[]) => calls.map((u) => u.hostname).sort();
 
 let warn: ReturnType<typeof vi.spyOn>;
 
@@ -171,6 +198,25 @@ describe('matchPlaces with OpenStreetMap', () => {
 describe('matchPlaces when a provider fails', () => {
   const stored = () => ({ pois: [poiAt(90, 250, { id: 'poi_temple', name: '净慈寺', category: '寺', radius: 150 })] });
 
+  it('falls back to Overpass when Photon is down', async () => {
+    const elements = [elementAt(0, 100, 1, { name: '雷峰塔', tourism: 'attraction' })];
+    stubFetch((url) => (url.hostname === 'photon.komoot.io' ? new Response('down', { status: 502 }) : osm({ elements })(url)));
+    const result = await matchPlaces(makeEnv().env, 'u_1', INPUT);
+    expect(result.provider).toBe('osm');
+    expect(result.candidates.map((c) => c.name)).toEqual(['雷峰塔']);
+    expect(warn).toHaveBeenCalledWith('photon nearby failed, trying overpass', 'photon reverse: HTTP 502');
+  });
+
+  it('still lists places when only one of the two Photon requests fails', async () => {
+    const elements = [elementAt(0, 100, 1, { name: '雷峰塔', tourism: 'attraction' })];
+    // the landmark request carries osm_tag filters; let only that one fail
+    const calls = stubFetch((url) => (url.searchParams.has('osm_tag') ? new Response('busy', { status: 503 }) : osm({ elements })(url)));
+    const result = await matchPlaces(makeEnv().env, 'u_1', INPUT);
+    expect(result.provider).toBe('osm');
+    expect(result.candidates.map((c) => c.name)).toEqual(['雷峰塔']);
+    expect(calls.some((u) => u.hostname.includes('overpass'))).toBe(false);
+  });
+
   it('still answers with the stored places and says the provider was "local"', async () => {
     stubFetch(osm(500));
     const result = await matchPlaces(makeEnv(stored()).env, 'u_1', INPUT);
@@ -258,7 +304,7 @@ describe('matchPlaces with AMap', () => {
     const calls = stubFetch(osm({ elements: [] }, { address: { city: 'Tokyo', suburb: 'Shibuya' } }));
     const result = await matchPlaces(env().env, 'u_1', { lat: 35.6595, lng: 139.7005, heading: null, radius: 300 });
     expect(result.provider).toBe('osm');
-    expect(calls.map((u) => u.hostname).sort()).toEqual(['nominatim.openstreetmap.org', 'overpass-api.de']);
+    expect(hosts(calls)).toEqual(['nominatim.openstreetmap.org', 'photon.komoot.io', 'photon.komoot.io']);
     expect(result).toMatchObject({ city: 'Tokyo', district: 'Shibuya' });
   });
 
@@ -277,7 +323,7 @@ describe('matchPlaces caching', () => {
     stubFetch(osm({ elements }));
     const { env, kv } = makeEnv();
     await matchPlaces(env, 'u_1', INPUT);
-    expect([...kv.store.keys()].sort()).toEqual(['geo:rev:osm:30.232:120.148', 'poi:near:osm:30.2316:120.1479:300']);
+    expect([...kv.store.keys()].sort()).toEqual(['geo:rev:osm:30.232:120.148', 'poi:near:photon:30.2316:120.1479:300']);
     expect(kv.puts.every((p) => (p.options as { expirationTtl: number }).expirationTtl === 604_800)).toBe(true);
   });
 
@@ -286,7 +332,8 @@ describe('matchPlaces caching', () => {
     const { env } = makeEnv();
     const first = await matchPlaces(env, 'u_1', INPUT);
     const second = await matchPlaces(env, 'u_2', INPUT);
-    expect(calls).toHaveLength(2);
+    // two Photon requests (nearest anything, nearest landmarks) and one reverse geocode
+    expect(calls).toHaveLength(3);
     expect(second).toEqual(first);
   });
 
@@ -295,7 +342,7 @@ describe('matchPlaces caching', () => {
     const { env } = makeEnv();
     await matchPlaces(env, 'u_1', INPUT);
     await matchPlaces(env, 'u_1', { ...INPUT, radius: 500 });
-    expect(calls.map((u) => u.hostname)).toEqual(['overpass-api.de', 'nominatim.openstreetmap.org', 'overpass-api.de']);
+    expect(hosts(calls)).toEqual(['nominatim.openstreetmap.org', ...Array<string>(4).fill('photon.komoot.io')]);
   });
 
   it('shares an answer between photos a few metres apart', async () => {
@@ -303,13 +350,13 @@ describe('matchPlaces caching', () => {
     const { env } = makeEnv();
     await matchPlaces(env, 'u_1', INPUT);
     await matchPlaces(env, 'u_1', { ...INPUT, lat: PHOTO.lat + 0.00001, lng: PHOTO.lng - 0.00001 });
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
   });
 
   it('does not cache a failed lookup, so the next photo tries again', async () => {
     let healthy = false;
     const calls = stubFetch((url) =>
-      healthy || !url.hostname.includes('overpass') ? osm({ elements })(url) : new Response('busy', { status: 500 })
+      healthy || !/photon|overpass/.test(url.hostname) ? osm({ elements })(url) : new Response('busy', { status: 500 })
     );
     const { env } = makeEnv();
     expect((await matchPlaces(env, 'u_1', INPUT)).provider).toBe('local');
@@ -317,6 +364,8 @@ describe('matchPlaces caching', () => {
     const retry = await matchPlaces(env, 'u_1', INPUT);
     expect(retry.provider).toBe('osm');
     expect(retry.candidates.map((c) => c.name)).toEqual(['雷峰塔']);
-    expect(calls.filter((u) => u.hostname.includes('overpass'))).toHaveLength(2);
+    // Photon twice per attempt; Overpass only as the fallback of the failed first attempt
+    expect(calls.filter((u) => u.hostname === 'photon.komoot.io')).toHaveLength(4);
+    expect(calls.filter((u) => u.hostname.includes('overpass'))).toHaveLength(1);
   });
 });

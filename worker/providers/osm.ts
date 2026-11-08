@@ -1,12 +1,43 @@
-// OpenStreetMap: Overpass for nearby places, Nominatim for reverse geocoding and name search.
-// Both are WGS-84, so no coordinate conversion is needed.
+// OpenStreetMap, through free public services: Photon (komoot) for nearby places and name search, Nominatim for reverse
+// geocoding and name search, Overpass as a fallback for nearby places (its public servers are often overloaded).
+// All are WGS-84, so no coordinate conversion is needed.
 
-import { categoryFromOsm } from './category';
+import { categoryFromOsm, categoryFromOsmAny } from './category';
 import { fetchJson, UpstreamError } from './http';
 import type { ExternalPlace, Geocode } from './types';
 
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
+const PHOTON = 'https://photon.komoot.io';
+
+/** How far a name search reaches around the photo, in degrees each way (about 6 km). */
+export const NEAR_SEARCH_DEGREES = 0.06;
+/** Photon answers at most about 50 features per request. */
+const PHOTON_LIMIT = 50;
+/**
+ * The second nearby query keeps only these OSM tags (any one), so landmarks still show up where shops and offices fill
+ * the nearest 50.
+ */
+export const SCENIC_TAGS = [
+  'tourism',
+  'historic',
+  'leisure',
+  'natural',
+  'man_made:bridge',
+  'man_made:tower',
+  'man_made:pier',
+  'amenity:place_of_worship',
+  'waterway',
+  'place:square',
+  'place:island',
+  'place:village'
+];
+
+type LatLng = { lat: number; lng: number };
+
+/** A `minLon,minLat,maxLon,maxLat` box around a point (Photon's bbox and Nominatim's viewbox both take this order). */
+export const bboxAround = (at: LatLng, d = NEAR_SEARCH_DEGREES) =>
+  [at.lng - d, at.lat - d, at.lng + d, at.lat + d].map((v) => v.toFixed(4)).join(',');
 
 export interface OverpassElement {
   type: 'node' | 'way' | 'relation';
@@ -143,9 +174,13 @@ interface NominatimHit {
   address?: NominatimAddress;
 }
 
-/** Name search via Nominatim (used when no AMap key is configured). */
-export async function nominatimSearch(q: string): Promise<ExternalPlace[]> {
+/** Name search via Nominatim; with a point, only within about 6 km of it. */
+export async function nominatimSearch(q: string, near: LatLng | null = null): Promise<ExternalPlace[]> {
   const qs = new URLSearchParams({ format: 'jsonv2', q, limit: '10', addressdetails: '1', 'accept-language': 'zh-CN' });
+  if (near) {
+    qs.set('viewbox', bboxAround(near));
+    qs.set('bounded', '1');
+  }
   const data = await fetchJson<NominatimHit[]>(`${NOMINATIM}/search?${qs.toString()}`, 'nominatim search');
   if (!Array.isArray(data)) throw new UpstreamError('nominatim search: unexpected response');
   const out: ExternalPlace[] = [];
@@ -163,4 +198,98 @@ export async function nominatimSearch(q: string): Promise<ExternalPlace[]> {
     out.push({ source: 'osm', sourceId: `${h.osm_type}/${h.osm_id}`, name, category, lat, lng, city: g.city, district: g.district });
   }
   return out;
+}
+
+export interface PhotonFeature {
+  geometry?: { coordinates?: number[] };
+  properties?: {
+    osm_type?: string;
+    osm_id?: number;
+    osm_key?: string;
+    osm_value?: string;
+    name?: string;
+    city?: string;
+    district?: string;
+    county?: string;
+    countrycode?: string;
+  };
+}
+
+const OSM_TYPE: Record<string, string> = { N: 'node', W: 'way', R: 'relation' };
+
+/** Photon features → places. Photon reports one main OSM tag per feature, which decides the category. */
+export function parsePhoton(features: PhotonFeature[]): ExternalPlace[] {
+  const out: ExternalPlace[] = [];
+  const seen = new Set<string>();
+  for (const f of features) {
+    const p = f.properties ?? {};
+    const name = p.name?.trim();
+    const [lng, lat] = f.geometry?.coordinates ?? [];
+    const type = OSM_TYPE[p.osm_type ?? ''];
+    if (!name || !type || typeof p.osm_id !== 'number' || typeof lat !== 'number' || typeof lng !== 'number') continue;
+    const sourceId = `${type}/${p.osm_id}`;
+    if (seen.has(sourceId)) continue;
+    const category = p.osm_key && p.osm_value ? categoryFromOsmAny({ [p.osm_key]: p.osm_value }, name) : null;
+    if (!category) continue;
+    seen.add(sourceId);
+    // Only a city or county from Photon is trusted; without one the caller fills in the reverse geocode.
+    const g =
+      p.city || p.county
+        ? geocodeFromAddress({ city: p.city, district: p.district, county: p.county, country_code: p.countrycode?.toLowerCase() })
+        : null;
+    out.push({ source: 'osm', sourceId, name, category, lat, lng, city: g?.city ?? null, district: g?.district ?? null });
+  }
+  return out;
+}
+
+async function photonFeatures(url: string, label: string): Promise<PhotonFeature[]> {
+  const data = await fetchJson<{ features?: PhotonFeature[] }>(url, label);
+  if (!Array.isArray(data.features)) throw new UpstreamError(`${label}: unexpected response`);
+  return data.features;
+}
+
+/**
+ * Named places within `radius` metres, nearest first: the nearest of any kind (shops, cafés, buildings…) plus, in a
+ * second request, the nearest landmarks. One of the two failing still gives a list.
+ */
+export async function photonNearby(lat: number, lng: number, radius: number): Promise<ExternalPlace[]> {
+  const base = { lat: lat.toFixed(5), lon: lng.toFixed(5), limit: String(PHOTON_LIMIT), radius: (Math.max(radius, 30) / 1000).toFixed(3) };
+  const scenic = new URLSearchParams(base);
+  for (const tag of SCENIC_TAGS) scenic.append('osm_tag', tag);
+  const answers = await Promise.allSettled([
+    photonFeatures(`${PHOTON}/reverse?${new URLSearchParams(base).toString()}`, 'photon reverse'),
+    photonFeatures(`${PHOTON}/reverse?${scenic.toString()}`, 'photon reverse')
+  ]);
+  const ok = answers.flatMap((a) => (a.status === 'fulfilled' ? [a.value] : []));
+  if (!ok.length) throw (answers[0] as PromiseRejectedResult).reason;
+  return parsePhoton(ok.flat());
+}
+
+/** Nearby places from OpenStreetMap: Photon, or Overpass when Photon is down. */
+export async function osmNearby(lat: number, lng: number, radius: number): Promise<ExternalPlace[]> {
+  try {
+    return await photonNearby(lat, lng, radius);
+  } catch (e) {
+    console.warn('photon nearby failed, trying overpass', e instanceof Error ? e.message : e);
+    return overpassAround(lat, lng, radius);
+  }
+}
+
+/** Photon name search; with a point, limited to about 6 km around it and ranked by closeness. */
+export async function photonSearch(q: string, near: LatLng | null): Promise<ExternalPlace[]> {
+  const qs = new URLSearchParams({ q, limit: '20' });
+  if (near) {
+    qs.set('lat', near.lat.toFixed(5));
+    qs.set('lon', near.lng.toFixed(5));
+    qs.set('bbox', bboxAround(near));
+  }
+  return parsePhoton(await photonFeatures(`${PHOTON}/api?${qs.toString()}`, 'photon search'));
+}
+
+/** Name search on OpenStreetMap through Photon and Nominatim together; fails only when both do. */
+export async function osmSearch(q: string, near: LatLng | null): Promise<ExternalPlace[]> {
+  const answers = await Promise.allSettled([photonSearch(q, near), nominatimSearch(q, near)]);
+  const ok = answers.flatMap((a) => (a.status === 'fulfilled' ? [a.value] : []));
+  if (!ok.length) throw (answers[0] as PromiseRejectedResult).reason;
+  return ok.flat();
 }

@@ -352,8 +352,6 @@ export default function Upload() {
                 visibility: src.visibility,
                 geoPrivacy: it.match?.res?.privacyZone ? 'hidden' : src.geoPrivacy,
                 geoTouched: it.geoTouched || src.geoTouched,
-                inLiving: src.inLiving,
-                favorite: src.favorite,
                 themeIds: [...src.themeIds]
               }
         )

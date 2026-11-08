@@ -31,10 +31,12 @@ interface Props {
   tags: { value: string[]; suggested?: string[]; onChange: (ids: string[]) => void };
   /** why location precision cannot be changed (photo inside a privacy zone) */
   geoLocked?: string | null;
+  /** show the Living and favourite switches (the photo editor does; the upload form keeps their defaults) */
+  toggles?: boolean;
   disabled?: boolean;
 }
 
-export default function PhotoFields({ value, onChange, tags, geoLocked, disabled }: Props) {
+export default function PhotoFields({ value, onChange, tags, geoLocked, toggles = true, disabled }: Props) {
   const id = useId();
   return (
     <div className="stack pf" style={{ ['--gap' as string]: '20px' }}>
@@ -91,16 +93,18 @@ export default function PhotoFields({ value, onChange, tags, geoLocked, disabled
         hint={geoLocked ?? '对他人生效，你自己始终看到原值'}
       />
 
-      <div className="pf-toggles">
-        <Toggle
-          label="进入 Living"
-          hint="参与全屏轮播"
-          checked={value.inLiving}
-          onChange={(v) => onChange({ inLiving: v })}
-          disabled={disabled}
-        />
-        <Toggle label="收藏" checked={value.favorite} onChange={(v) => onChange({ favorite: v })} disabled={disabled} />
-      </div>
+      {toggles && (
+        <div className="pf-toggles">
+          <Toggle
+            label="进入 Living"
+            hint="参与全屏轮播"
+            checked={value.inLiving}
+            onChange={(v) => onChange({ inLiving: v })}
+            disabled={disabled}
+          />
+          <Toggle label="收藏" checked={value.favorite} onChange={(v) => onChange({ favorite: v })} disabled={disabled} />
+        </div>
+      )}
     </div>
   );
 }
