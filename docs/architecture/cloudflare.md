@@ -1,7 +1,7 @@
 ---
 type: Infrastructure
 title: Cloudflare 资源
-description: Living 在 Cloudflare 账号 6f12e69d… 下使用的 Worker、D1、R2、KV、自定义域名与构建配置。
+description: Living 在 Cloudflare 账号 6f12e69d… 下使用的 Worker、D1、R2、KV、自定义域名、构建配置与每小时的定时任务。
 tags: [architecture, cloudflare]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/wrangler.jsonc
@@ -23,6 +23,16 @@ sources:
 | Git 连接 | GitHub `ticoAg/Living` | 连接 `698a6c91-dcf8-461c-a196-797ace8fc0c9` | — |
 
 `workers.dev` 与预览地址关闭，只通过自定义域名访问。可观测性（Workers Logs）开启。
+
+# 定时任务
+
+`wrangler.jsonc` 的 `triggers.crons` 设为 `23 * * * *`：每小时第 23 分钟，Worker 的 `scheduled` 处理函数（`worker/index.ts`）调用 `worker/lib/regions.ts` 补全照片的省份。
+
+- 每次随机取最多 8 张还没有省份、有坐标（自己的或所在地点的）的照片，逐张逆地理编码，两张之间停 2.2 秒（Nominatim 要求每秒最多一次请求，一次查询可能要两次请求）。
+- 写入 `province`，`city`、`district` 只在为空时填写；查不到省份的写 `''`；外部服务出错的留到下一小时。规则见 [photos](/data/photos.md#省市区县)。
+- 与地点匹配共用数据源和 KV 缓存 `geo:rev2:`，配置了 `AMAP_KEY` 时中国境内用高德。
+- 结果写进 Workers Logs：`regions {"filled":…,"empty":…,"failed":…}`。本地开发时用 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"` 触发一次。
+- Cron 触发器在免费版里不另外计费，每次运行算一次请求。
 
 # 变量与密钥
 

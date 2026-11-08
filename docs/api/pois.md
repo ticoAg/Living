@@ -26,8 +26,11 @@ tags: [api, places]
 3. 与站内候选去重：相同 `source + sourceId`，或同名且相距 < 80 米。
 4. 类别：由高德类型或 OSM 标签映射（OSM 的店铺、酒店、车站、写字楼和有名字的建筑也有类别），再按名称后缀（桥 湖 山 寺 塔 岛 村 园 亭 堤）修正；取值见 `shared/types.ts` 的 `POI_CATEGORIES`。
 5. 打分：`distance − (inView ? 25 : 0) − (local ? 10 : 0)`；`inView` = 有朝向且方位角与朝向相差 ≤ 30°。面状候选（湖泊、公园、区县）在范围内时 `area: true`、`distance: 0`，排在点状候选之后。
-6. 逆地理：与第 2 步同一数据源，高德 `v3/geocode/regeo` 或 Nominatim `reverse`（`User-Agent: Living/1.0 (+https://living.ticoag.fun)`，`accept-language=zh-CN`），得到 `city`、`district`；直辖市的城市取省名。
-7. KV 缓存 7 天：`poi:near:<amap|photon>:<lat 4 位>:<lng 4 位>:<radius>`、`geo:rev:<provider>:<lat 3 位>:<lng 3 位>`。外部请求超时 8 秒；失败时 `provider: "local"`，只返回站内候选。
+6. 逆地理：与第 2 步同一数据源，高德 `v3/geocode/regeo` 或 Nominatim `reverse`（`User-Agent: Living/1.0 (+https://living.ticoag.fun)`，`accept-language=zh-CN`），得到 `province`、`city`、`district`；直辖市的城市取省名。`province` 只来自逆地理，失败时为 `null`；`city`、`district` 失败时取最近的站内候选的。
+   - Nominatim 的省份取 `state`（日本是 `province`），北京等直辖市按 ISO 代码命名；同一个名字给出简繁两种写法（`第七区;第七區`）时取第一个。
+   - 中国大陆的地址字段不固定：区县可能在 `city`、`district` 或 `county`，乡镇、街道、苏木可能在 `city`，地级市在 `state_district`、`region` 或 `league`，也可能没有。区县取这些字段里第一个以区、县、旗结尾的，或已知地级市之下的县级市（义乌市、北流市）；城市取地级市；乡镇不会被当成城市。
+   - 地址里没有直接写出地级市时（西湖区、义乌市都是这样），再以 zoom 7 请求一次 Nominatim，它返回的是地级市；比较两者分出县级市。第二次请求失败时整个逆地理算失败，不缓存只有一半的结果。
+7. KV 缓存 7 天：`poi:near:<amap|photon>:<lat 4 位>:<lng 4 位>:<radius>`、`geo:rev2:<provider>:<lat 3 位>:<lng 3 位>`（每小时的省份补全也用这个缓存）。外部请求超时 8 秒；失败时 `provider: "local"`，只返回站内候选。
 8. `privacyZone`：坐标落在请求者某个隐私区域内时返回区域名。
 
 # GET /api/pois/search?q=&lat=&lng=（登录）
