@@ -43,7 +43,17 @@ interface Props {
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 let lib: Promise<typeof import('maplibre-gl')> | null = null;
-const loadLib = () => (lib ??= Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m]) => m));
+// MapLibre 6 looks for its worker next to its own module file, which a bundle does not keep; point it at the worker Vite
+// builds from the package (with the shared chunk it imports).
+const loadLib = () =>
+  (lib ??= Promise.all([
+    import('maplibre-gl'),
+    import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'),
+    import('maplibre-gl/dist/maplibre-gl.css')
+  ]).then(([m, worker]) => {
+    m.setWorkerUrl(worker.default);
+    return m;
+  }));
 
 function restyle(map: MLMap) {
   for (const l of map.getStyle().layers ?? []) {
@@ -168,13 +178,13 @@ export default function MapView({
     const map = mapRef.current;
     const m = libRef.current;
     if (!ready || !map || !m) return;
-    (map.getSource('lv-circles') as GeoJSONSource).setData(
+    void (map.getSource('lv-circles') as GeoJSONSource).setData(
       fc((shapes?.circles ?? []).map((c) => poly(circleRing(c.lat, c.lng, c.radius))))
     );
-    (map.getSource('lv-cones') as GeoJSONSource).setData(
+    void (map.getSource('lv-cones') as GeoJSONSource).setData(
       fc((shapes?.cones ?? []).map((c) => poly(coneRing(c.lat, c.lng, c.heading, c.radius ?? 70), { muted: !!c.muted })))
     );
-    (map.getSource('lv-lines') as GeoJSONSource).setData(
+    void (map.getSource('lv-lines') as GeoJSONSource).setData(
       fc(
         (shapes?.lines ?? []).map((l) => ({
           type: 'Feature',
