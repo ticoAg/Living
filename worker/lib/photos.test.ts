@@ -11,7 +11,7 @@ import type { PoiRow } from './poi';
 //  fuzzy      | fuzz()        | null         | as stored               | as stored
 //  hidden     | null          | null         | null                    | null
 //
-// The owner always sees everything. `city` is always returned.
+// The owner always sees everything. `province` and `city` are always returned; `district` follows the table in lists too.
 
 const OWNER = 'u_owner';
 const STRANGER = 'u_stranger';
@@ -36,6 +36,7 @@ const row = (over: Partial<PhotoRow> = {}): PhotoRow => ({
   alt: 12.5,
   heading: 123.4,
   geo_privacy: 'exact',
+  province: '浙江省',
   city: '杭州',
   district: '西湖区',
   poi_id: 'poi_1',
@@ -82,27 +83,29 @@ const POI: PoiRow = {
 };
 
 describe('toSummary', () => {
-  describe.each<[GeoPrivacy, number | null, number | null, number | null, string | null]>([
-    // geoPrivacy, lat, lng, heading, poiId — as a stranger sees them
-    ['exact', 30.25912, 120.13878, 123.4, 'poi_1'],
-    ['fuzzy', 30.26, 120.14, null, 'poi_1'],
-    ['hidden', null, null, null, null]
-  ])('%s photo seen by someone else', (geoPrivacy, lat, lng, heading, poiId) => {
+  describe.each<[GeoPrivacy, number | null, number | null, number | null, string | null, string | null]>([
+    // geoPrivacy, lat, lng, heading, poiId, district — as a stranger sees them
+    ['exact', 30.25912, 120.13878, 123.4, 'poi_1', '西湖区'],
+    ['fuzzy', 30.26, 120.14, null, 'poi_1', '西湖区'],
+    ['hidden', null, null, null, null, null]
+  ])('%s photo seen by someone else', (geoPrivacy, lat, lng, heading, poiId, district) => {
     it('follows the documented table', () => {
       const s = toSummary(row({ geo_privacy: geoPrivacy }), STRANGER);
       expect(s.lat).toBe(lat);
       expect(s.lng).toBe(lng);
       expect(s.heading).toBe(heading);
       expect(s.poiId).toBe(poiId);
+      expect(s.district).toBe(district);
     });
 
     it('is the same for a visitor who is not signed in', () => {
       expect(toSummary(row({ geo_privacy: geoPrivacy }), null)).toEqual(toSummary(row({ geo_privacy: geoPrivacy }), STRANGER));
     });
 
-    it('still reports the stored setting and always returns the city', () => {
+    it('still reports the stored setting and always returns the province and city', () => {
       const s = toSummary(row({ geo_privacy: geoPrivacy }), STRANGER);
       expect(s.geoPrivacy).toBe(geoPrivacy);
+      expect(s.province).toBe('浙江省');
       expect(s.city).toBe('杭州');
     });
   });
@@ -110,7 +113,14 @@ describe('toSummary', () => {
   it('lets the owner see everything exactly, whatever the setting', () => {
     for (const geoPrivacy of ['exact', 'fuzzy', 'hidden'] as const) {
       const s = toSummary(row({ geo_privacy: geoPrivacy }), OWNER);
-      expect(s, geoPrivacy).toMatchObject({ lat: 30.25912, lng: 120.13878, heading: 123.4, poiId: 'poi_1', geoPrivacy });
+      expect(s, geoPrivacy).toMatchObject({
+        lat: 30.25912,
+        lng: 120.13878,
+        heading: 123.4,
+        poiId: 'poi_1',
+        district: '西湖区',
+        geoPrivacy
+      });
     }
   });
 
@@ -141,7 +151,9 @@ describe('toSummary', () => {
       variants: VARIANTS,
       palette: ['#112233', '#AABBCC'],
       poiId: 'poi_1',
+      province: '浙江省',
       city: '杭州',
+      district: '西湖区',
       tagIds: ['lake', 'bridge'],
       visibility: 'public',
       geoPrivacy: 'exact',
@@ -183,6 +195,11 @@ describe('toSummary', () => {
 
   it('keeps a photo without a capture time', () => {
     expect(toSummary(row({ taken_at: null }), OWNER).takenAt).toBeNull();
+  });
+
+  it('reads a province that was looked up without a result, stored as an empty string, as none', () => {
+    expect(toSummary(row({ province: '' }), OWNER).province).toBeNull();
+    expect(toSummary(row({ province: null }), OWNER).province).toBeNull();
   });
 });
 

@@ -167,9 +167,9 @@ describe('amapText', () => {
 });
 
 describe('amapRegeo', () => {
-  it('asks about the converted point and maps city and district', async () => {
+  it('asks about the converted point and maps province, city and district', async () => {
     const urls = stubFetch({ status: '1', regeocode: { addressComponent: { province: '浙江省', city: '杭州市', district: '西湖区' } } });
-    expect(await amapRegeo('k', PAGODA.lat, PAGODA.lng)).toEqual({ city: '杭州市', district: '西湖区' });
+    expect(await amapRegeo('k', PAGODA.lat, PAGODA.lng)).toEqual({ province: '浙江省', city: '杭州市', district: '西湖区' });
     const url = new URL(urls[0]);
     expect(url.pathname).toBe('/v3/geocode/regeo');
     expect(url.searchParams.get('location')).toBe(gcjLocation(PAGODA.lat, PAGODA.lng));
@@ -177,14 +177,14 @@ describe('amapRegeo', () => {
 
   it('uses the province as the city for municipalities, where AMap’s city is an empty list', async () => {
     stubFetch({ status: '1', regeocode: { addressComponent: { province: '上海市', city: [], district: '黄浦区' } } });
-    expect(await amapRegeo('k', 31.23, 121.47)).toEqual({ city: '上海市', district: '黄浦区' });
+    expect(await amapRegeo('k', 31.23, 121.47)).toEqual({ province: '上海市', city: '上海市', district: '黄浦区' });
   });
 
   it('has nothing for a point AMap cannot place', async () => {
     stubFetch({ status: '1', regeocode: { addressComponent: { province: [], city: [], district: [] } } });
-    expect(await amapRegeo('k', 0, 0)).toEqual({ city: null, district: null });
+    expect(await amapRegeo('k', 0, 0)).toEqual({ province: null, city: null, district: null });
     stubFetch({ status: '1' });
-    expect(await amapRegeo('k', 0, 0)).toEqual({ city: null, district: null });
+    expect(await amapRegeo('k', 0, 0)).toEqual({ province: null, city: null, district: null });
   });
 
   it('fails on a service error', async () => {

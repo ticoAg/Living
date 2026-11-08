@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import type { Env } from './env';
-import app from './index';
+import { app } from './index';
 import { fakeD1 } from './test-utils';
 
 const SITE = 'https://living.example';

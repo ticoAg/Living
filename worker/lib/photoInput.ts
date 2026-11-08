@@ -32,6 +32,7 @@ export interface ParsedMeta {
   alt: number | null;
   heading: number | null;
   geoPrivacy: GeoPrivacy;
+  province: string | null;
   city: string | null;
   district: string | null;
   poiId: string | null;
@@ -102,6 +103,7 @@ export function parseCreateMeta(raw: unknown): ParsedMeta {
     alt: optNum(m.alt, '海拔', { min: -1000, max: 100000 }),
     heading: optHeading(m.heading),
     geoPrivacy: optEnum<GeoPrivacy>(m.geoPrivacy, '位置精度', GEO_PRIVACIES) ?? 'exact',
+    province: optText(m.province, '省份', 60),
     city: optText(m.city, '城市', 60),
     district: optText(m.district, '区县', 60),
     poiId,

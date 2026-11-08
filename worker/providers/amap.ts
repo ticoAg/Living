@@ -4,7 +4,7 @@
 import { gcj02ToWgs84, wgs84ToGcj02 } from '../../shared/geo';
 import { categoryFromAmap } from './category';
 import { fetchJson, UpstreamError } from './http';
-import type { ExternalPlace, Geocode } from './types';
+import type { ExternalPlace, Region } from './types';
 
 const BASE = 'https://restapi.amap.com/v3';
 /** 风景名胜 · 科教文化服务 · 地名地址信息 */
@@ -88,8 +88,8 @@ export async function amapText(key: string, keywords: string): Promise<ExternalP
   return parseAmapPois(data.pois);
 }
 
-/** Reverse geocode to city and district (直辖市: the city is the province name). */
-export async function amapRegeo(key: string, lat: number, lng: number): Promise<Geocode> {
+/** Reverse geocode to province, city and district (直辖市: the city is the province name). */
+export async function amapRegeo(key: string, lat: number, lng: number): Promise<Region> {
   const [gLat, gLng] = wgs84ToGcj02(lat, lng);
   const qs = new URLSearchParams({ key, location: `${gLng.toFixed(6)},${gLat.toFixed(6)}`, extensions: 'base' });
   const data = await fetchJson<{ status?: string; info?: string; regeocode?: { addressComponent?: Record<string, unknown> } }>(
@@ -98,5 +98,5 @@ export async function amapRegeo(key: string, lat: number, lng: number): Promise<
   );
   if (data.status !== '1') throw new UpstreamError(`amap regeo: ${data.info ?? 'status ' + String(data.status)}`);
   const a = data.regeocode?.addressComponent ?? {};
-  return { city: s(a.city) ?? s(a.province), district: s(a.district) };
+  return { province: s(a.province), city: s(a.city) ?? s(a.province), district: s(a.district) };
 }

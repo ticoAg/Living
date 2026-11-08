@@ -12,7 +12,7 @@ import { amapAround, amapRegeo, amapText } from './amap';
 import { isAreaCategory, radiusOf } from './category';
 import { kvCached, settle } from './http';
 import { nominatimReverse, osmNearby, osmSearch } from './osm';
-import type { ExternalPlace, Geocode } from './types';
+import type { ExternalPlace, Geocode, Region } from './types';
 
 const AREA_PENALTY = 10_000; // areal fallbacks rank after every point candidate
 const IN_VIEW_DEGREES = 30;
@@ -159,10 +159,11 @@ function nearby(env: Env, provider: 'amap' | 'osm', lat: number, lng: number, ra
   );
 }
 
-export function reverse(env: Env, provider: 'amap' | 'osm', lat: number, lng: number): Promise<Geocode> {
+/** Province, city and district of a point, cached for a week per ~100 m cell (`rev2`: the answers that carry a province). */
+export function reverse(env: Env, provider: 'amap' | 'osm', lat: number, lng: number): Promise<Region> {
   const qLat = Number(lat.toFixed(3));
   const qLng = Number(lng.toFixed(3));
-  const key = `geo:rev:${provider}:${qLat.toFixed(3)}:${qLng.toFixed(3)}`;
+  const key = `geo:rev2:${provider}:${qLat.toFixed(3)}:${qLng.toFixed(3)}`;
   return kvCached(env.KV, key, () => (provider === 'amap' ? amapRegeo(env.AMAP_KEY as string, qLat, qLng) : nominatimReverse(qLat, qLng)));
 }
 
@@ -194,13 +195,14 @@ export async function matchPlaces(env: Env, userId: string, input: MatchInput): 
     console.warn(`match: ${provider} nearby search failed`, external.error instanceof Error ? external.error.message : external.error);
   if (!geo.ok) console.warn(`match: ${provider} reverse geocode failed`, geo.error instanceof Error ? geo.error.message : geo.error);
 
-  const area: Geocode = geo.ok ? geo.value : { city: null, district: null };
+  const area: Region = geo.ok ? geo.value : { province: null, city: null, district: null };
   const candidates = rank(local, external.ok ? external.value.map((e) => fromExternal(e, area)) : [], input);
 
   // Without a geocoder answer, the nearest local place still tells which city/district this is.
   const nearest = candidates.find((c) => c.city || c.district);
   return {
     candidates,
+    province: area.province,
     city: area.city ?? nearest?.city ?? null,
     district: area.district ?? nearest?.district ?? null,
     provider: external.ok ? provider : 'local',

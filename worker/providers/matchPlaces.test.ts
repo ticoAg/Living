@@ -72,7 +72,7 @@ const elementAt = (bearing: number, meters: number, id: number, tags: Record<str
   return { type: 'node', id, lat, lon, tags };
 };
 
-const CHINA_ADDRESS = { address: { country_code: 'cn', city: '西湖区', state_district: '杭州市' } };
+const CHINA_ADDRESS = { address: { country_code: 'cn', city: '西湖区', state_district: '杭州市', state: '浙江省' } };
 
 type Element = ReturnType<typeof elementAt>;
 
@@ -143,6 +143,7 @@ describe('matchPlaces with OpenStreetMap', () => {
     const result = await matchPlaces(env, 'u_1', INPUT);
 
     expect(result.provider).toBe('osm');
+    expect(result.province).toBe('浙江省');
     expect(result.city).toBe('杭州市');
     expect(result.district).toBe('西湖区');
     expect(result.privacyZone).toBeNull();
@@ -235,13 +236,29 @@ describe('matchPlaces when a provider fails', () => {
     expect(result.candidates.map((c) => c.name)).toEqual(['雷峰塔', '净慈寺']);
     expect(result.city).toBe('杭州');
     expect(result.district).toBe('西湖区');
+    // places carry no province: only the geocoder knows it
+    expect(result.province).toBeNull();
     expect(warn).toHaveBeenCalledWith('match: osm reverse geocode failed', 'nominatim reverse: HTTP 503');
   });
 
   it('answers with nothing, but does not fail, when everything is down and nothing is stored', async () => {
     stubFetch(osm(500, 500));
     const result = await matchPlaces(makeEnv().env, 'u_1', INPUT);
-    expect(result).toEqual({ candidates: [], city: null, district: null, provider: 'local', privacyZone: null });
+    expect(result).toEqual({ candidates: [], province: null, city: null, district: null, provider: 'local', privacyZone: null });
+  });
+
+  it('looks up the prefecture-level city when the street address leaves it out, once per spot', async () => {
+    const calls = stubFetch((url) => {
+      if (url.hostname !== 'nominatim.openstreetmap.org') return osm({ elements: [] })(url);
+      const wide = url.searchParams.get('zoom') === '7';
+      return Response.json({ address: { country_code: 'cn', city: wide ? '杭州市' : '西湖区', state: '浙江省' } });
+    });
+    const { env } = makeEnv();
+    const result = await matchPlaces(env, 'u_1', INPUT);
+    expect(result).toMatchObject({ province: '浙江省', city: '杭州市', district: '西湖区' });
+    await matchPlaces(env, 'u_2', INPUT);
+    const nominatim = calls.filter((u) => u.hostname === 'nominatim.openstreetmap.org').map((u) => u.searchParams.get('zoom'));
+    expect(nominatim).toEqual(['16', '7']);
   });
 
   it('fills a provider place’s missing city and district from the reverse geocode', async () => {
@@ -297,7 +314,7 @@ describe('matchPlaces with AMap', () => {
     expect(tower.distance).toBeLessThan(101);
     expect(tower.bearing).toBe(0);
     expect(distance(PHOTO.lat, PHOTO.lng, tower.lat, tower.lng)).toBeCloseTo(100, 0);
-    expect(result).toMatchObject({ city: '杭州市', district: '西湖区' });
+    expect(result).toMatchObject({ province: '浙江省', city: '杭州市', district: '西湖区' });
   });
 
   it('uses OpenStreetMap instead for a photo taken abroad, key or not', async () => {
@@ -323,7 +340,7 @@ describe('matchPlaces caching', () => {
     stubFetch(osm({ elements }));
     const { env, kv } = makeEnv();
     await matchPlaces(env, 'u_1', INPUT);
-    expect([...kv.store.keys()].sort()).toEqual(['geo:rev:osm:30.232:120.148', 'poi:near:photon:30.2316:120.1479:300']);
+    expect([...kv.store.keys()].sort()).toEqual(['geo:rev2:osm:30.232:120.148', 'poi:near:photon:30.2316:120.1479:300']);
     expect(kv.puts.every((p) => (p.options as { expirationTtl: number }).expirationTtl === 604_800)).toBe(true);
   });
 

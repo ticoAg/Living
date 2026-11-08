@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { UpstreamError } from './http';
-import { geocodeFromAddress, nominatimReverse, nominatimSearch, overpassAround, parseOverpass, type OverpassElement } from './osm';
+import {
+  geocodeFromAddress,
+  nominatimReverse,
+  nominatimSearch,
+  overpassAround,
+  parseOverpass,
+  provinceFromAddress,
+  type OverpassElement
+} from './osm';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -124,6 +132,19 @@ describe('geocodeFromAddress', () => {
       });
     });
 
+    it('takes it from `region` too, where Nominatim puts it in Guangxi, but only when it looks like one', () => {
+      // 22.6006N 110.1437E at zoom 16: { city: 玉州区, region: 玉林市, state: 广西壮族自治区 }
+      expect(geocodeFromAddress({ country_code: 'cn', city: '玉州区', region: '玉林市', state: '广西壮族自治区' })).toEqual({
+        city: '玉林市',
+        district: '玉州区'
+      });
+      for (const region of ['大理白族自治州', '锡林郭勒盟', '阿里地区']) {
+        expect(geocodeFromAddress({ country_code: 'cn', city: '某某县', region }).city, region).toBe(region);
+      }
+      expect(geocodeFromAddress({ country_code: 'cn', city: '某某县', region: '华南' }).city).toBeNull();
+      expect(geocodeFromAddress({ country_code: 'cn', city: '西湖区', state_district: '杭州市', region: '别的市' }).city).toBe('杭州市');
+    });
+
     it('keeps a real city name as the city', () => {
       expect(geocodeFromAddress({ country_code: 'cn', city: '杭州市', city_district: '西湖区' })).toEqual({
         city: '杭州市',
@@ -161,6 +182,33 @@ describe('geocodeFromAddress', () => {
     it('has nothing to say about an empty address', () => {
       expect(geocodeFromAddress({})).toEqual({ city: null, district: null });
     });
+
+    it('keeps the first of the names Nominatim gives in both scripts, and drops blank ones', () => {
+      expect(geocodeFromAddress({ city: '巴黎', suburb: '第七区;第七區' })).toEqual({ city: '巴黎', district: '第七区' });
+      expect(geocodeFromAddress({ city: ' ', town: 'Smalltown' }).city).toBe('Smalltown');
+    });
+  });
+});
+
+describe('provinceFromAddress', () => {
+  it('reads the province from `state`', () => {
+    expect(provinceFromAddress({ country_code: 'cn', city: '西湖区', state: '浙江省', 'ISO3166-2-lvl4': 'CN-ZJ' })).toBe('浙江省');
+    expect(provinceFromAddress({ state: '广西壮族自治区' })).toBe('广西壮族自治区');
+  });
+
+  it('names a municipality from its ISO code, as Beijing comes without a state', () => {
+    expect(provinceFromAddress({ 'ISO3166-2-lvl4': 'CN-BJ', city: '东城区' })).toBe('北京市');
+    expect(provinceFromAddress({ 'ISO3166-2-lvl4': 'CN-SH', state: '上海市' })).toBe('上海市');
+  });
+
+  it('takes a prefecture of Japan, which Nominatim calls a province, and the first of two scripts', () => {
+    expect(provinceFromAddress({ city: '京都市', province: '京都府', 'ISO3166-2-lvl4': 'JP-26' })).toBe('京都府');
+    expect(provinceFromAddress({ state: '法兰西岛大区;法蘭西島大區' })).toBe('法兰西岛大区');
+  });
+
+  it('is null when the address has none', () => {
+    expect(provinceFromAddress({})).toBeNull();
+    expect(provinceFromAddress({ state: ' ' })).toBeNull();
   });
 });
 
@@ -218,10 +266,25 @@ describe('overpassAround', () => {
 });
 
 describe('nominatimReverse', () => {
-  it('asks for a Chinese address at zoom 16 and maps it to city and district', async () => {
-    const requests = stubFetch({ address: { country_code: 'cn', city: '西湖区', state_district: '杭州市' } });
-    expect(await nominatimReverse(30.25, 120.14)).toEqual({ city: '杭州市', district: '西湖区' });
+  /** Answers each reverse request by its `zoom` parameter; a missing zoom answers 503. */
+  function stubByZoom(byZoom: Record<string, unknown>) {
+    const zooms: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const zoom = new URL(url).searchParams.get('zoom') ?? '';
+        zooms.push(zoom);
+        return zoom in byZoom ? Response.json(byZoom[zoom]) : Response.json({ error: 'busy' }, { status: 503 });
+      })
+    );
+    return zooms;
+  }
 
+  it('asks for a Chinese address at zoom 16 and maps it to province, city and district', async () => {
+    const requests = stubFetch({ address: { country_code: 'cn', city: '西湖区', state_district: '杭州市', state: '浙江省' } });
+    expect(await nominatimReverse(30.25, 120.14)).toEqual({ province: '浙江省', city: '杭州市', district: '西湖区' });
+
+    expect(requests).toHaveLength(1);
     const url = new URL(requests[0].url);
     expect(url.origin + url.pathname).toBe('https://nominatim.openstreetmap.org/reverse');
     expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -234,14 +297,43 @@ describe('nominatimReverse', () => {
     });
   });
 
+  it('asks again at zoom 7 for the prefecture-level city a mainland street address leaves out', async () => {
+    // what Nominatim answers for the Bai Causeway
+    const zooms = stubByZoom({
+      16: { address: { road: '白堤', suburb: '北山街道', city: '西湖区', state: '浙江省', 'ISO3166-2-lvl4': 'CN-ZJ', country_code: 'cn' } },
+      7: { address: { city: '杭州市', state: '浙江省', 'ISO3166-2-lvl4': 'CN-ZJ', country_code: 'cn' } }
+    });
+    expect(await nominatimReverse(30.259, 120.148)).toEqual({ province: '浙江省', city: '杭州市', district: '西湖区' });
+    expect(zooms).toEqual(['16', '7']);
+  });
+
+  it('does not take a county from the second answer as the city', async () => {
+    stubByZoom({
+      16: { address: { city: '陵水黎族自治县', state: '海南省', country_code: 'cn' } },
+      7: { address: { city: '陵水黎族自治县', state: '海南省', country_code: 'cn' } }
+    });
+    expect(await nominatimReverse(18.5, 110)).toEqual({ province: '海南省', city: null, district: '陵水黎族自治县' });
+  });
+
+  it('fails as a whole when the second request fails, so no answer without the city is cached', async () => {
+    stubByZoom({ 16: { address: { city: '西湖区', state: '浙江省', country_code: 'cn' } } });
+    await expect(nominatimReverse(30.259, 120.148)).rejects.toThrow(new UpstreamError('nominatim reverse: HTTP 503'));
+  });
+
+  it('makes one request when the city is known, or outside mainland China', async () => {
+    const zooms = stubByZoom({ 16: { address: { city: '京都市', suburb: '中京区', province: '京都府', country_code: 'jp' } } });
+    expect(await nominatimReverse(35.01, 135.77)).toEqual({ province: '京都府', city: '京都市', district: '中京区' });
+    expect(zooms).toEqual(['16']);
+  });
+
   it('answers with nothing for a point it cannot geocode, which is not an outage', async () => {
     stubFetch({ error: 'Unable to geocode' });
-    expect(await nominatimReverse(0, 0)).toEqual({ city: null, district: null });
+    expect(await nominatimReverse(0, 0)).toEqual({ province: null, city: null, district: null });
   });
 
   it('copes with a response without an address', async () => {
     stubFetch({});
-    expect(await nominatimReverse(0, 0)).toEqual({ city: null, district: null });
+    expect(await nominatimReverse(0, 0)).toEqual({ province: null, city: null, district: null });
   });
 });
 
