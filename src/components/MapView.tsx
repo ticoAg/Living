@@ -2,21 +2,14 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Map as MLMap, Marker, GeoJSONSource, LngLatBoundsLike } from 'maplibre-gl';
 import type { Feature, FeatureCollection } from 'geojson';
 import { circleRing, coneRing } from '../../shared/geo';
+import { createClusterLayer, type ClusterLayer } from './mapCluster';
+import { pointElement, pointMarkerOptions, type MapPoint } from './mapPoints';
+
+export type { MapPoint };
 
 // MapLibre wrapper with the atlas look: OpenFreeMap vector tiles restyled to paper land, pale
 // water, quiet roads. MapLibre (~250 kB gz) is loaded only when a map mounts.
 
-export interface MapPoint {
-  id: string;
-  lat: number;
-  lng: number;
-  /** number shown in the marker; omit for a plain photo dot */
-  count?: number;
-  label?: string;
-  selected?: boolean;
-  muted?: boolean;
-  onClick?: () => void;
-}
 export interface MapShapes {
   /** matching radius rings (metres) */
   circles?: { id: string; lat: number; lng: number; radius: number }[];
@@ -38,6 +31,12 @@ interface Props {
   interactive?: boolean;
   /** require Ctrl/⌘ + scroll or two fingers to move the map, so an embedded map does not trap page scrolling */
   cooperativeGestures?: boolean;
+  /**
+   * Merge nearby points into numbered cluster markers that zoom in when clicked (default off). Like `interactive`, it is read
+   * when the map is created. A cluster shows the sum of its points' `count`s (1 for a point without one), is drawn selected when
+   * it holds a selected point and muted when all of its points are muted; `fit` still fits every point.
+   */
+  cluster?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -80,12 +79,14 @@ export default function MapView({
   maxZoom = 16,
   interactive = true,
   cooperativeGestures = false,
+  cluster = false,
   className,
   style
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Marker[]>([]);
+  const clusters = useRef<ClusterLayer | null>(null);
   const libRef = useRef<typeof import('maplibre-gl') | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -145,6 +146,7 @@ export default function MapView({
             filter: ['get', 'dashed'],
             paint: { 'line-color': '#1C201E', 'line-width': 1.2, 'line-dasharray': [2, 2] }
           });
+          if (cluster) clusters.current = createClusterLayer(m, map);
           setReady(true);
         });
         map.on('error', () => {});
@@ -152,6 +154,8 @@ export default function MapView({
       .catch(() => setFailed(true));
     return () => {
       cancelled = true;
+      clusters.current?.destroy();
+      clusters.current = null;
       markers.current.forEach((mk) => mk.remove());
       mapRef.current?.remove();
       mapRef.current = null;
@@ -180,40 +184,13 @@ export default function MapView({
       )
     );
 
-    markers.current.forEach((mk) => mk.remove());
-    markers.current = points.map((p) => {
-      const el = document.createElement(p.onClick ? 'button' : 'span');
-      el.className = 'map-pt';
-      el.dataset.selected = String(!!p.selected);
-      el.dataset.muted = String(!!p.muted);
-      if (p.onClick) {
-        (el as HTMLButtonElement).type = 'button';
-        el.setAttribute('aria-label', p.label ? `${p.label}${p.count != null ? `，${p.count} 张` : ''}` : '地点');
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          p.onClick!();
-        });
-      }
-      if (p.count != null) {
-        const dot = document.createElement('span');
-        dot.className = 'map-pt-dot';
-        dot.textContent = String(p.count);
-        el.appendChild(dot);
-      } else {
-        const dot = document.createElement('span');
-        dot.className = 'map-pt-photo';
-        el.appendChild(dot);
-      }
-      if (p.label) {
-        const label = document.createElement('span');
-        label.className = 'map-pt-label';
-        label.textContent = p.label;
-        el.appendChild(label);
-      }
-      return new m.Marker({ element: el, anchor: p.label ? 'left' : 'center', offset: p.label ? [-13, 0] : [0, 0] })
-        .setLngLat([p.lng, p.lat])
-        .addTo(map);
-    });
+    if (clusters.current) clusters.current.update(points);
+    else {
+      markers.current.forEach((mk) => mk.remove());
+      markers.current = points.map((p) =>
+        new m.Marker({ element: pointElement(p), ...pointMarkerOptions(p) }).setLngLat([p.lng, p.lat]).addTo(map)
+      );
+    }
 
     if (!fit) return;
     const coords: [number, number][] = [
