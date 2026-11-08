@@ -27,7 +27,7 @@ interface Marker extends Poi {
   n: number;
 }
 
-/** /map — one numbered marker per place with photos; filters recount, the side panel shows the selection. */
+/** /map — one numbered marker per place with photos, nearby places merged into clusters; filters recount, the side panel shows the selection. */
 export default function MapPage() {
   const { pois, error, reload } = usePoiList();
   const { photos } = usePhotoList('');
@@ -218,7 +218,7 @@ export default function MapPage() {
       <div className="mpg-body">
         <div ref={boxRef} className="mpg-map">
           {pois && size ? (
-            <SwapMap viewKey={city || 'all'} viewport={viewport} ariaLabel="有照片的地点" points={points} />
+            <SwapMap viewKey={city || 'all'} viewport={viewport} ariaLabel="有照片的地点" points={points} cluster />
           ) : (
             <Loading label="地图加载中" />
           )}
