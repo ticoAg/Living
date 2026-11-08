@@ -22,17 +22,28 @@ tags: [api, places]
 请求 `MatchRequest` → `MatchResponse`。
 
 1. 站内候选：`pois` 中距离 ≤ `max(radius, poi.radius)` 且对请求者开放的地点（别人的自建地点要有公开且位置未隐藏的照片在用，见 [pois 的隐私](/data/pois.md#隐私)）；`radius` 默认 300，最大 1000。
-2. 外部候选：有 `AMAP_KEY` 且坐标在中国境内时调用高德 `v3/place/around`（坐标先转 GCJ-02，结果转回 WGS-84，按距离排序，最多 25 个）；否则 Overpass（`nwr(around:R)` 查询带名称的 tourism、historic、leisure=park/garden、natural、man_made=bridge/tower/pier、bridge、amenity=place_of_worship/cafe/restaurant/library/arts_centre/theatre、place=square/village/neighbourhood/island）。
+2. 外部候选：有 `AMAP_KEY` 且坐标在中国境内时调用高德 `v3/place/around`（坐标先转 GCJ-02，结果转回 WGS-84，按距离排序，最多 25 个）；否则 OpenStreetMap，经免费公共服务 Photon（`photon.komoot.io/reverse`）同时发两次请求，各取半径内最近的 50 个带名称的对象：一次不限类型（店铺、餐馆、建筑、车站……），一次只要 tourism、historic、leisure、natural、man_made=bridge/tower/pier、amenity=place_of_worship、waterway、place=square/island/village（`osm_tag` 过滤），免得景点被街边店铺挤出前 50。两次合并去重，有一次失败也照样返回；两次都失败时退到 Overpass。路牌、导览图、界碑和普通道路不列入。
 3. 与站内候选去重：相同 `source + sourceId`，或同名且相距 < 80 米。
-4. 类别：由高德类型或 OSM 标签映射，再按名称后缀（桥 湖 山 寺 塔 岛 村 园 亭 堤）修正；取值见 `shared/types.ts` 的 `POI_CATEGORIES`。
+4. 类别：由高德类型或 OSM 标签映射（OSM 的店铺、酒店、车站、写字楼和有名字的建筑也有类别），再按名称后缀（桥 湖 山 寺 塔 岛 村 园 亭 堤）修正；取值见 `shared/types.ts` 的 `POI_CATEGORIES`。
 5. 打分：`distance − (inView ? 25 : 0) − (local ? 10 : 0)`；`inView` = 有朝向且方位角与朝向相差 ≤ 30°。面状候选（湖泊、公园、区县）在范围内时 `area: true`、`distance: 0`，排在点状候选之后。
 6. 逆地理：与第 2 步同一数据源，高德 `v3/geocode/regeo` 或 Nominatim `reverse`（`User-Agent: Living/1.0 (+https://living.ticoag.fun)`，`accept-language=zh-CN`），得到 `city`、`district`；直辖市的城市取省名。
-7. KV 缓存 7 天：`poi:near:<provider>:<lat 4 位>:<lng 4 位>:<radius>`、`geo:rev:<provider>:<lat 3 位>:<lng 3 位>`。外部请求超时 8 秒；失败时 `provider: "local"`，只返回站内候选。
+7. KV 缓存 7 天：`poi:near:<amap|photon>:<lat 4 位>:<lng 4 位>:<radius>`、`geo:rev:<provider>:<lat 3 位>:<lng 3 位>`。外部请求超时 8 秒；失败时 `provider: "local"`，只返回站内候选。
 8. `privacyZone`：坐标落在请求者某个隐私区域内时返回区域名。
 
 # GET /api/pois/search?q=&lat=&lng=（登录）
 
-按名称搜索：站内 `name`/`aliases` 包含 `q` 且对请求者开放的地点（规则同上），加上高德 `v3/place/text`（有 Key 时）。返回 `{ "results": MatchCandidate[] }`，有坐标时附距离并按距离排序，最多 20 个。
+按名称搜索：站内 `name`/`aliases` 包含 `q` 且对请求者开放的地点（规则同上），加上外部结果。返回 `{ "results": MatchCandidate[] }`，有坐标时附距离并按距离排序，最多 30 个。
+
+外部结果：
+
+| 条件 | 来源 |
+|---|---|
+| 有 `AMAP_KEY`，有坐标且在中国境内 | 高德 `v3/place/around`，`keywords=q`，半径 6 千米 |
+| 有 `AMAP_KEY`，没有坐标 | 高德 `v3/place/text` |
+| 其余，有坐标 | Photon 搜索和 Nominatim 搜索，都限定在照片周围约 6 千米的框内（`bbox`、`viewbox` + `bounded=1`）；再加上 1 千米内附近地点里名称包含 `q` 的（按词搜索会漏掉中文名称的一部分，例如"咖啡"之于"库迪咖啡"） |
+| 其余，没有坐标 | Photon 搜索和 Nominatim 搜索，不限范围 |
+
+KV 缓存 1 天：`poi:q:<amap|osm>:<q>[:<lat 2 位>:<lng 2 位>]`，有坐标时按约 1 千米的网格分开。所有来源都失败时只返回站内结果。
 
 # POST /api/pois（登录）
 

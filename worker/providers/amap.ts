@@ -62,14 +62,14 @@ function check(data: AmapPlaceResponse, label: string): void {
   if (data.status !== '1') throw new UpstreamError(`${label}: ${data.info ?? 'status ' + String(data.status)}`);
 }
 
-/** Places within `radius` metres of a WGS-84 point, nearest first, at most 25. */
-export async function amapAround(key: string, lat: number, lng: number, radius: number): Promise<ExternalPlace[]> {
+/** Places within `radius` metres of a WGS-84 point, nearest first, at most 25; with `keywords`, only those matching it. */
+export async function amapAround(key: string, lat: number, lng: number, radius: number, keywords?: string): Promise<ExternalPlace[]> {
   const [gLat, gLng] = wgs84ToGcj02(lat, lng);
   const qs = new URLSearchParams({
     key,
     location: `${gLng.toFixed(6)},${gLat.toFixed(6)}`,
     radius: String(Math.round(radius)),
-    types: AROUND_TYPES,
+    ...(keywords ? { keywords } : { types: AROUND_TYPES }),
     sortrule: 'distance',
     offset: '25',
     page: '1',

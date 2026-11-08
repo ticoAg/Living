@@ -1,6 +1,7 @@
 # Directory Update Log
 
 ## 2026-11-08
+* **Update**: 附近地点改用免费的 Photon（线上从 Workers 请求 Overpass 全部超时，Overpass 改作后备），列出半径内所有带名称的地点；名称搜索在有坐标时只找照片附近约 6 千米；上传页不再显示"进入 Living"和"收藏"，见 [地点匹配](/product/features/poi-matching.md) 和 [地点接口](/api/pois.md)。
 * **Update**: 带内容哈希的 `/assets/*` 让浏览器缓存一年（`public/_headers`）；各层缓存整理在 [Cloudflare 资源](/architecture/cloudflare.md#缓存)。
 * **Update**: 第一批单元测试（41 个文件、931 个测试），`npm run build` 和 PR 检查都会跑，见 [本地开发](/runbooks/local-dev.md#单元测试)；顺带修了坐标显示偶尔出现 60″ 的问题，以及高德类别匹配的先后顺序。
 * **Update**: MapLibre GL 升级到 6（修复 GHSA-jrc7-96c5-q579），Worker 由 Vite 单独构建，见 [前端分区](/architecture/frontend.md)。

@@ -21,13 +21,15 @@ sources:
 |---|---|---|---|
 | `sess:<token>` | JSON `{"userId":"u_…","createdAt":"…"}` | 30 天 | 登录会话 |
 | `rl:login:<ip>:<handle>` | JSON `{"count":3,"resetAt":1790000000}` | 约 60 秒 | 登录限流 |
-| `poi:near:<provider>:<lat4>:<lng4>:<radius>` | 外部地点候选列表（JSON） | 7 天 | 周边搜索缓存 |
+| `poi:near:<source>:<lat4>:<lng4>:<radius>` | 外部地点候选列表（JSON） | 7 天 | 周边搜索缓存 |
+| `poi:q:<provider>:<q>[:<lat2>:<lng2>]` | 名称搜索的外部结果（JSON） | 1 天 | 名称搜索缓存 |
 | `geo:rev:<provider>:<lat3>:<lng3>` | 城市与区县（JSON） | 7 天 | 逆地理缓存 |
 
 - `<token>`：32 字节随机数的 base64url，与 Cookie `living_session` 的值相同。退出登录时删除该键。
 - `rl:login`：固定窗口计数，`resetAt` 是窗口结束的 Unix 秒。同一 IP 对同一用户名每分钟最多 5 次，超过返回 429；登录成功后删除该键。`<handle>` 统一转小写，因为用户名不区分大小写。60 秒是 KV 允许的最短过期时间。
 - `<provider>`：`amap` 或 `osm`。配置了 `AMAP_KEY` 且坐标在中国大陆范围内用 `amap`，其余用 `osm`。缓存按数据源分开，设置或删除 `AMAP_KEY` 后不会读到另一个数据源的结果。
-- `<lat4>` `<lng4>`：坐标四舍五入到 4 位小数，约 10 米网格；`<lat3>` `<lng3>` 取 3 位，约 100 米；`<radius>` 是搜索半径（米）。
+- `<source>`：`amap` 或 `photon`。OpenStreetMap 的附近地点来自 Photon，键写 `photon`，旧的 Overpass 缓存（`osm`）不再读取。
+- `<lat4>` `<lng4>`：坐标四舍五入到 4 位小数，约 10 米网格；`<lat3>` `<lng3>` 取 3 位，约 100 米；`<lat2>` `<lng2>` 取 2 位，约 1 千米；`<radius>` 是搜索半径（米）；`<q>` 是 NFKC 规范化并转小写的搜索词。
 - 外部请求失败时不写缓存；缓存读写出错都被忽略，不会让地点匹配失败。
 - 键的约定来自 [认证接口](/api/auth.md)、[接口约定](/api/conventions.md) 和 [地点接口](/api/pois.md)。
 

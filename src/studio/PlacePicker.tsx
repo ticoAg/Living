@@ -20,6 +20,9 @@ import {
 } from './match';
 import { errMsg } from './util';
 
+/** Candidates shown before "显示全部". */
+const SHORT_LIST = 12;
+
 // Place chooser used by the upload page and the photo editor: the match plot with its radius slider and
 // radio list of candidates, search by name, and "create a place". It never talks to the photo itself;
 // it reports the chosen PlaceChoice (or null to clear) and the caller decides when to save.
@@ -165,10 +168,10 @@ function PlaceSearch({
   }
 
   return (
-    <section className="pk-block" aria-label="搜索其他地点">
+    <section className="pk-block" aria-label={at ? '搜索附近的地点' : '搜索地点'}>
       <form className="field" onSubmit={submit} role="search">
         <label className="label" htmlFor={`${id}-q`}>
-          搜索其他地点
+          {at ? '搜索附近的地点' : '搜索地点'}
         </label>
         <div className="pk-searchrow">
           <input
@@ -177,7 +180,7 @@ function PlaceSearch({
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="地点名称，如 断桥残雪"
+            placeholder={at ? '名称或其中几个字，如 断桥、咖啡' : '地点名称，如 断桥残雪'}
             disabled={disabled}
             maxLength={60}
             enterKeyHint="search"
@@ -372,8 +375,12 @@ export default function PlacePicker({
 }: PlacePickerProps) {
   const id = useId();
   const [active, setActive] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const radius = match?.radius ?? DEFAULT_RADIUS;
   const candidates = match?.res?.candidates ?? [];
+  // The nearest first; the rest one click away (the chosen place always stays in view).
+  const chosenAt = candidates.findIndex((c) => c.key === value?.key);
+  const listed = showAll || chosenAt >= SHORT_LIST ? candidates : candidates.slice(0, SHORT_LIST);
   const res = match?.res ?? null;
 
   const extraRows = useMemo(() => {
@@ -444,7 +451,7 @@ export default function PlacePicker({
 
           {candidates.length > 0 ? (
             <div className="pk-list" role="radiogroup" aria-label="候选地点">
-              {candidates.map((c, i) => {
+              {listed.map((c, i) => {
                 const pickable = isPickable(c, radius);
                 return (
                   <Row
@@ -472,10 +479,17 @@ export default function PlacePicker({
           ) : (
             !match.loading && !match.error && <p className="muted small">{radius} 米内没有找到地点。可以放大半径、搜索，或新建一个。</p>
           )}
+          {candidates.length > SHORT_LIST && chosenAt < SHORT_LIST && (
+            <button type="button" className="btn btn-quiet pk-more" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>
+              {showAll ? '只看最近的' : `显示全部 ${candidates.length} 个`}
+            </button>
+          )}
         </section>
       ) : (
         !coords && <p className="small muted pk-nogps">这张照片没有位置信息。可以搜索地点，或新建一个。</p>
       )}
+
+      <PlaceSearch at={coords} value={value} onPick={onChange} disabled={disabled} />
 
       {extraRows.length > 0 && (
         <section className="pk-block" aria-label="本次新建的地点">
@@ -495,7 +509,6 @@ export default function PlacePicker({
         </section>
       )}
 
-      <PlaceSearch at={coords} value={value} onPick={onChange} disabled={disabled} />
       <PlaceCustom
         at={customAt}
         city={res?.city ?? null}

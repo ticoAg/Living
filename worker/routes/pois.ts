@@ -8,17 +8,14 @@ import { currentUser, requireUser, viewerId } from '../lib/session';
 import { likeContains, prepQ, Sql } from '../lib/sql';
 import { has, optNum, optText, reqStr, strArray } from '../lib/validate';
 import { photoList, photoLocation, poiOffered } from '../lib/visibility';
-import { amapText } from '../providers/amap';
-import { dedupe, fromExternal, fromPoiRow, matchPlaces, score, type RawPlace } from '../providers/match';
-import { kvCached, settle } from '../providers/http';
-import { nominatimSearch } from '../providers/osm';
+import { dedupe, fromExternal, fromPoiRow, matchPlaces, score, searchExternal, type RawPlace } from '../providers/match';
+import { settle } from '../providers/http';
 
 export const pois = new Hono<AppEnv>({ strict: false });
 
 const NEARBY_METERS = 5000;
 const NEARBY_LIMIT = 8;
-const SEARCH_LIMIT = 20;
-const SEARCH_CACHE_TTL = 24 * 60 * 60; // seconds; searches are open-ended, so keep the cache short
+const SEARCH_LIMIT = 30;
 
 /** Visible-photo POIs: the viewer's own photos, or public photos whose location is not hidden. */
 function visiblePhotos(q: Sql, viewer: string | null): string {
@@ -69,12 +66,9 @@ pois.get('/search', async (c) => {
   ).all<PoiRow>();
   const local = localRows.results.map(fromPoiRow);
 
-  // AMap with a key; otherwise OSM Nominatim. A provider failure just leaves the local results.
-  const useAmap = Boolean(c.env.AMAP_KEY);
-  const key = `poi:q:${useAmap ? 'amap' : 'osm'}:${q.normalize('NFKC').toLowerCase()}`;
-  const external = await settle(
-    kvCached(c.env.KV, key, () => (useAmap ? amapText(c.env.AMAP_KEY as string, q) : nominatimSearch(q)), SEARCH_CACHE_TTL)
-  );
+  // AMap with a key in China; otherwise OpenStreetMap (Photon, Nominatim). With a point, only places around it.
+  // A provider failure just leaves the local results.
+  const external = await settle(searchExternal(c.env, q, at));
   let remote: RawPlace[] = [];
   if (external.ok) {
     // Provider results carry their own city/district; no reference-point fallback (they may be anywhere).

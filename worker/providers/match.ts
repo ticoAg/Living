@@ -8,10 +8,10 @@ import { POI_COLS, type PoiRow } from '../lib/poi';
 import { zoneAt } from '../lib/privacy';
 import { prepQ, Sql } from '../lib/sql';
 import { poiOffered } from '../lib/visibility';
-import { amapAround, amapRegeo } from './amap';
+import { amapAround, amapRegeo, amapText } from './amap';
 import { isAreaCategory, radiusOf } from './category';
 import { kvCached, settle } from './http';
-import { nominatimReverse, overpassAround } from './osm';
+import { nominatimReverse, osmNearby, osmSearch } from './osm';
 import type { ExternalPlace, Geocode } from './types';
 
 const AREA_PENALTY = 10_000; // areal fallbacks rank after every point candidate
@@ -152,9 +152,10 @@ async function localPlaces(db: D1Database, userId: string, lat: number, lng: num
 function nearby(env: Env, provider: 'amap' | 'osm', lat: number, lng: number, radius: number): Promise<ExternalPlace[]> {
   const qLat = Number(lat.toFixed(4));
   const qLng = Number(lng.toFixed(4));
-  const key = `poi:near:${provider}:${qLat.toFixed(4)}:${qLng.toFixed(4)}:${Math.round(radius)}`;
+  // OpenStreetMap places come from Photon now; the key names it so answers cached from Overpass are not reused.
+  const key = `poi:near:${provider === 'osm' ? 'photon' : provider}:${qLat.toFixed(4)}:${qLng.toFixed(4)}:${Math.round(radius)}`;
   return kvCached(env.KV, key, () =>
-    provider === 'amap' ? amapAround(env.AMAP_KEY as string, qLat, qLng, radius) : overpassAround(qLat, qLng, radius)
+    provider === 'amap' ? amapAround(env.AMAP_KEY as string, qLat, qLng, radius) : osmNearby(qLat, qLng, radius)
   );
 }
 
@@ -205,4 +206,38 @@ export async function matchPlaces(env: Env, userId: string, input: MatchInput): 
     provider: external.ok ? provider : 'local',
     privacyZone: zone?.name ?? null
   };
+}
+
+export const SEARCH_CACHE_TTL = 24 * 60 * 60; // seconds; searches are open-ended, so keep the cache short
+/** A name search with a point looks this far around it, in metres (AMap); OpenStreetMap services use a ~6 km box. */
+const NEAR_SEARCH_METERS = 6000;
+/** The nearby list a name search also filters by substring, in metres. */
+const NEARBY_FILTER_METERS = 1000;
+
+/** Whether a place name contains the search term, ignoring case and width. */
+export const nameMatches = (name: string, q: string): boolean => nameKey(name).includes(nameKey(q));
+
+/**
+ * Provider places named like `q`. With a point they are limited to its surroundings: AMap's nearby keyword search in
+ * China (with a key); otherwise Photon and Nominatim within about 6 km, plus the places within 1 km whose name merely
+ * contains `q` — word-based search misses part of a Chinese name, such as 咖啡 in 库迪咖啡.
+ */
+export async function searchExternal(env: Env, q: string, at: { lat: number; lng: number } | null): Promise<ExternalPlace[]> {
+  const term = q.normalize('NFKC').toLowerCase();
+  const grid = at ? `:${at.lat.toFixed(2)}:${at.lng.toFixed(2)}` : '';
+  if (env.AMAP_KEY && (!at || !outOfChina(at.lat, at.lng))) {
+    const key = env.AMAP_KEY;
+    return kvCached(
+      env.KV,
+      `poi:q:amap:${term}${grid}`,
+      () => (at ? amapAround(key, at.lat, at.lng, NEAR_SEARCH_METERS, q) : amapText(key, q)),
+      SEARCH_CACHE_TTL
+    );
+  }
+  const [named, around] = await Promise.all([
+    settle(kvCached(env.KV, `poi:q:osm:${term}${grid}`, () => osmSearch(q, at), SEARCH_CACHE_TTL)),
+    at ? settle(nearby(env, 'osm', at.lat, at.lng, NEARBY_FILTER_METERS)) : null
+  ]);
+  if (!named.ok && !around?.ok) throw named.error;
+  return [...(named.ok ? named.value : []), ...(around?.ok ? around.value.filter((p) => nameMatches(p.name, q)) : [])];
 }
