@@ -6,6 +6,8 @@ tags: [architecture, cloudflare]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/wrangler.jsonc
     title: Wrangler 配置
+  - resource: https://github.com/ticoAg/Living/blob/main/public/_headers
+    title: 静态资源响应头
 ---
 # 资源
 
@@ -31,6 +33,19 @@ sources:
 | `AMAP_KEY` | 密钥（可选） | 高德 Web 服务 Key；未设置时地点匹配使用 OpenStreetMap |
 
 配置方法见 [密钥与初始化](/runbooks/secrets.md)。
+
+# 缓存
+
+| 内容 | 边缘 | 浏览器 |
+|---|---|---|
+| 页面（`index.html`）和 `favicon.svg` | Workers 静态资源自动缓存 | `max-age=0, must-revalidate`：每次用 ETag 确认，发布后立刻看到新版 |
+| `/assets/*`（文件名带内容哈希的 JS、CSS、Worker） | 同上 | `public/_headers` 设为一年、`immutable`，不再回源确认 |
+| `/media/` 下的公开尺寸图 | Worker 用 Cache API 存一份，命中时不读 D1 和 R2；照片改为私密或删除时清除当前机房的副本 | 一年、`immutable`：尺寸图只在上传时写入，之后不再改写 |
+| 原图、私密照片的尺寸图 | 不缓存 | `private, no-store` |
+| 列表接口（照片、标签、地点、主题） | 不缓存 | 未登录 `public, max-age=30`，登录后 `private, no-store`，都带 `Vary: Cookie` |
+| 其他接口 | 不缓存 | `no-store` |
+
+静态资源请求不调用 Worker，不占请求额度。构建缓存另见 [构建与发布](/architecture/ci-cd.md)。
 
 # 费用
 
