@@ -112,6 +112,8 @@ interface NominatimAddress {
   village?: string;
   state_district?: string;
   region?: string;
+  /** 盟 in Inner Mongolia */
+  league?: string;
   county?: string;
   state?: string;
   province?: string;
@@ -127,6 +129,8 @@ const MUNICIPALITIES: Record<string, string> = { 'CN-BJ': '北京市', 'CN-SH': 
 const DISTRICT_NAME = /[区區县縣旗]$/;
 /** What a prefecture-level division (地级行政区) is called: 杭州市、大理白族自治州、锡林郭勒盟、阿里地区. */
 const PREFECTURE_NAME = /(市|州|盟|地区|地區)$/;
+/** Below the county: 乡、镇、街道、苏木 and villages, which Nominatim sometimes puts in `city`. */
+const TOWNSHIP_NAME = /(乡|鄉|镇|鎮|街道|苏木|蘇木|村)$/;
 
 /**
  * Asked for Chinese, Nominatim may give a name in both scripts, `法兰西岛大区;法蘭西島大區`: keep the first. Blank
@@ -134,21 +138,37 @@ const PREFECTURE_NAME = /(市|州|盟|地区|地區)$/;
  */
 const first = (v: unknown): string | null => (typeof v === 'string' ? v.split(';')[0].trim() || null : null);
 
+function cleanAddress(address: NominatimAddress): NominatimAddress {
+  return Object.fromEntries(Object.entries(address).map(([k, v]) => [k, first(v) ?? undefined])) as NominatimAddress;
+}
+
+/** The prefecture-level city a mainland address names outright: `state_district`, or a prefecture-looking region or league. */
+function prefectureOf(a: NominatimAddress): string | null {
+  return a.state_district ?? [a.region, a.league].find((n) => n && PREFECTURE_NAME.test(n)) ?? null;
+}
+
 /**
- * City and district from a Nominatim address. In mainland China OSM tags the 区/县 as `city` and rarely carries the
- * prefecture-level city, so a district-looking `city` becomes the district and the city comes from `state_district` or a
- * prefecture-looking `region`, or is left for the caller to fill in.
+ * City and district from a Nominatim address. Mainland China does not fit the usual fields: the 区/县 may come as
+ * `city`, `district` or `county`, a township as `city`, the prefecture-level city as `state_district`, `region` or
+ * `league`, or not at all. There the district is the county-level unit (a 区, 县 or 旗, or a county-level city such
+ * as 义乌市 under a known prefecture), and the city is the prefecture; without one, a `city` that is neither the
+ * district nor a township stands for it, else it is left for the caller to fill in.
  */
 export function geocodeFromAddress(address: NominatimAddress): Geocode {
-  const a = Object.fromEntries(Object.entries(address).map(([k, v]) => [k, first(v) ?? undefined])) as NominatimAddress;
+  const a = cleanAddress(address);
   const named = a.city || a.town || a.municipality || a.village || null;
   const municipality = MUNICIPALITIES[a['ISO3166-2-lvl4'] ?? ''];
   if (municipality) {
     return { city: municipality, district: (named && named !== municipality ? named : null) ?? a.city_district ?? a.district ?? null };
   }
-  if (a.country_code === 'cn' && named && DISTRICT_NAME.test(named)) {
-    const prefecture = a.state_district ?? (a.region && PREFECTURE_NAME.test(a.region) ? a.region : null);
-    return { city: prefecture, district: named };
+  if (a.country_code === 'cn') {
+    const prefecture = prefectureOf(a);
+    const county =
+      [a.city, a.town, a.district, a.county, a.city_district].find((n) => n && DISTRICT_NAME.test(n)) ??
+      (prefecture ? [a.county, a.city].find((n) => n && n !== prefecture && n.endsWith('市')) : undefined) ??
+      null;
+    const city = prefecture ?? (named && named !== county && !TOWNSHIP_NAME.test(named) && !DISTRICT_NAME.test(named) ? named : null);
+    return { city, district: county };
   }
   const city = named || a.state_district || a.county || a.state || null;
   const district = a.city_district || a.district || (a.county && a.county !== city ? a.county : null) || a.suburb || null;
@@ -174,23 +194,28 @@ async function nominatimAddress(lat: number, lng: number, zoom: number): Promise
     'nominatim reverse'
   );
   // "Unable to geocode" (open sea, no data) is a valid empty answer, not an outage.
-  return data.error ? null : (data.address ?? {});
+  return data.error ? null : cleanAddress(data.address ?? {});
 }
 
 /**
  * Province, city and district for a point, in Chinese where OSM has it. A street-level answer in mainland China often
- * leaves out the prefecture-level city (西湖区 comes without 杭州市); asked at zoom 7, Nominatim answers with that city,
- * so a second request fills it in. If that request fails the whole lookup fails, and nothing half-done is cached.
+ * leaves out the prefecture-level city (西湖区 comes without 杭州市, 义乌市 without 金华市); asked at zoom 7, Nominatim
+ * answers with it, so a second request fills it in, and a city-level name that turns out not to be the prefecture is
+ * the county-level city. If that request fails the whole lookup fails, and nothing half-done is cached.
  */
 export async function nominatimReverse(lat: number, lng: number): Promise<Region> {
   const a = await nominatimAddress(lat, lng, 16);
   if (!a) return { province: null, city: null, district: null };
   const g = geocodeFromAddress(a);
   const province = provinceFromAddress(a);
-  if (g.city || a.country_code !== 'cn') return { province, ...g };
+  if (a.country_code !== 'cn' || MUNICIPALITIES[a['ISO3166-2-lvl4'] ?? ''] || prefectureOf(a)) return { province, ...g };
   const wide = await nominatimAddress(lat, lng, 7);
-  const named = wide ? first(wide.city) || first(wide.state_district) || first(wide.region) : null;
-  return { province, city: named && PREFECTURE_NAME.test(named) ? named : null, district: g.district };
+  const prefecture = wide
+    ? ([wide.city, wide.state_district, wide.region, wide.league].find((n) => n && PREFECTURE_NAME.test(n) && !DISTRICT_NAME.test(n)) ??
+      null)
+    : null;
+  if (!prefecture) return { province, ...g };
+  return { province, city: prefecture, district: g.district ?? (g.city && g.city !== prefecture ? g.city : null) };
 }
 
 interface NominatimHit {

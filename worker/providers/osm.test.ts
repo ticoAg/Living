@@ -151,6 +151,27 @@ describe('geocodeFromAddress', () => {
         district: '西湖区'
       });
     });
+
+    it('never takes a township for the city, and finds the county in `district` (Inner Mongolia)', () => {
+      // 43.0N 115.0E at zoom 16
+      const a = { country_code: 'cn', city: '伊和淖尔苏木', district: '正镶白旗', region: '锡林郭勒盟', state: '内蒙古自治区' };
+      expect(geocodeFromAddress(a)).toEqual({ city: '锡林郭勒盟', district: '正镶白旗' });
+      expect(geocodeFromAddress({ country_code: 'cn', city: '某某苏木', district: '某某旗', league: '锡林郭勒盟' }).city).toBe(
+        '锡林郭勒盟'
+      );
+      expect(geocodeFromAddress({ country_code: 'cn', city: '千岛湖镇' })).toEqual({ city: null, district: null });
+      expect(geocodeFromAddress({ country_code: 'cn', town: '北山街道' })).toEqual({ city: null, district: null });
+    });
+
+    it('takes a county-level city inside a known prefecture as the district', () => {
+      // 22.70N 110.35E: 北流市 is a county-level city of 玉林市
+      expect(
+        geocodeFromAddress({ country_code: 'cn', city: '北流市', county: '北流市', region: '玉林市', state: '广西壮族自治区' })
+      ).toEqual({
+        city: '玉林市',
+        district: '北流市'
+      });
+    });
   });
 
   describe('everywhere else', () => {
@@ -305,6 +326,34 @@ describe('nominatimReverse', () => {
     });
     expect(await nominatimReverse(30.259, 120.148)).toEqual({ province: '浙江省', city: '杭州市', district: '西湖区' });
     expect(zooms).toEqual(['16', '7']);
+  });
+
+  it('learns from the second answer that a city-level name is a county-level city', async () => {
+    // 义乌市 at zoom 16 says nothing of 金华市
+    stubByZoom({
+      16: { address: { suburb: '稠城街道', city: '义乌市', state: '浙江省', country_code: 'cn' } },
+      7: { address: { city: '金华市', state: '浙江省', country_code: 'cn' } }
+    });
+    expect(await nominatimReverse(29.3069, 120.075)).toEqual({ province: '浙江省', city: '金华市', district: '义乌市' });
+  });
+
+  it('confirms a city that is the prefecture, and reads a league as one', async () => {
+    stubByZoom({
+      16: { address: { city: '桂林市', district: '七星区', state: '广西壮族自治区', country_code: 'cn' } },
+      7: { address: { city: '桂林市', state: '广西壮族自治区', country_code: 'cn' } }
+    });
+    expect(await nominatimReverse(25.27, 110.3)).toEqual({ province: '广西壮族自治区', city: '桂林市', district: '七星区' });
+    stubByZoom({
+      16: { address: { city: '某某苏木', district: '正镶白旗', state: '内蒙古自治区', country_code: 'cn' } },
+      7: { address: { league: '锡林郭勒盟', state: '内蒙古自治区', country_code: 'cn' } }
+    });
+    expect(await nominatimReverse(43, 115)).toEqual({ province: '内蒙古自治区', city: '锡林郭勒盟', district: '正镶白旗' });
+  });
+
+  it('makes one request when the address names the prefecture', async () => {
+    const zooms = stubByZoom({ 16: { address: { city: '玉州区', region: '玉林市', state: '广西壮族自治区', country_code: 'cn' } } });
+    expect(await nominatimReverse(22.6, 110.14)).toEqual({ province: '广西壮族自治区', city: '玉林市', district: '玉州区' });
+    expect(zooms).toEqual(['16']);
   });
 
   it('does not take a county from the second answer as the city', async () => {
