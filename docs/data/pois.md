@@ -1,7 +1,7 @@
 ---
 type: D1 Table
 title: pois
-description: 地点：名称、类别、中心点和匹配半径，全站共享；来源可以是用户自建、高德或 OpenStreetMap。
+description: 地点：名称、类别、中心点和匹配半径；来源可以是用户自建、高德或 OpenStreetMap。自建地点在被公开照片使用前只有创建者能匹配和搜到。
 tags: [data, d1, places]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/migrations/0001_init.sql
@@ -47,6 +47,7 @@ sources:
 
 # 隐私
 
-- 表上没有可见性字段。所有登录用户都能通过 `POST /api/pois/match`（按位置）和 `GET /api/pois/search`（按名称）查到站内地点的名称和坐标，包括别人自建的。`GET /api/pois/:id` 不要求登录，按 id 返回任何地点；id 是不可猜的 ULID。
+- 表上没有可见性字段，由使用它的照片决定。`POST /api/pois/match`（按位置）和 `GET /api/pois/search`（按名称）提供给某个用户的站内地点是：高德和 OpenStreetMap 来源的地点；他自己建的地点；以及至少有一张照片使用的自建地点，这张照片是他自己的，或者是公开且位置未隐藏的。别人只用在私密、仅链接可见或隐藏位置的照片上的自建地点，不会出现在他的匹配和搜索里。
+- `GET /api/pois/:id` 不要求登录，按 id 返回任何地点；id 是不可猜的 ULID，只有位置可见的照片会带出它。
 - 访客可见的列表 `GET /api/pois` 只返回至少有一张对请求者可见、且位置未隐藏的照片的地点；`geo_privacy = 'hidden'` 的照片不会让它的地点出现。
-- 不要为家这样的私密位置建自定义地点；落在隐私区域内的照片本来就会被强制设为 `hidden`。
+- 给家这样的私密位置建的自建地点，在有公开且显示位置的照片用上它之前，只有自己看得到；落在隐私区域内的照片本来就会被强制设为 `hidden`。

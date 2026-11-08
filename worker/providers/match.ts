@@ -6,6 +6,8 @@ import type { MatchCandidate, MatchResponse } from '../../shared/types';
 import type { Env } from '../env';
 import { POI_COLS, type PoiRow } from '../lib/poi';
 import { zoneAt } from '../lib/privacy';
+import { prepQ, Sql } from '../lib/sql';
+import { poiOffered } from '../lib/visibility';
 import { amapAround, amapRegeo } from './amap';
 import { isAreaCategory, radiusOf } from './category';
 import { kvCached, settle } from './http';
@@ -130,15 +132,19 @@ export function dedupe(local: RawPlace[], external: RawPlace[], at?: { lat: numb
   return kept;
 }
 
-async function localPlaces(db: D1Database, lat: number, lng: number, radius: number): Promise<PoiRow[]> {
+async function localPlaces(db: D1Database, userId: string, lat: number, lng: number, radius: number): Promise<PoiRow[]> {
   const widest = await db.prepare('SELECT COALESCE(MAX(radius), 0) AS r FROM pois').first<{ r: number }>();
   const reach = Math.max(radius, widest?.r ?? 0);
   const dLat = reach / 111_320;
   const dLng = reach / (111_320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
-  const res = await db
-    .prepare(`SELECT ${POI_COLS} FROM pois WHERE lat BETWEEN ?1 AND ?2 AND lng BETWEEN ?3 AND ?4`)
-    .bind(lat - dLat, lat + dLat, lng - dLng, lng + dLng)
-    .all<PoiRow>();
+  const q = new Sql();
+  const res = await prepQ(
+    db,
+    `SELECT ${POI_COLS} FROM pois po
+     WHERE po.lat BETWEEN ${q.p(lat - dLat)} AND ${q.p(lat + dLat)} AND po.lng BETWEEN ${q.p(lng - dLng)} AND ${q.p(lng + dLng)}
+       AND ${poiOffered(q, userId)}`,
+    q
+  ).all<PoiRow>();
   // Within the search radius, or within the place's own radius when that is larger.
   return res.results.filter((p) => distance(lat, lng, p.lat, p.lng) <= Math.max(radius, p.radius));
 }
@@ -176,7 +182,7 @@ export async function matchPlaces(env: Env, userId: string, input: MatchInput): 
   const { lat, lng, radius } = input;
   const provider = providerFor(env, lat, lng);
   const [localRows, external, geo, zone] = await Promise.all([
-    localPlaces(env.DB, lat, lng, radius),
+    localPlaces(env.DB, userId, lat, lng, radius),
     settle(nearby(env, provider, lat, lng, radius)),
     settle(reverse(env, provider, lat, lng)),
     zoneAt(env.DB, userId, lat, lng)

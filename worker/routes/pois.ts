@@ -7,7 +7,7 @@ import { getPoiRow, parseNewPoi, findOrCreatePoi, poiCols, toPoi, type PoiRow } 
 import { isStaff, requireUser, viewerId } from '../lib/session';
 import { likeContains, prepQ, Sql } from '../lib/sql';
 import { has, optNum, optText, reqStr, strArray } from '../lib/validate';
-import { photoList, photoLocation } from '../lib/visibility';
+import { photoList, photoLocation, poiOffered } from '../lib/visibility';
 import { amapText } from '../providers/amap';
 import { dedupe, fromExternal, fromPoiRow, matchPlaces, score, type RawPlace } from '../providers/match';
 import { kvCached, settle } from '../providers/http';
@@ -47,7 +47,7 @@ pois.get('/', async (c) => {
 });
 
 pois.get('/search', async (c) => {
-  await requireUser(c);
+  const user = await requireUser(c);
   const q = (c.req.query('q') ?? '').trim();
   if (!q) return c.json({ results: [] as MatchCandidate[] });
   if ([...q].length > 60) throw invalid('搜索词最多 60 个字符');
@@ -62,7 +62,9 @@ pois.get('/search', async (c) => {
   const q1 = new Sql();
   const localRows = await prepQ(
     c.env.DB,
-    `SELECT ${poiCols('po')} FROM pois po WHERE po.name LIKE ${q1.p(like)} ESCAPE '\\' OR po.aliases LIKE ${q1.p(like)} ESCAPE '\\' LIMIT 50`,
+    `SELECT ${poiCols('po')} FROM pois po
+     WHERE (po.name LIKE ${q1.p(like)} ESCAPE '\\' OR po.aliases LIKE ${q1.p(like)} ESCAPE '\\') AND ${poiOffered(q1, user.id)}
+     LIMIT 50`,
     q1
   ).all<PoiRow>();
   const local = localRows.results.map(fromPoiRow);
