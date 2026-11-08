@@ -3,6 +3,7 @@ import { POI_CATEGORIES, type MatchCandidate, type Poi } from '../../shared/type
 import { distance as geoDistance, fmtDistance } from '../../shared/geo';
 import { CategoryIcon, Icon } from '../components/icons';
 import { invalidate } from '../lib/useApi';
+import MatchMap from './MatchMap';
 import MatchPlot from './MatchPlot';
 import {
   DEFAULT_RADIUS,
@@ -22,6 +23,8 @@ import { errMsg } from './util';
 
 /** Candidates shown before "显示全部". */
 const SHORT_LIST = 12;
+/** MapLibre needs WebGL 2; without it the schematic plot stands in for the map. */
+const HAS_WEBGL2 = typeof WebGL2RenderingContext !== 'undefined';
 
 // Place chooser used by the upload page and the photo editor: the match plot with its radius slider and
 // radio list of candidates, search by name, and "create a place". It never talks to the photo itself;
@@ -402,16 +405,32 @@ export default function PlacePicker({
 
       {coords && match ? (
         <section className="pk-block" aria-label="地点匹配">
-          <MatchPlot
-            radius={radius}
-            heading={heading}
-            candidates={candidates}
-            selectedKey={value?.key ?? null}
-            activeKey={active}
-            onActive={setActive}
-            onPick={(c) => !disabled && onChange(choiceFromCandidate(c, 'confirmed'))}
-          />
-          <p className="small muted pk-plot-note">同心圆 50 / 100 / 200 / 300 m · 虚线为匹配半径 · 扇形为镜头朝向 ±30°</p>
+          {HAS_WEBGL2 ? (
+            <MatchMap
+              at={coords}
+              heading={heading}
+              radius={radius}
+              candidates={candidates}
+              selectedKey={value?.key ?? null}
+              onPick={(c) => onChange(choiceFromCandidate(c, 'confirmed'))}
+              disabled={disabled}
+            />
+          ) : (
+            <MatchPlot
+              radius={radius}
+              heading={heading}
+              candidates={candidates}
+              selectedKey={value?.key ?? null}
+              activeKey={active}
+              onActive={setActive}
+              onPick={(c) => !disabled && onChange(choiceFromCandidate(c, 'confirmed'))}
+            />
+          )}
+          <p className="small muted pk-plot-note">
+            {HAS_WEBGL2
+              ? '虚线为匹配半径 · 扇形为镜头朝向 ±30° · 点地图上的编号选择地点'
+              : '同心圆 50 / 100 / 200 / 300 m · 虚线为匹配半径 · 扇形为镜头朝向 ±30°'}
+          </p>
 
           <div className="field">
             <label className="label" htmlFor={`${id}-radius`}>

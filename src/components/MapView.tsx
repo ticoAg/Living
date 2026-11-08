@@ -27,6 +27,8 @@ interface Props {
   zoom?: number;
   /** fit the view to points and shapes whenever they change (default true) */
   fit?: boolean;
+  /** with `fit`, fit only when this value changes, so a selection or restyle does not undo the user's pan and zoom */
+  fitKey?: string;
   maxZoom?: number;
   interactive?: boolean;
   /** require Ctrl/⌘ + scroll or two fingers to move the map, so an embedded map does not trap page scrolling */
@@ -86,6 +88,7 @@ export default function MapView({
   center,
   zoom = 13,
   fit = true,
+  fitKey,
   maxZoom = 16,
   interactive = true,
   cooperativeGestures = false,
@@ -100,6 +103,7 @@ export default function MapView({
   const libRef = useRef<typeof import('maplibre-gl') | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const fittedKey = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,6 +207,10 @@ export default function MapView({
     }
 
     if (!fit) return;
+    if (fitKey !== undefined) {
+      if (fittedKey.current === fitKey) return;
+      fittedKey.current = fitKey;
+    }
     const coords: [number, number][] = [
       ...points.map((p) => [p.lng, p.lat] as [number, number]),
       ...(shapes?.circles ?? []).flatMap((c) => circleRing(c.lat, c.lng, c.radius, 8)),
@@ -219,7 +227,7 @@ export default function MapView({
       ];
       map.fitBounds(bounds, { padding: 48, maxZoom, duration: 0 });
     }
-  }, [ready, points, shapes, fit, maxZoom]);
+  }, [ready, points, shapes, fit, fitKey, maxZoom]);
 
   return (
     <div className={`map-frame${className ? ` ${className}` : ''}`} style={style} role="region" aria-label={ariaLabel}>

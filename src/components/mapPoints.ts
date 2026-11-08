@@ -11,10 +11,12 @@ export interface MapPoint {
   label?: string;
   selected?: boolean;
   muted?: boolean;
+  /** what a screen reader says for the marker, instead of the label and count */
+  title?: string;
   onClick?: () => void;
 }
 
-const ariaLabel = (p: MapPoint) => (p.label ? `${p.label}${p.count != null ? `，${p.count} 张` : ''}` : '地点');
+const ariaLabel = (p: MapPoint) => p.title ?? (p.label ? `${p.label}${p.count != null ? `，${p.count} 张` : ''}` : '地点');
 
 /** `onClick` is what a click calls; it defaults to the point's own handler. */
 export function pointElement(p: MapPoint, onClick: (() => void) | undefined = p.onClick): HTMLElement {
