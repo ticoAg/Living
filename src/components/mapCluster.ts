@@ -1,6 +1,6 @@
 import type { GeoJSONSource, Map as MLMap, MapSourceDataEvent, Marker } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Point } from 'geojson';
-import { patchPoint, pointElement, pointMarkerOptions, pointShape, type MapPoint } from './mapPoints';
+import { MUTED_OPACITY, patchPoint, pointElement, pointMarkerOptions, pointShape, type MapPoint } from './mapPoints';
 
 // Marker clustering for MapView. MapLibre's GeoJSON source clusters the points in its worker; the markers
 // themselves stay HTML, so a cluster looks like a place dot with a bigger number. Markers are pooled (a place by
@@ -60,8 +60,6 @@ const MAX_ZOOM = 16;
 const MARGIN = 0.25;
 /** while the map is moving, look at the clusters at most this often; the end of a move and tile loads always do */
 const MOVE_STEP_MS = 90;
-/** MapLibre sets an inline `opacity: 1` on every marker, which beats the stylesheet's `.map-pt[data-muted]`; fade through the marker instead */
-const MUTED_OPACITY = '0.45';
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 

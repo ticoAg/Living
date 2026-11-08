@@ -49,9 +49,13 @@ export function pointElement(p: MapPoint, onClick: (() => void) | undefined = p.
   return el;
 }
 
-export const pointMarkerOptions = (p: MapPoint): Pick<MarkerOptions, 'anchor' | 'offset'> => ({
+/** MapLibre writes an inline `opacity` on every marker, which beats any stylesheet rule; muted markers fade through the marker. */
+export const MUTED_OPACITY = '0.45';
+
+export const pointMarkerOptions = (p: MapPoint): Pick<MarkerOptions, 'anchor' | 'offset' | 'opacity'> => ({
   anchor: p.label ? 'left' : 'center',
-  offset: p.label ? [-13, 0] : [0, 0]
+  offset: p.label ? [-13, 0] : [0, 0],
+  opacity: p.muted ? MUTED_OPACITY : '1'
 });
 
 /** Points with the same shape can be updated in place with `patchPoint`; a different shape needs a new element. */

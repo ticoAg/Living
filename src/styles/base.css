@@ -137,7 +137,6 @@ h1, h2, h3 { text-wrap: balance; }
 .map-pt { display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; cursor: pointer; color: var(--ink); font: inherit; }
 .map-pt-dot { min-width: 26px; height: 26px; padding: 0 6px; box-sizing: border-box; border-radius: 13px; border: 1.5px solid var(--ink); background: var(--paper); display: flex; align-items: center; justify-content: center; font: 500 12px var(--mono); box-shadow: 0 1px 3px rgba(28, 32, 30, 0.22); }
 .map-pt[data-selected='true'] .map-pt-dot { background: var(--ink); color: var(--paper); }
-.map-pt[data-muted='true'] { opacity: 0.45; }
 .map-pt-label { font: 600 14px var(--serif); letter-spacing: 0.08em; white-space: nowrap; text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper), 0 0 6px var(--paper); }
 .map-pt-photo { width: 12px; height: 12px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
 .map-pt-cluster { justify-content: center; min-width: 44px; min-height: 44px; border-radius: 22px; }
