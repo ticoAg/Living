@@ -1,6 +1,7 @@
 # Directory Update Log
 
 ## 2026-11-08
+* **Update**: 域名改为 Worker 路由 `living.ticoag.fun/*`，DNS 记录手动维护，不再使用自定义域名，见 [Cloudflare 资源](/architecture/cloudflare.md#资源)。
 * **Update**: 上传页"全部发布（N）"取代"发布全部已匹配"：一键照原样发布队列里所有没发的照片，待确认和无位置的不关联地点；刚拖进来就能点，处理和匹配完的照片依次发出，结束后报告发了几张、几张已存在、几张失败，见 [全部发布](/product/features/upload.md#全部发布)。
 * **Update**: 上传队列可以多选（勾选框、Ctrl/⌘、Shift、全选），选中两张以上时右栏变成"已选 N 张"，一起改标签、公开范围、位置精度和主题，部分照片才有的标签虚线显示，可"发布所选"；"标签和设置套用到其余 N 张"去掉，见 [一起整理](/product/features/upload.md#一起整理)。照片处理中也能填表。
 * **Update**: 已选标签显示在标签搜索框里，回车添加第一个匹配、↑ ↓ 选择、退格去掉最后一个；队列每行显示已匹配的地点名和标签名，见 [多层级标签](/product/features/hierarchical-tags.md#打标签)。

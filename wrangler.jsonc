@@ -24,7 +24,8 @@
   ],
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "living-photos" }],
   "kv_namespaces": [{ "binding": "KV", "id": "37fae53ace6d479380c48980477aa176" }],
-  "routes": [{ "pattern": "living.ticoag.fun", "custom_domain": true }],
+  // A Worker route, not a custom domain: the DNS record for living.ticoag.fun is managed by hand in the zone.
+  "routes": [{ "pattern": "living.ticoag.fun/*", "zone_id": "c823bc358d7a051de8df8cb19c6d2736" }],
   // Hourly: fill in the province (and a missing city or district) of photos stored without one (worker/lib/regions.ts).
   "triggers": { "crons": ["23 * * * *"] },
   "workers_dev": false,

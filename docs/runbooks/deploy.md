@@ -53,7 +53,7 @@ CLOUDFLARE_API_TOKEN=… npm run deploy
 - `npm run deploy` 先执行 `npm run build`，再执行 `wrangler d1 migrations apply living --remote && wrangler deploy`。
 - `vp build` 生成 `dist/client/`（静态资源）和 `dist/living/`（Worker 与生成的 `wrangler.json`），并写入 `.wrangler/deploy/config.json`，之后的 `wrangler` 命令通过它读取构建出的配置，迁移目录仍指向 `migrations/`。没有构建就执行 `wrangler deploy` 会报错。
 - `account_id` 已写在 `wrangler.jsonc`，不需要 `CLOUDFLARE_ACCOUNT_ID`。
-- 令牌需要账号级的 Workers Scripts 编辑和 D1 编辑权限；首次部署或修改自定义域名、路由时，还要该区域的 Workers Routes 编辑权限。令牌只通过环境变量传入，不要写进仓库。
+- 令牌需要账号级的 Workers Scripts 编辑和 D1 编辑权限；首次部署或修改路由时，还要该区域的 Workers Routes 编辑权限。令牌只通过环境变量传入，不要写进仓库。
 
 # 回滚
 
