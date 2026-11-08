@@ -8,7 +8,7 @@
 
 | 层     | 选择                                                                                            |
 | ------ | ----------------------------------------------------------------------------------------------- |
-| 前端   | React 19、wouter；MapLibre（OpenFreeMap 瓦片）；`exifr`、`thumbhash`、`suncalc`                 |
+| 前端   | React 19、wouter；MapLibre（OpenFreeMap 瓦片）；`exifr`、`thumbhash`                            |
 | 工具链 | Vite+（Vite 8、Rolldown、Vitest、Oxlint、Oxfmt）；Cloudflare Vite 插件在开发服务器里运行 Worker |
 | 后端   | Cloudflare Worker + Hono；同一个 Worker 提供静态资源、`/api` 和 `/media`                        |
 | 数据   | D1（SQLite）、R2（原图与尺寸图）、KV（会话与缓存）                                              |

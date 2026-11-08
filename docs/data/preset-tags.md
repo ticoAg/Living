@@ -40,16 +40,17 @@ sources:
 
 四个根依次是 题材 10、光与天气 20、季节 30、色调 40。同一父节点下的 `sort` 按上面列出的顺序以 10、20、30… 递增。
 
-# 自动建议用到的 id
+# 互斥的 id
 
-上传时的标签建议（见 [多层级标签](/product/features/hierarchical-tags.md)）依赖这些 id：
+标签板上每张照片最多选一个的（见 [多层级标签](/product/features/hierarchical-tags.md#打标签)，代码在 `src/studio/tag-board.ts`）：
 
-| 依据 | 建议的标签 id |
+| 一组 | id |
 |---|---|
-| 地点类别 | 桥→`bridge`，湖→`lake`，山→`mountain`，寺→`temple`，塔→`pagoda`，海岸或岛→`sea`，街区→`street`，建筑或美术馆→`architecture` |
-| 拍摄时刻与太阳高度 | `morning` `daylight` `sunset` `bluehour` `night` |
-| 日期与南北半球 | `spring` `summer` `autumn` `winter` |
-| 主色 | `warm` `cool` `green` `blue` `mono` |
+| 季节 | `spring` `summer` `autumn` `winter` |
+| 光线 | `morning` `daylight` `sunset` `bluehour` `night` |
+| 色调 | `warm` `cool` `green` `blue` `mono` |
+
+地图页的季节筛选同样把四季当作互斥。
 
 # 规则
 

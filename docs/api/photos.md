@@ -38,7 +38,7 @@ tags: [api, photos]
 2. 新 id `ph_<ulid>`；原图写入 `o/<ownerId>/<photoId>.<ext>`，尺寸图写入 `v/<photoId>/<s|m|l>.<webp|jpg>`，均带 `contentType`。
 3. 地点：`poiId` 存在则使用；否则 `newPoi` 按 `(source, sourceId)` 查找或新建（`created_by` 为请求者，半径按类别默认）。有坐标时服务端重新计算 `poi_distance`。`province`、`city`、`district` 原样保存（各最多 60 个字符），前端取自地点匹配的结果；`province` 为空的照片之后由每小时的补全任务查询。
 4. 坐标落在请求者的任一隐私区域内 → `geo_privacy` 强制为 `hidden`。
-5. 写入 `photo_tags`：`tagIds` 为 `manual`，`suggestedTagIds` 为 `suggested`；只接受预置标签和请求者自己的标签。
+5. 写入 `photo_tags`：`tagIds` 为 `manual`，`suggestedTagIds` 为 `suggested`（上传页已不再发送它）；只接受预置标签和请求者自己的标签。
 6. `themeIds` 中属于请求者的主题，在末尾追加照片条目。
 7. 用 D1 batch 一次写入。R2 写入失败时返回 502 且不写 D1。
 
