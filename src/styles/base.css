@@ -104,8 +104,8 @@ h1, h2, h3 { text-wrap: balance; }
 .btn-living { font-family: var(--latin); font-size: 15px; letter-spacing: 0.08em; }
 
 .chip { min-height: 44px; min-width: 44px; padding: 0 10px; border: 0; border-radius: 2px; background: transparent; color: var(--ink); font: 500 16px var(--serif); cursor: pointer; }
-.chip[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
 .chip[data-included='true'] { background: var(--mat); }
+.chip[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
 .chip:disabled { color: var(--chip-off); cursor: default; }
 .chip-outline { min-height: 40px; border: 1px solid #BFC4BE; font-size: 15px; }
 .swatch { width: 44px; height: 44px; padding: 0; border: 0; background: transparent; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }

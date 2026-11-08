@@ -31,7 +31,9 @@ function Routes() {
   return (
     <Switch>
       <Route path="/" component={Explore} />
-      <Route path="/@:handle" component={Profile} />
+      {/* wouter reads "@:handle" as a literal segment, and static assets redirect /@x to /%40x;
+          a RegExp route captures the handle in either form */}
+      <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/?$/i} component={Profile} />
       <Route path="/p/:id" component={Photo} />
       <Route path="/place/:id" component={Place} />
       <Route path="/map" component={MapPage} />
