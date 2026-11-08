@@ -1,0 +1,4 @@
+# Workers static assets: every file is served with "max-age=0, must-revalidate" unless a rule here says otherwise.
+# Vite puts a content hash in each file name under /assets/, so such a file never changes: browsers keep it for a year.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
