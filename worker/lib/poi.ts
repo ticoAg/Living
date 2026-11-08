@@ -1,7 +1,8 @@
 import { CATEGORY_RADIUS } from '../../shared/geo';
-import { POI_CATEGORIES, type NewPoi, type Poi, type PoiSource } from '../../shared/types';
+import { POI_CATEGORIES, POI_LIMITS, type NewPoi, type Poi, type PoiDetail, type PoiSource, type SessionUser } from '../../shared/types';
 import { newId } from './ids';
 import { invalid } from './http';
+import { isStaff } from './session';
 import { isPlainObject, optEnum, optNum, optText, reqStr } from './validate';
 import { nowIso, prep } from './sql';
 
@@ -45,6 +46,31 @@ export function toPoi(r: PoiRow, count?: number): Poi {
   return poi;
 }
 
+/** `pois.aliases` holds a JSON array of strings, or NULL. Anything else reads as no aliases. */
+export function parseAliases(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const list: unknown = JSON.parse(raw);
+    return Array.isArray(list) ? list.filter((a): a is string => typeof a === 'string' && a !== '') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Only the place's creator and staff (owner, admin) may change it. */
+export const canEditPoi = (user: SessionUser | null, row: Pick<PoiRow, 'created_by'>): boolean =>
+  user !== null && (row.created_by === user.id || isStaff(user));
+
+/**
+ * `toPoi` plus what the edit form needs. The creator's id stays on the server (it would tie a person to a place they
+ * created, even from a photo they keep private); the requester only learns whether they may edit, and the aliases with it.
+ */
+export function toPoiDetail(r: PoiRow, canEdit: boolean, count?: number): PoiDetail {
+  const poi: PoiDetail = { ...toPoi(r, count), canEdit };
+  if (canEdit) poi.aliases = parseAliases(r.aliases);
+  return poi;
+}
+
 export const defaultRadius = (category: string): number => CATEGORY_RADIUS[category] ?? 120;
 
 export async function getPoiRow(db: D1Database, id: string): Promise<PoiRow | null> {
@@ -54,7 +80,7 @@ export async function getPoiRow(db: D1Database, id: string): Promise<PoiRow | nu
 /** Validates a `NewPoi` payload. */
 export function parseNewPoi(v: unknown): NewPoi {
   if (!isPlainObject(v)) throw invalid('地点信息格式不对');
-  const name = reqStr(v, 'name', '地点名称', 1, 80);
+  const name = reqStr(v, 'name', '地点名称', 1, POI_LIMITS.nameMax);
   const category = v.category;
   if (typeof category !== 'string' || !(POI_CATEGORIES as readonly string[]).includes(category)) {
     throw invalid(`地点类别需要是：${POI_CATEGORIES.join('、')}`);

@@ -136,6 +136,36 @@ export interface Poi {
   count?: number;
 }
 
+/** A place as `GET /api/pois/:id` and `PATCH /api/pois/:id` return it, with what the edit form needs. */
+export interface PoiDetail extends Poi {
+  /** The requester may change this place: its creator, an owner or an admin. Who created it is never sent. */
+  canEdit: boolean;
+  /** Other names the place is found by when searching. Only sent together with `canEdit: true`. */
+  aliases?: string[];
+}
+
+/** Body of `PATCH /api/pois/:id`. Every field is optional; what is left out stays as it was. */
+export interface UpdatePoiBody {
+  name?: string;
+  category?: string;
+  /** Matching radius in metres, within `POI_LIMITS`. */
+  radius?: number;
+  /** Replaces the whole list; an empty list clears it. */
+  aliases?: string[];
+}
+
+/** What `PATCH /api/pois/:id` accepts, shared so the edit form can check before it sends. */
+export const POI_LIMITS = {
+  /** characters (code points) of the name */
+  nameMax: 80,
+  /** metres */
+  radiusMin: 10,
+  radiusMax: 5000,
+  aliasCount: 20,
+  /** characters of one alias */
+  aliasMax: 80
+} as const;
+
 export interface MatchCandidate {
   /** Stable key for the list: poi id, or `${source}:${sourceId}` for provider results. */
   key: string;

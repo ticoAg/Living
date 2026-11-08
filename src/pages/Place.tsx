@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type CSSProperties } from 'react';
 import { Link, useParams } from 'wouter';
-import type { PhotoSummary, Poi } from '../../shared/types';
+import type { PhotoSummary, Poi, PoiDetail } from '../../shared/types';
 import { circleRing, dms } from '../../shared/geo';
 import { enc, usePhotoList, useTagTree } from '../browse/api';
 import ChipGroup from '../browse/ChipGroup';
@@ -27,7 +27,7 @@ type Nearby = Poi & { distance: number };
 export default function Place() {
   const { id } = useParams<{ id: string }>();
   const { user } = useSession();
-  const res = useApi<{ poi: Poi; nearby?: Nearby[] }>(id ? `/api/pois/${enc(id)}` : null);
+  const res = useApi<{ poi: PoiDetail; nearby?: Nearby[] }>(id ? `/api/pois/${enc(id)}` : null);
   const { photos } = usePhotoList(id ? `poi=${enc(id)}` : null);
   const { tree } = useTagTree();
   const q = useQuery();
@@ -128,21 +128,29 @@ export default function Place() {
 
   return (
     <main className="page bw plc">
-      <nav className="plc-crumb" aria-label="位置">
-        <Link href="/map">地图</Link>
-        {poi.city && (
-          <>
-            <span aria-hidden="true">/</span>
-            <Link href={`/map?city=${enc(poi.city)}`}>{poi.city}</Link>
-          </>
+      <div className="plc-bar">
+        <nav className="plc-crumb" aria-label="位置">
+          <Link href="/map">地图</Link>
+          {poi.city && (
+            <>
+              <span aria-hidden="true">/</span>
+              <Link href={`/map?city=${enc(poi.city)}`}>{poi.city}</Link>
+            </>
+          )}
+          {poi.district && (
+            <>
+              <span aria-hidden="true">/</span>
+              <span>{poi.district}</span>
+            </>
+          )}
+        </nav>
+        {poi.canEdit && (
+          <Link href={`/studio/place/${poi.id}`} className="btn btn-quiet plc-edit" aria-label="编辑地点">
+            <Icon name="edit" size={16} />
+            编辑
+          </Link>
         )}
-        {poi.district && (
-          <>
-            <span aria-hidden="true">/</span>
-            <span>{poi.district}</span>
-          </>
-        )}
-      </nav>
+      </div>
 
       <section className="plc-top">
         <div className="plc-info">

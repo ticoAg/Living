@@ -142,10 +142,12 @@ a.pho-strip-all:hover { color: var(--ink); }
 
 /* ---------- place ---------- */
 .plc { display: flex; flex-direction: column; gap: 40px; }
-.plc-crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 12px; font-size: 14px; color: var(--ink-2); }
+.plc-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 24px; padding-top: 12px; }
+.plc-crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 14px; color: var(--ink-2); }
 .plc-crumb a { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 4px; color: var(--ink-2); }
 .plc-crumb a:hover { color: var(--ink); }
 .plc-crumb > span:not([aria-hidden]) { padding: 0 4px; color: var(--ink); }
+.plc-edit { margin-left: auto; padding: 0 12px; font-size: 14px; }
 .plc-top { display: flex; flex-wrap: wrap; align-items: stretch; gap: 40px 56px; margin-top: -24px; }
 .plc-info { flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; padding: 8px 0; container-type: inline-size; }
 .plc-id { display: flex; flex-direction: column; gap: 22px; }

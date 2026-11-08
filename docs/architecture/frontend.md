@@ -21,6 +21,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `/living` | `src/pages/Living.tsx` | living |
 | `/upload` | `src/pages/Upload.tsx` | studio |
 | `/studio/photo/:id` | `src/pages/PhotoEdit.tsx` | studio |
+| `/studio/place/:id` | `src/pages/PlaceEdit.tsx` | studio |
 | `/studio/tags` | `src/pages/TagsManager.tsx` | studio |
 | `/login` `/register` `/settings` | `src/pages/Login.tsx` 等 | studio |
 | `/themes` `/themes/new` | `src/pages/Themes.tsx`、`ThemeEditor.tsx` | themes |
