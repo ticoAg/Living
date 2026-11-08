@@ -2,10 +2,11 @@ import { cloudflare } from '@cloudflare/vite-plugin';
 import react from '@vitejs/plugin-react';
 import { defineConfig, lazyPlugins } from 'vite-plus';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // The Cloudflare plugin runs worker/index.ts in workerd next to the SPA, with the bindings from wrangler.jsonc.
   // `vp build` writes dist/client and dist/living; `wrangler deploy` picks them up through .wrangler/deploy.
-  plugins: lazyPlugins(() => [react(), cloudflare()]),
+  // Vitest (mode 'test') runs plain Node tests; the Cloudflare plugin's dev server would clash with Vitest's.
+  plugins: lazyPlugins(() => (mode === 'test' ? [react()] : [react(), cloudflare()])),
   build: { chunkSizeWarningLimit: 1400 },
   fmt: {
     singleQuote: true,
@@ -28,4 +29,4 @@ export default defineConfig({
     include: ['{src,worker,shared}/**/*.test.ts'],
     environment: 'node'
   }
-});
+}));
