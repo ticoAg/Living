@@ -20,7 +20,7 @@ Workers 的 Static Assets 可以直接托管构建产物，同时运行 Worker �
 只部署一个 Worker `living`：
 
 - 入口 `worker/index.ts`，用 Hono 路由；绑定 D1 `DB`、R2 `MEDIA`、KV `KV` 和静态资源 `ASSETS`。
-- 静态资源取自 `./dist`，`not_found_handling` 为 `single-page-application`：找不到文件的页面请求回退到 `index.html`，由前端路由处理。
+- 静态资源取自 `./dist`，`not_found_handling` 为 `single-page-application`：找不到文件的页面请求回退到 `index.html`，由前端路由处理。`html_handling` 为 `none`：路径只按文件名精确匹配，否则 `/index` 会被当成 `index.html` 重定向到 `/`。
 - `run_worker_first` 只列出 `/api/*` 和 `/media/*`：这两类路径总是先进入 Worker，其余请求直接由静态资源响应。
 - 站点只有一个源 `https://living.ticoag.fun`，Worker 绑定为自定义域名，关闭 `workers.dev` 和预览地址。
 

@@ -10,6 +10,8 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
+    // Paths are app routes, not file names: without this, /index is redirected to / (it names index.html).
+    "html_handling": "none",
     "run_worker_first": ["/api/*", "/media/*"]
   },
   "d1_databases": [
