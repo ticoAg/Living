@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Icon } from '../components/icons';
 import { swatchFill, type TagNode, type TagTree } from '../lib/tags';
-import { EVERY_PRESETS, FIELD_KEYS, type FieldKey, type Fit, type Fx, type Order, type Pos, type Settings, type Size, type Source, type Src } from './settings';
+import {
+  EVERY_PRESETS,
+  FIELD_KEYS,
+  type FieldKey,
+  type Fit,
+  type Fx,
+  type Order,
+  type Pos,
+  type Settings,
+  type Size,
+  type Source,
+  type Src
+} from './settings';
 
 /** An optional part of the source that came with the link: a place, theme, city or user. */
 export interface Scope {
@@ -93,7 +105,17 @@ function Row({ id, label, children }: { id: string; label: string; children: Rea
   );
 }
 
-function Options<T extends string | number | boolean>({ value, options, onPick, className }: { value: T; options: readonly (readonly [T, string])[]; onPick: (v: T) => void; className?: string }) {
+function Options<T extends string | number | boolean>({
+  value,
+  options,
+  onPick,
+  className
+}: {
+  value: T;
+  options: readonly (readonly [T, string])[];
+  onPick: (v: T) => void;
+  className?: string;
+}) {
   return (
     <div className="lv-chips">
       {options.map(([v, label]) => (
@@ -145,7 +167,19 @@ function TagPicker({ tags, selected, onToggle }: { tags: TagsState; selected: st
 }
 
 /** Right-hand settings drawer (400 px, full width on phones). */
-export default function Drawer({ open, onClose, closeRef, source: s, settings: v, onSource, onSettings, count, scopes, tags, link }: Props) {
+export default function Drawer({
+  open,
+  onClose,
+  closeRef,
+  source: s,
+  settings: v,
+  onSource,
+  onSettings,
+  count,
+  scopes,
+  tags,
+  link
+}: Props) {
   const linkRef = useRef<HTMLElement>(null);
   const [copy, setCopy] = useState<'idle' | 'ok' | 'manual'>('idle');
 

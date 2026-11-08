@@ -9,7 +9,25 @@ export type PoiSource = 'custom' | 'amap' | 'osm';
 export type ThemeKind = 'trip' | 'topic';
 
 /** POI categories double as map-legend symbols. */
-export const POI_CATEGORIES = ['桥', '堤', '湖', '山', '塔', '寺', '亭', '园', '岛', '村', '景', '街区', '建筑', '美术馆', '海岸', '店', '道路'] as const;
+export const POI_CATEGORIES = [
+  '桥',
+  '堤',
+  '湖',
+  '山',
+  '塔',
+  '寺',
+  '亭',
+  '园',
+  '岛',
+  '村',
+  '景',
+  '街区',
+  '建筑',
+  '美术馆',
+  '海岸',
+  '店',
+  '道路'
+] as const;
 export type PoiCategory = (typeof POI_CATEGORIES)[number];
 
 export interface UserPublic {
@@ -271,7 +289,11 @@ export interface CreateThemeBody {
 }
 export type UpdateThemeBody = Partial<CreateThemeBody>;
 export interface PutThemeItemsBody {
-  items: ({ kind: 'photo'; photoId: string; text?: string | null } | { kind: 'text'; text: string } | { kind: 'day'; day: string; text?: string | null })[];
+  items: (
+    | { kind: 'photo'; photoId: string; text?: string | null }
+    | { kind: 'text'; text: string }
+    | { kind: 'day'; day: string; text?: string | null }
+  )[];
 }
 
 export interface PrivacyZone {

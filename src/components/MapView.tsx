@@ -44,8 +44,7 @@ interface Props {
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 let lib: Promise<typeof import('maplibre-gl')> | null = null;
-const loadLib = () =>
-  (lib ??= Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m]) => m));
+const loadLib = () => (lib ??= Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]).then(([m]) => m));
 
 function restyle(map: MLMap) {
   for (const l of map.getStyle().layers ?? []) {
@@ -65,9 +64,25 @@ function restyle(map: MLMap) {
 }
 
 const fc = (features: Feature[]): FeatureCollection => ({ type: 'FeatureCollection', features });
-const poly = (ring: [number, number][], props: Record<string, unknown> = {}): Feature => ({ type: 'Feature', properties: props, geometry: { type: 'Polygon', coordinates: [ring] } });
+const poly = (ring: [number, number][], props: Record<string, unknown> = {}): Feature => ({
+  type: 'Feature',
+  properties: props,
+  geometry: { type: 'Polygon', coordinates: [ring] }
+});
 
-export default function MapView({ ariaLabel, points = [], shapes, center, zoom = 13, fit = true, maxZoom = 16, interactive = true, cooperativeGestures = false, className, style }: Props) {
+export default function MapView({
+  ariaLabel,
+  points = [],
+  shapes,
+  center,
+  zoom = 13,
+  fit = true,
+  maxZoom = 16,
+  interactive = true,
+  cooperativeGestures = false,
+  className,
+  style
+}: Props) {
   const box = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Marker[]>([]);
@@ -98,11 +113,38 @@ export default function MapView({ ariaLabel, points = [], shapes, center, zoom =
           map.addSource('lv-circles', { type: 'geojson', data: fc([]) });
           map.addSource('lv-cones', { type: 'geojson', data: fc([]) });
           map.addSource('lv-lines', { type: 'geojson', data: fc([]) });
-          map.addLayer({ id: 'lv-circles-fill', type: 'fill', source: 'lv-circles', paint: { 'fill-color': '#8F5530', 'fill-opacity': 0.06 } });
-          map.addLayer({ id: 'lv-circles-line', type: 'line', source: 'lv-circles', paint: { 'line-color': '#8F5530', 'line-width': 1.2, 'line-dasharray': [3, 2] } });
-          map.addLayer({ id: 'lv-cones-fill', type: 'fill', source: 'lv-cones', paint: { 'fill-color': '#8F5530', 'fill-opacity': ['case', ['get', 'muted'], 0.08, 0.28] } });
-          map.addLayer({ id: 'lv-lines-solid', type: 'line', source: 'lv-lines', filter: ['!', ['get', 'dashed']], paint: { 'line-color': '#1C201E', 'line-width': 2 } });
-          map.addLayer({ id: 'lv-lines-dashed', type: 'line', source: 'lv-lines', filter: ['get', 'dashed'], paint: { 'line-color': '#1C201E', 'line-width': 1.2, 'line-dasharray': [2, 2] } });
+          map.addLayer({
+            id: 'lv-circles-fill',
+            type: 'fill',
+            source: 'lv-circles',
+            paint: { 'fill-color': '#8F5530', 'fill-opacity': 0.06 }
+          });
+          map.addLayer({
+            id: 'lv-circles-line',
+            type: 'line',
+            source: 'lv-circles',
+            paint: { 'line-color': '#8F5530', 'line-width': 1.2, 'line-dasharray': [3, 2] }
+          });
+          map.addLayer({
+            id: 'lv-cones-fill',
+            type: 'fill',
+            source: 'lv-cones',
+            paint: { 'fill-color': '#8F5530', 'fill-opacity': ['case', ['get', 'muted'], 0.08, 0.28] }
+          });
+          map.addLayer({
+            id: 'lv-lines-solid',
+            type: 'line',
+            source: 'lv-lines',
+            filter: ['!', ['get', 'dashed']],
+            paint: { 'line-color': '#1C201E', 'line-width': 2 }
+          });
+          map.addLayer({
+            id: 'lv-lines-dashed',
+            type: 'line',
+            source: 'lv-lines',
+            filter: ['get', 'dashed'],
+            paint: { 'line-color': '#1C201E', 'line-width': 1.2, 'line-dasharray': [2, 2] }
+          });
           setReady(true);
         });
         map.on('error', () => {});
@@ -122,7 +164,9 @@ export default function MapView({ ariaLabel, points = [], shapes, center, zoom =
     const map = mapRef.current;
     const m = libRef.current;
     if (!ready || !map || !m) return;
-    (map.getSource('lv-circles') as GeoJSONSource).setData(fc((shapes?.circles ?? []).map((c) => poly(circleRing(c.lat, c.lng, c.radius)))));
+    (map.getSource('lv-circles') as GeoJSONSource).setData(
+      fc((shapes?.circles ?? []).map((c) => poly(circleRing(c.lat, c.lng, c.radius))))
+    );
     (map.getSource('lv-cones') as GeoJSONSource).setData(
       fc((shapes?.cones ?? []).map((c) => poly(coneRing(c.lat, c.lng, c.heading, c.radius ?? 70), { muted: !!c.muted })))
     );
@@ -166,7 +210,9 @@ export default function MapView({ ariaLabel, points = [], shapes, center, zoom =
         label.textContent = p.label;
         el.appendChild(label);
       }
-      return new m.Marker({ element: el, anchor: p.label ? 'left' : 'center', offset: p.label ? [-13, 0] : [0, 0] }).setLngLat([p.lng, p.lat]).addTo(map);
+      return new m.Marker({ element: el, anchor: p.label ? 'left' : 'center', offset: p.label ? [-13, 0] : [0, 0] })
+        .setLngLat([p.lng, p.lat])
+        .addTo(map);
     });
 
     if (!fit) return;
@@ -191,7 +237,11 @@ export default function MapView({ ariaLabel, points = [], shapes, center, zoom =
   return (
     <div className={`map-frame${className ? ` ${className}` : ''}`} style={style} role="region" aria-label={ariaLabel}>
       <div ref={box} style={{ position: 'absolute', inset: 0 }} />
-      {failed && <p className="loading" style={{ position: 'absolute', inset: 0, margin: 0 }}>地图加载失败</p>}
+      {failed && (
+        <p className="loading" style={{ position: 'absolute', inset: 0, margin: 0 }}>
+          地图加载失败
+        </p>
+      )}
     </div>
   );
 }

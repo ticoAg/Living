@@ -54,7 +54,13 @@ export default function Controls(p: Props) {
         <button type="button" className="lv-btn" aria-label="上一张" disabled={!canStep} onClick={p.onPrev}>
           <Icon name="left" size={20} />
         </button>
-        <button type="button" className="lv-btn lv-btn-main" aria-label={p.paused ? '继续播放' : '暂停'} disabled={p.count < 1} onClick={p.onToggle}>
+        <button
+          type="button"
+          className="lv-btn lv-btn-main"
+          aria-label={p.paused ? '继续播放' : '暂停'}
+          disabled={p.count < 1}
+          onClick={p.onToggle}
+        >
           <Icon name={p.paused ? 'play' : 'pause'} size={18} />
         </button>
         <button type="button" className="lv-btn" aria-label="下一张" disabled={!canStep} onClick={p.onNext}>
@@ -77,7 +83,13 @@ export default function Controls(p: Props) {
           <Icon name="sliders" size={20} />
         </button>
         {p.fullscreenSupported && (
-          <button type="button" className="lv-btn lv-btn-fs" aria-label={p.fullscreenActive ? '退出全屏' : '全屏'} data-on={p.fullscreenActive} onClick={p.onFullscreen}>
+          <button
+            type="button"
+            className="lv-btn lv-btn-fs"
+            aria-label={p.fullscreenActive ? '退出全屏' : '全屏'}
+            data-on={p.fullscreenActive}
+            onClick={p.onFullscreen}
+          >
             <Icon name="expand" size={18} />
           </button>
         )}

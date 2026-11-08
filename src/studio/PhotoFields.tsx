@@ -39,12 +39,24 @@ export default function PhotoFields({ value, onChange, tags, geoLocked, disabled
   return (
     <div className="stack pf" style={{ ['--gap' as string]: '20px' }}>
       <div className="field">
-        <label className="label" htmlFor={`${id}-title`}>标题（可不填）</label>
-        <input id={`${id}-title`} className="input" value={value.title} onChange={(e) => onChange({ title: e.target.value })} maxLength={120} disabled={disabled} autoComplete="off" />
+        <label className="label" htmlFor={`${id}-title`}>
+          标题（可不填）
+        </label>
+        <input
+          id={`${id}-title`}
+          className="input"
+          value={value.title}
+          onChange={(e) => onChange({ title: e.target.value })}
+          maxLength={120}
+          disabled={disabled}
+          autoComplete="off"
+        />
       </div>
 
       <div className="field">
-        <label className="label" htmlFor={`${id}-note`}>笔记</label>
+        <label className="label" htmlFor={`${id}-note`}>
+          笔记
+        </label>
         <textarea
           id={`${id}-note`}
           className="textarea"
@@ -63,7 +75,13 @@ export default function PhotoFields({ value, onChange, tags, geoLocked, disabled
         <TagPicker value={tags.value} suggested={tags.suggested} onChange={tags.onChange} disabled={disabled} />
       </div>
 
-      <Seg label="公开范围" value={value.visibility} options={VISIBILITY} onChange={(v) => onChange({ visibility: v })} disabled={disabled} />
+      <Seg
+        label="公开范围"
+        value={value.visibility}
+        options={VISIBILITY}
+        onChange={(v) => onChange({ visibility: v })}
+        disabled={disabled}
+      />
       <Seg
         label="位置精度"
         value={value.geoPrivacy}
@@ -74,7 +92,13 @@ export default function PhotoFields({ value, onChange, tags, geoLocked, disabled
       />
 
       <div className="pf-toggles">
-        <Toggle label="进入 Living" hint="参与全屏轮播" checked={value.inLiving} onChange={(v) => onChange({ inLiving: v })} disabled={disabled} />
+        <Toggle
+          label="进入 Living"
+          hint="参与全屏轮播"
+          checked={value.inLiving}
+          onChange={(v) => onChange({ inLiving: v })}
+          disabled={disabled}
+        />
         <Toggle label="收藏" checked={value.favorite} onChange={(v) => onChange({ favorite: v })} disabled={disabled} />
       </div>
     </div>

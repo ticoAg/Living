@@ -44,7 +44,8 @@ export async function overpassAround(lat: number, lng: number, radius: number): 
   });
   if (!Array.isArray(data.elements)) throw new UpstreamError('overpass: unexpected response');
   // An overloaded server answers 200 with a "runtime error" remark and a partial or empty result: not worth caching.
-  if (typeof data.remark === 'string' && /runtime error|timed out|out of memory/i.test(data.remark)) throw new UpstreamError('overpass: query did not complete');
+  if (typeof data.remark === 'string' && /runtime error|timed out|out of memory/i.test(data.remark))
+    throw new UpstreamError('overpass: query did not complete');
   return parseOverpass(data.elements);
 }
 
@@ -120,7 +121,10 @@ export async function nominatimReverse(lat: number, lng: number): Promise<Geocod
     addressdetails: '1',
     'accept-language': 'zh-CN'
   });
-  const data = await fetchJson<{ address?: NominatimAddress; error?: string }>(`${NOMINATIM}/reverse?${qs.toString()}`, 'nominatim reverse');
+  const data = await fetchJson<{ address?: NominatimAddress; error?: string }>(
+    `${NOMINATIM}/reverse?${qs.toString()}`,
+    'nominatim reverse'
+  );
   // "Unable to geocode" (open sea, no data) is a valid empty answer, not an outage.
   if (data.error) return { city: null, district: null };
   return geocodeFromAddress(data.address ?? {});

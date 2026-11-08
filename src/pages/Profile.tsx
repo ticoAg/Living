@@ -12,7 +12,11 @@ import '../styles/browse.css';
 const VISIBILITY: Record<string, string> = { unlisted: '仅链接可见', private: '仅自己可见' };
 
 function themeMeta(t: ThemeSummary): string {
-  const range = t.startDate ? `${fmtDay(t.startDate)}${t.endDate && t.endDate !== t.startDate ? ` – ${fmtDay(t.endDate).slice(5)}` : ''}` : t.kind === 'trip' ? '旅程' : '专题';
+  const range = t.startDate
+    ? `${fmtDay(t.startDate)}${t.endDate && t.endDate !== t.startDate ? ` – ${fmtDay(t.endDate).slice(5)}` : ''}`
+    : t.kind === 'trip'
+      ? '旅程'
+      : '专题';
   return `${range} · ${t.photoCount} 张`;
 }
 
@@ -81,7 +85,11 @@ export default function Profile() {
             {themeList.map((t) => (
               <li key={t.id}>
                 <Link href={`/t/${t.id}`} className="prof-theme">
-                  {t.cover ? <Img photo={t.cover} ratio="3 / 2" sizes="280px" alt="" /> : <span className="prof-theme-blank" aria-hidden="true" />}
+                  {t.cover ? (
+                    <Img photo={t.cover} ratio="3 / 2" sizes="280px" alt="" />
+                  ) : (
+                    <span className="prof-theme-blank" aria-hidden="true" />
+                  )}
                   <span className="prof-theme-title">{t.title}</span>
                   <span className="prof-theme-meta">
                     {themeMeta(t)}

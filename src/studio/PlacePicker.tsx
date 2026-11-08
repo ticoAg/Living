@@ -40,7 +40,12 @@ export function PlaceSummary({ value, onClear, disabled }: { value: PlaceChoice 
         <span className="pk-current-name serif">{value.name}</span>
         <span className="small muted">
           {value.category} · {METHOD_LABEL[value.method]}
-          {value.distance != null && !value.area && <> · <span className="mono">{fmtDistance(value.distance)}</span></>}
+          {value.distance != null && !value.area && (
+            <>
+              {' '}
+              · <span className="mono">{fmtDistance(value.distance)}</span>
+            </>
+          )}
           {value.area && <> · 范围内</>}
         </span>
         {value.from && <span className="small pk-from">{value.from}</span>}
@@ -83,15 +88,38 @@ function Row({
   onActive?: (key: string | null) => void;
 }) {
   return (
-    <label className="pk-row" data-checked={checked} data-disabled={disabled || undefined} onMouseEnter={() => onActive?.(row.key)} onMouseLeave={() => onActive?.(null)}>
-      <input type="radio" name={group} className="visually-hidden" checked={checked} disabled={disabled} onChange={onSelect} onFocus={() => onActive?.(row.key)} onBlur={() => onActive?.(null)} />
-      {rank != null && <span className="pk-rank mono" aria-hidden="true">{rank}</span>}
+    <label
+      className="pk-row"
+      data-checked={checked}
+      data-disabled={disabled || undefined}
+      onMouseEnter={() => onActive?.(row.key)}
+      onMouseLeave={() => onActive?.(null)}
+    >
+      <input
+        type="radio"
+        name={group}
+        className="visually-hidden"
+        checked={checked}
+        disabled={disabled}
+        onChange={onSelect}
+        onFocus={() => onActive?.(row.key)}
+        onBlur={() => onActive?.(null)}
+      />
+      {rank != null && (
+        <span className="pk-rank mono" aria-hidden="true">
+          {rank}
+        </span>
+      )}
       <span className="pk-main">
         <span className="pk-name serif">{row.name}</span>
         <span className="pk-sub small muted">
           <CategoryIcon category={row.category} size={14} />
           <span>{row.category}</span>
-          {row.area ? <span className="pk-tag">范围内</span> : row.distance != null && <span className="mono">{fmtDistance(row.distance)}</span>}
+          {row.area ? (
+            <span className="pk-tag">范围内</span>
+          ) : (
+            row.distance != null && <span className="mono">{fmtDistance(row.distance)}</span>
+          )}
           {row.inView && <span className="pk-tag pk-tag-view">朝向内</span>}
           {row.local && <span className="pk-tag">站内</span>}
           {row.far && <span className="pk-tag pk-tag-far">超出半径</span>}
@@ -114,7 +142,12 @@ function PlaceSearch({
 }) {
   const id = useId();
   const [q, setQ] = useState('');
-  const [state, setState] = useState<{ loading: boolean; error: string | null; results: MatchCandidate[] | null; term: string }>({ loading: false, error: null, results: null, term: '' });
+  const [state, setState] = useState<{ loading: boolean; error: string | null; results: MatchCandidate[] | null; term: string }>({
+    loading: false,
+    error: null,
+    results: null,
+    term: ''
+  });
   const seq = useRef(0);
 
   async function submit(e: FormEvent) {
@@ -134,9 +167,21 @@ function PlaceSearch({
   return (
     <section className="pk-block" aria-label="搜索其他地点">
       <form className="field" onSubmit={submit} role="search">
-        <label className="label" htmlFor={`${id}-q`}>搜索其他地点</label>
+        <label className="label" htmlFor={`${id}-q`}>
+          搜索其他地点
+        </label>
         <div className="pk-searchrow">
-          <input id={`${id}-q`} className="input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="地点名称，如 断桥残雪" disabled={disabled} maxLength={60} enterKeyHint="search" />
+          <input
+            id={`${id}-q`}
+            className="input"
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="地点名称，如 断桥残雪"
+            disabled={disabled}
+            maxLength={60}
+            enterKeyHint="search"
+          />
           <button type="submit" className="btn" disabled={disabled || state.loading || !q.trim()}>
             <Icon name="search" size={16} />
             搜索
@@ -145,8 +190,14 @@ function PlaceSearch({
       </form>
       <div aria-live="polite">
         {state.loading && <p className="small muted">搜索中…</p>}
-        {state.error && <p className="error-text" role="alert">{state.error}</p>}
-        {state.results && state.results.length === 0 && <p className="small muted">没有找到「{state.term}」。可以换个说法，或在下面新建。</p>}
+        {state.error && (
+          <p className="error-text" role="alert">
+            {state.error}
+          </p>
+        )}
+        {state.results && state.results.length === 0 && (
+          <p className="small muted">没有找到「{state.term}」。可以换个说法，或在下面新建。</p>
+        )}
       </div>
       {state.results && state.results.length > 0 && (
         <div className="pk-list" role="radiogroup" aria-label={`「${state.term}」的搜索结果`}>
@@ -154,7 +205,14 @@ function PlaceSearch({
             <Row
               key={c.key}
               group={`${id}-r`}
-              row={{ key: c.key, name: c.name, category: c.category, distance: at ? c.distance : null, area: c.area && !!at, local: c.source === 'local' }}
+              row={{
+                key: c.key,
+                name: c.name,
+                category: c.category,
+                distance: at ? c.distance : null,
+                area: c.area && !!at,
+                local: c.source === 'local'
+              }}
               checked={value?.key === c.key}
               disabled={disabled}
               onSelect={() => onPick(choiceFromCandidate(c, 'manual'))}
@@ -206,7 +264,14 @@ function PlaceCustom({
 
   return (
     <section className="pk-block">
-      <button type="button" className="btn btn-quiet pk-custom-toggle" aria-expanded={open} aria-controls={`${id}-form`} onClick={() => setOpen((o) => !o)} disabled={disabled}>
+      <button
+        type="button"
+        className="btn btn-quiet pk-custom-toggle"
+        aria-expanded={open}
+        aria-controls={`${id}-form`}
+        onClick={() => setOpen((o) => !o)}
+        disabled={disabled}
+      >
         <Icon name="plus" size={16} />
         新建地点
       </button>
@@ -218,21 +283,50 @@ function PlaceCustom({
             <p className="small muted">这张照片没有坐标，新地点没法定位。请先搜索已有地点。</p>
           )}
           <div className="field">
-            <label className="label" htmlFor={`${id}-name`}>名称</label>
-            <input id={`${id}-name`} className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="如 家门口的桥" disabled={!at || busy} required />
+            <label className="label" htmlFor={`${id}-name`}>
+              名称
+            </label>
+            <input
+              id={`${id}-name`}
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={40}
+              placeholder="如 家门口的桥"
+              disabled={!at || busy}
+              required
+            />
           </div>
           <div className="field">
-            <label className="label" htmlFor={`${id}-cat`}>类别</label>
-            <select id={`${id}-cat`} className="input select" value={category} onChange={(e) => setCategory(e.target.value)} disabled={!at || busy}>
+            <label className="label" htmlFor={`${id}-cat`}>
+              类别
+            </label>
+            <select
+              id={`${id}-cat`}
+              className="input select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              disabled={!at || busy}
+            >
               {POI_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
           </div>
-          {error && <p className="error-text" role="alert">{error}</p>}
+          {error && (
+            <p className="error-text" role="alert">
+              {error}
+            </p>
+          )}
           <div className="row">
-            <button type="submit" className="btn btn-primary" disabled={!at || busy || !name.trim()}>{busy ? '新建中…' : '新建并使用'}</button>
-            <button type="button" className="btn btn-quiet" onClick={() => setOpen(false)} disabled={busy}>取消</button>
+            <button type="submit" className="btn btn-primary" disabled={!at || busy || !name.trim()}>
+              {busy ? '新建中…' : '新建并使用'}
+            </button>
+            <button type="button" className="btn btn-quiet" onClick={() => setOpen(false)} disabled={busy}>
+              取消
+            </button>
           </div>
         </form>
       )}
@@ -261,7 +355,21 @@ export interface PlacePickerProps {
   disabled?: boolean;
 }
 
-export default function PlacePicker({ coords, heading, match, onRadius, onRetry, value, onChange, extras = [], onCreated, customAt, privacyZone, hideCurrent, disabled }: PlacePickerProps) {
+export default function PlacePicker({
+  coords,
+  heading,
+  match,
+  onRadius,
+  onRetry,
+  value,
+  onChange,
+  extras = [],
+  onCreated,
+  customAt,
+  privacyZone,
+  hideCurrent,
+  disabled
+}: PlacePickerProps) {
   const id = useId();
   const [active, setActive] = useState<string | null>(null);
   const radius = match?.radius ?? DEFAULT_RADIUS;
@@ -287,28 +395,49 @@ export default function PlacePicker({ coords, heading, match, onRadius, onRetry,
 
       {coords && match ? (
         <section className="pk-block" aria-label="地点匹配">
-          <MatchPlot radius={radius} heading={heading} candidates={candidates} selectedKey={value?.key ?? null} activeKey={active} onActive={setActive} onPick={(c) => !disabled && onChange(choiceFromCandidate(c, 'confirmed'))} />
+          <MatchPlot
+            radius={radius}
+            heading={heading}
+            candidates={candidates}
+            selectedKey={value?.key ?? null}
+            activeKey={active}
+            onActive={setActive}
+            onPick={(c) => !disabled && onChange(choiceFromCandidate(c, 'confirmed'))}
+          />
           <p className="small muted pk-plot-note">同心圆 50 / 100 / 200 / 300 m · 虚线为匹配半径 · 扇形为镜头朝向 ±30°</p>
 
           <div className="field">
             <label className="label" htmlFor={`${id}-radius`}>
               匹配半径 <span className="mono pk-radius-val">{radius} m</span>
             </label>
-            <input id={`${id}-radius`} className="pk-range" type="range" min={MIN_RADIUS} max={MAX_RADIUS} step={10} value={radius} onChange={(e) => onRadius(Number(e.target.value))} disabled={disabled} />
+            <input
+              id={`${id}-radius`}
+              className="pk-range"
+              type="range"
+              min={MIN_RADIUS}
+              max={MAX_RADIUS}
+              step={10}
+              value={radius}
+              onChange={(e) => onRadius(Number(e.target.value))}
+              disabled={disabled}
+            />
           </div>
 
           <div className="pk-status small" aria-live="polite">
             {match.loading && <span className="muted">匹配中…</span>}
             {!match.loading && res && (
               <span className="muted">
-                {[res.city, res.district].filter(Boolean).join(' · ') || '未知区域'} · {PROVIDER_LABEL[res.provider]} · {candidates.length} 个候选
+                {[res.city, res.district].filter(Boolean).join(' · ') || '未知区域'} · {PROVIDER_LABEL[res.provider]} · {candidates.length}{' '}
+                个候选
               </span>
             )}
           </div>
           {match.error && (
             <div className="notice pk-error" role="alert">
               <span className="error-text">{match.error}</span>
-              <button type="button" className="btn btn-quiet" onClick={onRetry}>重试</button>
+              <button type="button" className="btn btn-quiet" onClick={onRetry}>
+                重试
+              </button>
             </div>
           )}
           {res?.provider === 'local' && !match.loading && <p className="small muted">外部地点服务暂时不可用，只显示站内已有地点。</p>}
@@ -322,7 +451,16 @@ export default function PlacePicker({ coords, heading, match, onRadius, onRetry,
                     key={c.key}
                     group={`${id}-c`}
                     rank={i + 1}
-                    row={{ key: c.key, name: c.name, category: c.category, distance: c.distance, inView: c.inView, area: c.area, local: c.source === 'local', far: !pickable }}
+                    row={{
+                      key: c.key,
+                      name: c.name,
+                      category: c.category,
+                      distance: c.distance,
+                      inView: c.inView,
+                      area: c.area,
+                      local: c.source === 'local',
+                      far: !pickable
+                    }}
                     checked={value?.key === c.key}
                     disabled={disabled || !pickable}
                     onSelect={() => onChange(choiceFromCandidate(c, 'confirmed'))}
@@ -332,8 +470,7 @@ export default function PlacePicker({ coords, heading, match, onRadius, onRetry,
               })}
             </div>
           ) : (
-            !match.loading &&
-            !match.error && <p className="muted small">{radius} 米内没有找到地点。可以放大半径、搜索，或新建一个。</p>
+            !match.loading && !match.error && <p className="muted small">{radius} 米内没有找到地点。可以放大半径、搜索，或新建一个。</p>
           )}
         </section>
       ) : (

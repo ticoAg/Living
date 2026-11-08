@@ -20,15 +20,50 @@ const SWATCHES: { color: string; label: string }[] = [
   { color: 'mono', label: '黑白' }
 ];
 
-function IconBtn({ label, icon, onClick, disabled, danger, pressed, flip }: { label: string; icon: IconName; onClick: () => void; disabled?: boolean; danger?: boolean; pressed?: boolean; flip?: boolean }) {
+function IconBtn({
+  label,
+  icon,
+  onClick,
+  disabled,
+  danger,
+  pressed,
+  flip
+}: {
+  label: string;
+  icon: IconName;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  pressed?: boolean;
+  flip?: boolean;
+}) {
   return (
-    <button type="button" className="tm-icon" data-danger={danger || undefined} aria-label={label} title={label} aria-pressed={pressed} disabled={disabled} onClick={onClick}>
+    <button
+      type="button"
+      className="tm-icon"
+      data-danger={danger || undefined}
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={onClick}
+    >
       <Icon name={icon} size={17} style={flip ? { transform: 'rotate(180deg)' } : undefined} />
     </button>
   );
 }
 
-function RenameForm({ tag, busy, onSubmit, onCancel }: { tag: TagNode; busy: boolean; onSubmit: (name: string) => void; onCancel: () => void }) {
+function RenameForm({
+  tag,
+  busy,
+  onSubmit,
+  onCancel
+}: {
+  tag: TagNode;
+  busy: boolean;
+  onSubmit: (name: string) => void;
+  onCancel: () => void;
+}) {
   const [name, setName] = useState(tag.name);
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') onCancel();
@@ -42,15 +77,39 @@ function RenameForm({ tag, busy, onSubmit, onCancel }: { tag: TagNode; busy: boo
         if (name.trim()) onSubmit(name.trim());
       }}
     >
-      <label className="visually-hidden" htmlFor={`rn-${tag.id}`}>标签名称</label>
-      <input id={`rn-${tag.id}`} className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={24} autoFocus required />
-      <button type="submit" className="btn btn-primary" disabled={busy || !name.trim()}>保存</button>
-      <button type="button" className="btn btn-quiet" onClick={onCancel}>取消</button>
+      <label className="visually-hidden" htmlFor={`rn-${tag.id}`}>
+        标签名称
+      </label>
+      <input
+        id={`rn-${tag.id}`}
+        className="input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={24}
+        autoFocus
+        required
+      />
+      <button type="submit" className="btn btn-primary" disabled={busy || !name.trim()}>
+        保存
+      </button>
+      <button type="button" className="btn btn-quiet" onClick={onCancel}>
+        取消
+      </button>
     </form>
   );
 }
 
-function AddForm({ tag, busy, onSubmit, onCancel }: { tag: TagNode; busy: boolean; onSubmit: (name: string) => void; onCancel: () => void }) {
+function AddForm({
+  tag,
+  busy,
+  onSubmit,
+  onCancel
+}: {
+  tag: TagNode;
+  busy: boolean;
+  onSubmit: (name: string) => void;
+  onCancel: () => void;
+}) {
   const [name, setName] = useState('');
   return (
     <form
@@ -60,18 +119,49 @@ function AddForm({ tag, busy, onSubmit, onCancel }: { tag: TagNode; busy: boolea
         if (name.trim()) onSubmit(name.trim());
       }}
     >
-      <label className="label" htmlFor={`add-${tag.id}`}>在「{tag.name}」下新建标签</label>
+      <label className="label" htmlFor={`add-${tag.id}`}>
+        在「{tag.name}」下新建标签
+      </label>
       <div className="tm-inline">
-        <input id={`add-${tag.id}`} className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={24} placeholder="标签名称" autoFocus required />
-        <button type="submit" className="btn btn-primary" disabled={busy || !name.trim()}>添加</button>
-        <button type="button" className="btn btn-quiet" onClick={onCancel}>取消</button>
+        <input
+          id={`add-${tag.id}`}
+          className="input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={24}
+          placeholder="标签名称"
+          autoFocus
+          required
+        />
+        <button type="submit" className="btn btn-primary" disabled={busy || !name.trim()}>
+          添加
+        </button>
+        <button type="button" className="btn btn-quiet" onClick={onCancel}>
+          取消
+        </button>
       </div>
     </form>
   );
 }
 
 /** Move under another tag, and switch the colour swatch on or off. */
-function MorePanel({ tag, tree, editable, busy, onMove, onColor, onClose }: { tag: TagNode; tree: TagTree; editable: boolean; busy: boolean; onMove: (parentId: string | null) => void; onColor: (color: string | null) => void; onClose: () => void }) {
+function MorePanel({
+  tag,
+  tree,
+  editable,
+  busy,
+  onMove,
+  onColor,
+  onClose
+}: {
+  tag: TagNode;
+  tree: TagTree;
+  editable: boolean;
+  busy: boolean;
+  onMove: (parentId: string | null) => void;
+  onColor: (color: string | null) => void;
+  onClose: () => void;
+}) {
   const [parent, setParent] = useState(tag.parentId ?? '');
   // Not itself or anything below it. Presets can only live under presets; user tags under presets or their own.
   const targets = useMemo(() => {
@@ -92,9 +182,17 @@ function MorePanel({ tag, tree, editable, busy, onMove, onColor, onClose }: { ta
   return (
     <div className="tm-panel">
       <div className="field">
-        <label className="label" htmlFor={`mv-${tag.id}`}>移动到</label>
+        <label className="label" htmlFor={`mv-${tag.id}`}>
+          移动到
+        </label>
         <div className="tm-inline">
-          <select id={`mv-${tag.id}`} className="input select" value={parent} onChange={(e) => setParent(e.target.value)} disabled={!editable || busy}>
+          <select
+            id={`mv-${tag.id}`}
+            className="input select"
+            value={parent}
+            onChange={(e) => setParent(e.target.value)}
+            disabled={!editable || busy}
+          >
             <option value="">（根）</option>
             {targets.map((t) => (
               <option key={t.id} value={t.id}>
@@ -103,30 +201,58 @@ function MorePanel({ tag, tree, editable, busy, onMove, onColor, onClose }: { ta
               </option>
             ))}
           </select>
-          <button type="button" className="btn" disabled={!editable || busy || parent === (tag.parentId ?? '')} onClick={() => onMove(parent || null)}>
+          <button
+            type="button"
+            className="btn"
+            disabled={!editable || busy || parent === (tag.parentId ?? '')}
+            onClick={() => onMove(parent || null)}
+          >
             移动
           </button>
         </div>
       </div>
 
       <div className="field">
-        <Toggle label="显示为色块" hint="带颜色的标签在图库里显示成色块" checked={colored} disabled={!editable || busy} onChange={(on) => onColor(on ? SWATCHES[0].color : null)} />
+        <Toggle
+          label="显示为色块"
+          hint="带颜色的标签在图库里显示成色块"
+          checked={colored}
+          disabled={!editable || busy}
+          onChange={(on) => onColor(on ? SWATCHES[0].color : null)}
+        />
         {colored && (
           <div className="tm-colors" role="group" aria-label="色块颜色">
             {SWATCHES.map((s) => (
-              <button key={s.color} type="button" className="swatch" aria-label={s.label} title={s.label} aria-pressed={tag.color === s.color} disabled={!editable || busy} onClick={() => onColor(s.color)}>
+              <button
+                key={s.color}
+                type="button"
+                className="swatch"
+                aria-label={s.label}
+                title={s.label}
+                aria-pressed={tag.color === s.color}
+                disabled={!editable || busy}
+                onClick={() => onColor(s.color)}
+              >
                 <span style={{ background: swatchFill(s.color) }} />
               </button>
             ))}
             <label className="tm-pick-color">
               <span className="small muted">自定义</span>
-              <input type="color" aria-label="自定义颜色" value={tag.color && tag.color.startsWith('#') ? tag.color.toLowerCase() : '#888888'} disabled={!editable || busy} onChange={(e) => onColor(e.target.value.toUpperCase())} />
+              <input
+                type="color"
+                aria-label="自定义颜色"
+                value={tag.color && tag.color.startsWith('#') ? tag.color.toLowerCase() : '#888888'}
+                disabled={!editable || busy}
+                onChange={(e) => onColor(e.target.value.toUpperCase())}
+              />
             </label>
           </div>
         )}
       </div>
       <div>
-        <button type="button" className="btn btn-quiet" onClick={onClose}>收起</button>
+        <button type="button" className="btn btn-quiet" onClick={onClose}>
+          收起
+        </button>
       </div>
     </div>
   );
@@ -173,7 +299,14 @@ export default function TagsManager() {
       return next;
     });
   const expand = (id: string) => setOpen((o) => new Set(o).add(id));
-  const expandAll = () => setOpen(new Set(Array.from(tree.byId.values()).filter((n) => n.children.length).map((n) => n.id)));
+  const expandAll = () =>
+    setOpen(
+      new Set(
+        Array.from(tree.byId.values())
+          .filter((n) => n.children.length)
+          .map((n) => n.id)
+      )
+    );
 
   async function run(id: string, job: () => Promise<unknown>, success?: string, alsoPhotos = false): Promise<boolean> {
     setBusy(id);
@@ -242,7 +375,13 @@ export default function TagsManager() {
             <li key={n.id} className="tm-item">
               <div className="tm-row" data-preset={n.ownerId === null || undefined} data-busy={working || undefined}>
                 {n.children.length ? (
-                  <button type="button" className="tm-fold" aria-expanded={isOpen} aria-label={`${isOpen ? '收起' : '展开'}「${n.name}」`} onClick={() => toggleOpen(n.id)}>
+                  <button
+                    type="button"
+                    className="tm-fold"
+                    aria-expanded={isOpen}
+                    aria-label={`${isOpen ? '收起' : '展开'}「${n.name}」`}
+                    onClick={() => toggleOpen(n.id)}
+                  >
                     <Icon name="right" size={16} />
                   </button>
                 ) : (
@@ -275,12 +414,55 @@ export default function TagsManager() {
                 </span>
 
                 <span className="tm-actions">
-                  {mine && <IconBtn label={`「${n.name}」上移`} icon="down" flip onClick={() => void reorder(n, -1)} disabled={at <= 0 || !!busy} />}
-                  {mine && <IconBtn label={`「${n.name}」下移`} icon="down" onClick={() => void reorder(n, 1)} disabled={at < 0 || at >= sibs.length - 1 || !!busy} />}
-                  <IconBtn label={`在「${n.name}」下新建子标签`} icon="plus" onClick={() => setPanel(here === 'add' ? null : { id: n.id, kind: 'add' })} pressed={here === 'add'} />
-                  {mine && <IconBtn label={`重命名「${n.name}」`} icon="edit" onClick={() => setRenaming(renaming === n.id ? null : n.id)} pressed={renaming === n.id} disabled={!!busy} />}
-                  {mine && <IconBtn label={`移动或设置颜色：「${n.name}」`} icon="sliders" onClick={() => setPanel(here === 'more' ? null : { id: n.id, kind: 'more' })} pressed={here === 'more'} />}
-                  {mine && <IconBtn label={`删除「${n.name}」`} icon="trash" danger onClick={() => setPanel(here === 'delete' ? null : { id: n.id, kind: 'delete' })} pressed={here === 'delete'} />}
+                  {mine && (
+                    <IconBtn
+                      label={`「${n.name}」上移`}
+                      icon="down"
+                      flip
+                      onClick={() => void reorder(n, -1)}
+                      disabled={at <= 0 || !!busy}
+                    />
+                  )}
+                  {mine && (
+                    <IconBtn
+                      label={`「${n.name}」下移`}
+                      icon="down"
+                      onClick={() => void reorder(n, 1)}
+                      disabled={at < 0 || at >= sibs.length - 1 || !!busy}
+                    />
+                  )}
+                  <IconBtn
+                    label={`在「${n.name}」下新建子标签`}
+                    icon="plus"
+                    onClick={() => setPanel(here === 'add' ? null : { id: n.id, kind: 'add' })}
+                    pressed={here === 'add'}
+                  />
+                  {mine && (
+                    <IconBtn
+                      label={`重命名「${n.name}」`}
+                      icon="edit"
+                      onClick={() => setRenaming(renaming === n.id ? null : n.id)}
+                      pressed={renaming === n.id}
+                      disabled={!!busy}
+                    />
+                  )}
+                  {mine && (
+                    <IconBtn
+                      label={`移动或设置颜色：「${n.name}」`}
+                      icon="sliders"
+                      onClick={() => setPanel(here === 'more' ? null : { id: n.id, kind: 'more' })}
+                      pressed={here === 'more'}
+                    />
+                  )}
+                  {mine && (
+                    <IconBtn
+                      label={`删除「${n.name}」`}
+                      icon="trash"
+                      danger
+                      onClick={() => setPanel(here === 'delete' ? null : { id: n.id, kind: 'delete' })}
+                      pressed={here === 'delete'}
+                    />
+                  )}
                 </span>
               </div>
 
@@ -314,7 +496,9 @@ export default function TagsManager() {
                 <ConfirmBar
                   prompt={
                     <>
-                      删除「{n.name}」会同时删除它下面的 <strong className="mono">{tree.descendants(n.id).length}</strong> 个子标签（共 <strong className="mono">{tree.descendants(n.id).length + 1}</strong> 个标签），并从你的 <strong className="mono">{countOf(n)}</strong> 张照片上取下它们。照片本身不受影响。
+                      删除「{n.name}」会同时删除它下面的 <strong className="mono">{tree.descendants(n.id).length}</strong> 个子标签（共{' '}
+                      <strong className="mono">{tree.descendants(n.id).length + 1}</strong> 个标签），并从你的{' '}
+                      <strong className="mono">{countOf(n)}</strong> 张照片上取下它们。照片本身不受影响。
                       {n.ownerId === null && ' 这是预置标签，其他用户的照片也会受影响。'}
                     </>
                   }
@@ -348,8 +532,12 @@ export default function TagsManager() {
             : '预置标签只读，但你可以在任何一个下面添加自己的标签，也可以新建自己的根。选中父标签会包含它所有的子孙。'
         }
       >
-        <button type="button" className="btn btn-quiet" onClick={expandAll} disabled={!tagData}>全部展开</button>
-        <button type="button" className="btn btn-quiet" onClick={() => setOpen(new Set())} disabled={!tagData}>全部收起</button>
+        <button type="button" className="btn btn-quiet" onClick={expandAll} disabled={!tagData}>
+          全部展开
+        </button>
+        <button type="button" className="btn btn-quiet" onClick={() => setOpen(new Set())} disabled={!tagData}>
+          全部收起
+        </button>
       </PageHead>
 
       <form
@@ -359,29 +547,51 @@ export default function TagsManager() {
           if (rootName.trim() && (await addTag(null, rootName.trim()))) setRootName('');
         }}
       >
-        <label className="label" htmlFor="tm-root-name">新建根标签</label>
+        <label className="label" htmlFor="tm-root-name">
+          新建根标签
+        </label>
         <div className="tm-inline">
-          <input id="tm-root-name" className="input" value={rootName} onChange={(e) => setRootName(e.target.value)} maxLength={24} placeholder="如 人物、家人、项目" />
-          <button type="submit" className="btn btn-primary" disabled={!rootName.trim() || busy === '__root'}>添加根标签</button>
+          <input
+            id="tm-root-name"
+            className="input"
+            value={rootName}
+            onChange={(e) => setRootName(e.target.value)}
+            maxLength={24}
+            placeholder="如 人物、家人、项目"
+          />
+          <button type="submit" className="btn btn-primary" disabled={!rootName.trim() || busy === '__root'}>
+            添加根标签
+          </button>
         </div>
       </form>
 
       <div className="tm-status" role="status" aria-live="polite">
-        {problem && <p className="error-text" role="alert">{problem}</p>}
+        {problem && (
+          <p className="error-text" role="alert">
+            {problem}
+          </p>
+        )}
         {!problem && done && <p className="sf-ok">{done}</p>}
       </div>
 
       {!tagData && !tagsReq.error && <p className="loading">加载中</p>}
       {!tagData && tagsReq.error != null && (
         <div className="notice stack">
-          <p className="error-text" style={{ margin: 0 }}>{errMsg(tagsReq.error, '标签加载失败')}</p>
-          <div><button type="button" className="btn" onClick={tagsReq.reload}>重试</button></div>
+          <p className="error-text" style={{ margin: 0 }}>
+            {errMsg(tagsReq.error, '标签加载失败')}
+          </p>
+          <div>
+            <button type="button" className="btn" onClick={tagsReq.reload}>
+              重试
+            </button>
+          </div>
         </div>
       )}
       {tagData && (
         <>
           <p className="small muted tm-summary">
-            共 <span className="mono">{tagData.tags.length}</span> 个标签，其中你的 <span className="mono">{own}</span> 个。右侧数字是带这个标签或其子孙标签的照片数。
+            共 <span className="mono">{tagData.tags.length}</span> 个标签，其中你的 <span className="mono">{own}</span>{' '}
+            个。右侧数字是带这个标签或其子孙标签的照片数。
           </p>
           <div className="tm-tree">{renderNodes(tree.roots)}</div>
         </>

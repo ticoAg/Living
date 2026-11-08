@@ -158,7 +158,11 @@ export default function IndexPage() {
             {roots.map((root) => {
               const useKids = root.children.some(live);
               return (
-                <div key={root.id} className="idx-root" style={{ flexGrow: useKids ? Math.min(3, Math.max(1, Math.round(root.children.filter(live).length / 3))) : 1 }}>
+                <div
+                  key={root.id}
+                  className="idx-root"
+                  style={{ flexGrow: useKids ? Math.min(3, Math.max(1, Math.round(root.children.filter(live).length / 3))) : 1 }}
+                >
                   <h3>{root.name}</h3>
                   {level(useKids ? root.children : [root])}
                 </div>
@@ -195,7 +199,16 @@ export default function IndexPage() {
                   ))}
                   {c.hidden > 0 && (
                     <li className="idx-place idx-hidden">
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                      <svg
+                        width="17"
+                        height="17"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        aria-hidden="true"
+                      >
                         <circle cx="12" cy="12" r="8" strokeDasharray="3 3" />
                       </svg>
                       <span className="idx-place-name">位置未公开</span>

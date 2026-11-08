@@ -13,14 +13,20 @@ function ThemePicker({ value, onChange, disabled }: { value: string[]; onChange:
   if (!kept && error) {
     return (
       <p className="small error-text">
-        主题加载失败。<button type="button" className="btn btn-quiet" onClick={reload}>重试</button>
+        主题加载失败。
+        <button type="button" className="btn btn-quiet" onClick={reload}>
+          重试
+        </button>
       </p>
     );
   }
   if (!themes.length) {
     return (
       <p className="small muted">
-        还没有主题。<Link href="/themes/new" target="_blank" rel="noopener">新建主题</Link>
+        还没有主题。
+        <Link href="/themes/new" target="_blank" rel="noopener">
+          新建主题
+        </Link>
       </p>
     );
   }
@@ -85,16 +91,26 @@ export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRe
 
           <div className="up-publish">
             {item.publish.state === 'sending' && (
-              <div className="up-progress" role="progressbar" aria-label="上传进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(item.publish.progress * 100)}>
+              <div
+                className="up-progress"
+                role="progressbar"
+                aria-label="上传进度"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(item.publish.progress * 100)}
+              >
                 <span style={{ width: `${Math.round(item.publish.progress * 100)}%` }} />
               </div>
             )}
             {item.publish.state === 'failed' && (
-              <p className="error-text" role="alert">{item.publish.error}</p>
+              <p className="error-text" role="alert">
+                {item.publish.error}
+              </p>
             )}
             {item.publish.state === 'done' && item.publish.photoId && (
               <p role="status">
-                已发布。<Link href={`/p/${item.publish.photoId}`}>查看照片</Link> · <Link href={`/studio/photo/${item.publish.photoId}`}>继续编辑</Link>
+                已发布。<Link href={`/p/${item.publish.photoId}`}>查看照片</Link> ·{' '}
+                <Link href={`/studio/photo/${item.publish.photoId}`}>继续编辑</Link>
               </p>
             )}
             {item.publish.state === 'duplicate' && (
@@ -102,7 +118,8 @@ export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRe
                 你已经上传过这张照片，已跳过。
                 {item.publish.photoId && (
                   <>
-                    {' '}<Link href={`/p/${item.publish.photoId}`}>查看已有的</Link>
+                    {' '}
+                    <Link href={`/p/${item.publish.photoId}`}>查看已有的</Link>
                   </>
                 )}
               </p>
@@ -110,8 +127,17 @@ export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRe
             {unplaced && item.publish.state !== 'sending' && <p className="small muted">还没有选择地点，发布后这张照片不会关联地点。</p>}
 
             {item.publish.state !== 'done' && item.publish.state !== 'duplicate' && (
-              <button type="button" className="btn btn-primary up-publish-btn" disabled={!canPublish(item, all)} onClick={() => onPublish(item.id)}>
-                {item.publish.state === 'sending' ? `发布中 ${Math.round(item.publish.progress * 100)}%` : item.publish.state === 'failed' ? '重试发布' : '发布'}
+              <button
+                type="button"
+                className="btn btn-primary up-publish-btn"
+                disabled={!canPublish(item, all)}
+                onClick={() => onPublish(item.id)}
+              >
+                {item.publish.state === 'sending'
+                  ? `发布中 ${Math.round(item.publish.progress * 100)}%`
+                  : item.publish.state === 'failed'
+                    ? '重试发布'
+                    : '发布'}
               </button>
             )}
             {!locked && unpublishedOthers > 0 && (

@@ -102,11 +102,22 @@ export default function ZonesSection() {
 
   return (
     <section className="se-section sf-panel" id="privacy" aria-labelledby="se-zones-h">
-      <h2 className="sf-h" id="se-zones-h">隐私区域</h2>
-      <p className="muted se-lede">之后上传的照片，只要落在区域里，位置就会自动设为隐藏，上传页也会提示。已经发布的照片不受影响，需要的话到编辑页把位置精度改成隐藏。</p>
+      <h2 className="sf-h" id="se-zones-h">
+        隐私区域
+      </h2>
+      <p className="muted se-lede">
+        之后上传的照片，只要落在区域里，位置就会自动设为隐藏，上传页也会提示。已经发布的照片不受影响，需要的话到编辑页把位置精度改成隐藏。
+      </p>
 
       {!zones && !zonesReq.error && <p className="small muted">加载中…</p>}
-      {zonesReq.error != null && !zones && <p className="error-text">隐私区域加载失败。<button type="button" className="btn btn-quiet" onClick={zonesReq.reload}>重试</button></p>}
+      {zonesReq.error != null && !zones && (
+        <p className="error-text">
+          隐私区域加载失败。
+          <button type="button" className="btn btn-quiet" onClick={zonesReq.reload}>
+            重试
+          </button>
+        </p>
+      )}
       {zones && zones.length === 0 && <p className="small muted">还没有隐私区域。</p>}
       {zones && zones.length > 0 && (
         <ul className="se-zones">
@@ -120,12 +131,24 @@ export default function ZonesSection() {
                     {fmtLat(z.lat)} {fmtLng(z.lng)} · 半径 {z.radius} m
                   </span>
                 </div>
-                <button type="button" className="btn btn-quiet" aria-label={`删除隐私区域「${z.name}」`} onClick={() => setRemoving(removing === z.id ? null : z.id)} aria-expanded={removing === z.id}>
+                <button
+                  type="button"
+                  className="btn btn-quiet"
+                  aria-label={`删除隐私区域「${z.name}」`}
+                  onClick={() => setRemoving(removing === z.id ? null : z.id)}
+                  aria-expanded={removing === z.id}
+                >
                   删除
                 </button>
               </div>
               {removing === z.id && (
-                <ConfirmBar prompt={`删除「${z.name}」？之后上传的照片不再因为它而自动隐藏位置。`} confirmLabel="确认删除" busy={removeBusy} onConfirm={() => void remove(z)} onCancel={() => setRemoving(null)} />
+                <ConfirmBar
+                  prompt={`删除「${z.name}」？之后上传的照片不再因为它而自动隐藏位置。`}
+                  confirmLabel="确认删除"
+                  busy={removeBusy}
+                  onConfirm={() => void remove(z)}
+                  onCancel={() => setRemoving(null)}
+                />
               )}
             </li>
           ))}
@@ -135,22 +158,65 @@ export default function ZonesSection() {
       <form className="se-zone-form stack" style={{ ['--gap' as string]: '16px' }} onSubmit={add} aria-label="添加隐私区域">
         <h3 className="sf-sub">添加区域</h3>
         <div className="field">
-          <label className="label" htmlFor="se-z-name">名称</label>
-          <input id="se-z-name" className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="如 家、公司" />
+          <label className="label" htmlFor="se-z-name">
+            名称
+          </label>
+          <input
+            id="se-z-name"
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={40}
+            placeholder="如 家、公司"
+          />
         </div>
 
         <div className="se-coords">
           <div className="field">
-            <label className="label" htmlFor="se-z-lat">纬度</label>
-            <input id="se-z-lat" className="input mono" value={lat} onChange={(e) => onLat(e.target.value)} inputMode="decimal" placeholder="30.25920" autoComplete="off" />
+            <label className="label" htmlFor="se-z-lat">
+              纬度
+            </label>
+            <input
+              id="se-z-lat"
+              className="input mono"
+              value={lat}
+              onChange={(e) => onLat(e.target.value)}
+              inputMode="decimal"
+              placeholder="30.25920"
+              autoComplete="off"
+            />
           </div>
           <div className="field">
-            <label className="label" htmlFor="se-z-lng">经度</label>
-            <input id="se-z-lng" className="input mono" value={lng} onChange={(e) => { setLng(e.target.value); setFrom(null); }} inputMode="decimal" placeholder="120.14000" autoComplete="off" />
+            <label className="label" htmlFor="se-z-lng">
+              经度
+            </label>
+            <input
+              id="se-z-lng"
+              className="input mono"
+              value={lng}
+              onChange={(e) => {
+                setLng(e.target.value);
+                setFrom(null);
+              }}
+              inputMode="decimal"
+              placeholder="120.14000"
+              autoComplete="off"
+            />
           </div>
           <div className="field">
-            <label className="label" htmlFor="se-z-r">半径（米）</label>
-            <input id="se-z-r" className="input mono" value={radius} onChange={(e) => setRadius(e.target.value)} inputMode="numeric" placeholder="300" autoComplete="off" aria-describedby="se-z-r-hint" />
+            <label className="label" htmlFor="se-z-r">
+              半径（米）
+            </label>
+            <input
+              id="se-z-r"
+              className="input mono"
+              value={radius}
+              onChange={(e) => setRadius(e.target.value)}
+              inputMode="numeric"
+              placeholder="300"
+              autoComplete="off"
+              aria-describedby="se-z-r-hint"
+            />
           </div>
         </div>
         <p id="se-z-r-hint" className="small muted se-hint">
@@ -159,7 +225,15 @@ export default function ZonesSection() {
         </p>
 
         <div>
-          <button type="button" className="btn btn-quiet" aria-expanded={picking} onClick={() => { setPicking((p) => !p); setShown(PAGE); }}>
+          <button
+            type="button"
+            className="btn btn-quiet"
+            aria-expanded={picking}
+            onClick={() => {
+              setPicking((p) => !p);
+              setShown(PAGE);
+            }}
+          >
             <Icon name="pin" size={16} />
             {picking ? '收起' : '用照片的位置'}
           </button>
@@ -173,13 +247,21 @@ export default function ZonesSection() {
               <>
                 <div className="se-grid">
                   {located.slice(0, shown).map((p) => (
-                    <button key={p.id} type="button" className="se-thumb" aria-label={`${p.title ?? '未命名'} ${fmtStamp(p.takenAt)} ${p.city ?? ''}`} onClick={() => pick(p)}>
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="se-thumb"
+                      aria-label={`${p.title ?? '未命名'} ${fmtStamp(p.takenAt)} ${p.city ?? ''}`}
+                      onClick={() => pick(p)}
+                    >
                       <Img photo={p} ratio="1 / 1" sizes="96px" alt="" />
                     </button>
                   ))}
                 </div>
                 {located.length > shown && (
-                  <button type="button" className="btn btn-quiet" onClick={() => setShown((n) => n + PAGE)}>显示更多（还有 {located.length - shown} 张）</button>
+                  <button type="button" className="btn btn-quiet" onClick={() => setShown((n) => n + PAGE)}>
+                    显示更多（还有 {located.length - shown} 张）
+                  </button>
                 )}
               </>
             )}
@@ -187,8 +269,12 @@ export default function ZonesSection() {
         )}
 
         <div className="row">
-          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? '添加中…' : '添加隐私区域'}</button>
-          <span className="small" role="status" aria-live="polite">{msg && <span className={msg.ok ? 'sf-ok' : 'error-text'}>{msg.text}</span>}</span>
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy ? '添加中…' : '添加隐私区域'}
+          </button>
+          <span className="small" role="status" aria-live="polite">
+            {msg && <span className={msg.ok ? 'sf-ok' : 'error-text'}>{msg.text}</span>}
+          </span>
         </div>
       </form>
     </section>

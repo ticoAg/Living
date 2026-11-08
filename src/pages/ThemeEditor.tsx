@@ -112,7 +112,8 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
   // ---- item actions (one stable object for all rows) ----
   const actions = useMemo<RowActions>(
     () => ({
-      patch: (key, patch) => setDraft((d) => ({ ...d, items: d.items.map((it) => (it.key === key ? ({ ...it, ...patch } as DraftItem) : it)) })),
+      patch: (key, patch) =>
+        setDraft((d) => ({ ...d, items: d.items.map((it) => (it.key === key ? ({ ...it, ...patch } as DraftItem) : it)) })),
       move: (key, delta) => {
         pendingFocus.current = { key, focus: false, act: delta < 0 ? 'up' : 'down' };
         setDraft((d) => {
@@ -236,7 +237,10 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
     }
     return out.slice(0, 300);
   }, [draft.items]);
-  const privateCount = useMemo(() => draft.items.filter((it) => it.kind === 'photo' && it.photo?.visibility === 'private').length, [draft.items]);
+  const privateCount = useMemo(
+    () => draft.items.filter((it) => it.kind === 'photo' && it.photo?.visibility === 'private').length,
+    [draft.items]
+  );
   const range = useMemo(() => photoDayRange(draft.items), [draft.items]);
 
   async function autoArrange() {
@@ -420,7 +424,13 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
                 <label className="label" htmlFor="th-subtitle">
                   副标题
                 </label>
-                <input id="th-subtitle" className="input" value={draft.subtitle} maxLength={200} onChange={(e) => set('subtitle', e.target.value)} />
+                <input
+                  id="th-subtitle"
+                  className="input"
+                  value={draft.subtitle}
+                  maxLength={200}
+                  onChange={(e) => set('subtitle', e.target.value)}
+                />
               </div>
 
               <div className="field">

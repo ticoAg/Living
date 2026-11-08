@@ -82,13 +82,17 @@ export default function Register() {
             站点暂不开放注册。已有账号请<Link href={loginHref}>登录</Link>。
           </p>
         )}
-        {!setup && !closed && site?.registration === 'invite' && <p className="small muted au-note">注册需要邀请码，请向站长或管理员索取。</p>}
+        {!setup && !closed && site?.registration === 'invite' && (
+          <p className="small muted au-note">注册需要邀请码，请向站长或管理员索取。</p>
+        )}
         {openMode && <p className="small muted au-note">任何人都可以注册。有邀请码的话也可以填写。</p>}
 
         <form className="stack" style={{ ['--gap' as string]: '20px' }} onSubmit={submit} noValidate>
           {(needInvite || openMode || !site) && (
             <div className="field">
-              <label className="label" htmlFor="au-invite">邀请码{needInvite ? '' : '（可不填）'}</label>
+              <label className="label" htmlFor="au-invite">
+                邀请码{needInvite ? '' : '（可不填）'}
+              </label>
               <input
                 id="au-invite"
                 className="input mono au-invite"
@@ -104,23 +108,63 @@ export default function Register() {
             </div>
           )}
           <div className="field">
-            <label className="label" htmlFor="au-handle">用户名</label>
-            <input id="au-handle" className="input" value={handle} onChange={(e) => setHandle(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={24} disabled={closed} aria-describedby="au-handle-hint" />
-            <span id="au-handle-hint" className="small muted">3–24 位，字母、数字、下划线、连字符。你的主页是 /@{handle.trim() || '用户名'}</span>
+            <label className="label" htmlFor="au-handle">
+              用户名
+            </label>
+            <input
+              id="au-handle"
+              className="input"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={24}
+              disabled={closed}
+              aria-describedby="au-handle-hint"
+            />
+            <span id="au-handle-hint" className="small muted">
+              3–24 位，字母、数字、下划线、连字符。你的主页是 /@{handle.trim() || '用户名'}
+            </span>
           </div>
           <div className="field">
-            <label className="label" htmlFor="au-name">显示名</label>
-            <input id="au-name" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="nickname" maxLength={40} disabled={closed} />
+            <label className="label" htmlFor="au-name">
+              显示名
+            </label>
+            <input
+              id="au-name"
+              className="input"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              autoComplete="nickname"
+              maxLength={40}
+              disabled={closed}
+            />
           </div>
           <div className="field">
-            <label className="label" htmlFor="au-password">密码</label>
+            <label className="label" htmlFor="au-password">
+              密码
+            </label>
             <div className="au-pw">
-              <input id="au-password" className="input" type={show ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" maxLength={256} disabled={closed} aria-describedby="au-pw-hint" />
+              <input
+                id="au-password"
+                className="input"
+                type={show ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                maxLength={256}
+                disabled={closed}
+                aria-describedby="au-pw-hint"
+              />
               <button type="button" className="btn btn-quiet au-pw-toggle" aria-pressed={show} onClick={() => setShow((s) => !s)}>
                 {show ? '隐藏' : '显示'}
               </button>
             </div>
-            <span id="au-pw-hint" className="small muted">至少 8 位。</span>
+            <span id="au-pw-hint" className="small muted">
+              至少 8 位。
+            </span>
           </div>
           <div className="au-status" role="alert" aria-live="assertive">
             {error && <p className="error-text">{error}</p>}

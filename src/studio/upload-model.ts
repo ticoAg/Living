@@ -195,7 +195,8 @@ export function canPublish(it: Item, all: Item[]): boolean {
 }
 
 /** Photos that "发布全部已匹配" sends. */
-export const isBulkReady = (it: Item, all: Item[]) => it.stage === 'ready' && it.publish.state === 'idle' && statusOf(it, all).key === 'matched';
+export const isBulkReady = (it: Item, all: Item[]) =>
+  it.stage === 'ready' && it.publish.state === 'idle' && statusOf(it, all).key === 'matched';
 
 /** What happens when a match response arrives: record it and make the automatic decision once. */
 export function applyMatch(cur: Item, res: MatchResponse, radius: number): Partial<Item> {

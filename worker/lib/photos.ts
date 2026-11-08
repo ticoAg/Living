@@ -161,7 +161,11 @@ export async function summariesByIds(
   const list = q.p(JSON.stringify(unique));
   const vis = photoById(q, viewer);
   const cols = withNote ? `${SUMMARY_COLS}, p.note` : SUMMARY_COLS;
-  const res = await prepQ(db, `SELECT ${cols} FROM ${PHOTO_FROM} WHERE p.id IN (SELECT value FROM json_each(${list})) AND ${vis}`, q).all<PhotoRow>();
+  const res = await prepQ(
+    db,
+    `SELECT ${cols} FROM ${PHOTO_FROM} WHERE p.id IN (SELECT value FROM json_each(${list})) AND ${vis}`,
+    q
+  ).all<PhotoRow>();
   for (const r of res.results) out.set(r.id, { ...toSummary(r, viewer), note: r.note ?? null });
   return out;
 }

@@ -4,7 +4,18 @@ import type { GeoPrivacy, NewPoi, PoiMethod, Visibility } from '../../shared/typ
 import { invalid } from './http';
 import { parseNewPoi } from './poi';
 import {
-  isPlainObject, optBool, optEnum, optFocus, optHeading, optNum, optPalette, optTakenAt, optText, optTz, strArray, type Body
+  isPlainObject,
+  optBool,
+  optEnum,
+  optFocus,
+  optHeading,
+  optNum,
+  optPalette,
+  optTakenAt,
+  optText,
+  optTz,
+  strArray,
+  type Body
 } from './validate';
 
 export const VISIBILITIES = ['public', 'unlisted', 'private'] as const;
@@ -144,7 +155,11 @@ const ORIGINAL_EXT: Record<string, string> = {
   'image/bmp': 'bmp'
 };
 const KNOWN_EXT = new Set(Object.values(ORIGINAL_EXT).concat(['jpeg', 'tiff']));
-const EXT_TYPE: Record<string, string> = Object.fromEntries(Object.entries(ORIGINAL_EXT).filter(([t]) => t !== 'image/jpg').map(([t, e]) => [e, t]));
+const EXT_TYPE: Record<string, string> = Object.fromEntries(
+  Object.entries(ORIGINAL_EXT)
+    .filter(([t]) => t !== 'image/jpg')
+    .map(([t, e]) => [e, t])
+);
 
 /** Content type and file extension for the original, from its MIME type or file name. */
 export function originalKind(file: { type: string; name?: string }): { ext: string; type: string } {
@@ -164,7 +179,8 @@ export async function variantKind(file: Blob, label: string): Promise<{ ext: 'we
   if (type !== 'image/webp' && type !== 'image/jpeg') throw invalid(`${label}需要是 image/webp 或 image/jpeg`);
   const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
   const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
-  const isWebp = head.length >= 12 && String.fromCharCode(...head.slice(0, 4)) === 'RIFF' && String.fromCharCode(...head.slice(8, 12)) === 'WEBP';
+  const isWebp =
+    head.length >= 12 && String.fromCharCode(...head.slice(0, 4)) === 'RIFF' && String.fromCharCode(...head.slice(8, 12)) === 'WEBP';
   if (type === 'image/jpeg' ? !isJpeg : !isWebp) throw invalid(`${label}的内容和它声明的格式不一致`);
   return type === 'image/webp' ? { ext: 'webp', type } : { ext: 'jpg', type };
 }

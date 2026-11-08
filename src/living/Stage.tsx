@@ -102,7 +102,10 @@ export default function Stage({ photo, fit, fx, everySec, paused, onShown, onBro
 
   // Remove layers once their fade-out has finished (the countdown restarts whenever the set of
   // leaving layers changes, so a layer is never cut short).
-  const leaving = st.layers.filter((l) => l.out).map((l) => l.photo.id).join('|');
+  const leaving = st.layers
+    .filter((l) => l.out)
+    .map((l) => l.photo.id)
+    .join('|');
   useEffect(() => {
     if (!leaving) return;
     const t = window.setTimeout(() => setSt((s) => ({ ...s, layers: s.layers.filter((l) => !l.out) })), FADE_MS + 250);

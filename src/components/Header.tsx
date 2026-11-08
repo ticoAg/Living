@@ -15,7 +15,9 @@ export default function Header() {
   return (
     <header className="site-header">
       <div className="site-header-inner">
-        <Link href="/" className="wordmark">LIVING</Link>
+        <Link href="/" className="wordmark">
+          LIVING
+        </Link>
         <nav aria-label="主导航" className="site-nav">
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} className="nav-link" aria-current={n.match(path) ? 'page' : undefined}>
@@ -31,7 +33,10 @@ export default function Header() {
                 <summary className="btn btn-ghost btn-icon" aria-label={`${user.displayName} 的菜单`}>
                   <Icon name="user" size={18} />
                 </summary>
-                <div className="user-menu-panel" onClick={(e) => (e.currentTarget.parentElement as HTMLDetailsElement).removeAttribute('open')}>
+                <div
+                  className="user-menu-panel"
+                  onClick={(e) => (e.currentTarget.parentElement as HTMLDetailsElement).removeAttribute('open')}
+                >
                   <Link href={`/@${user.handle}`}>我的主页</Link>
                   <Link href="/themes?mine=1">我的主题</Link>
                   <Link href="/studio/tags">标签</Link>
@@ -49,7 +54,9 @@ export default function Header() {
               </details>
             </>
           ) : (
-            <Link href="/login" className="nav-link">登录</Link>
+            <Link href="/login" className="nav-link">
+              登录
+            </Link>
           )}
         </nav>
       </div>

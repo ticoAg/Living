@@ -27,10 +27,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [me, info] = await Promise.all([
-        api<{ user: SessionUser | null }>('/api/auth/me'),
-        api<SiteInfo>('/api/site')
-      ]);
+      const [me, info] = await Promise.all([api<{ user: SessionUser | null }>('/api/auth/me'), api<SiteInfo>('/api/site')]);
       // what the API returns depends on who is signed in; drop cached responses when that changes
       const next = me.user?.id ?? null;
       if (userId.current !== undefined && userId.current !== next) invalidate('/api');

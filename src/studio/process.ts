@@ -139,7 +139,13 @@ export function formatShutter(t: number | null): string | null {
 const MAKE_NOISE = /\b(corporation|corp|company|co|imaging|inc|limited|ltd|electronics)\b\.?/gi;
 /** Make + Model without repeating the brand ("Canon" + "Canon EOS R5" → "Canon EOS R5"). */
 export function formatCamera(make: string | null, model: string | null): string | null {
-  const mk = make ? make.replace(MAKE_NOISE, ' ').replace(/\s+/g, ' ').replace(/[\s,.]+$/, '').trim() : null;
+  const mk = make
+    ? make
+        .replace(MAKE_NOISE, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/[\s,.]+$/, '')
+        .trim()
+    : null;
   if (!model) return mk || make;
   if (!mk) return model;
   const head = mk.split(' ')[0].toLowerCase();
@@ -284,7 +290,10 @@ export function daypartBySun(sun: SunCalcApi, takenAt: string, tz: string | null
 
 /* ---------------------------------------------------------------- colour (pure) */
 
-const hex2 = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+const hex2 = (n: number) =>
+  Math.max(0, Math.min(255, Math.round(n)))
+    .toString(16)
+    .padStart(2, '0');
 export const toHex = (r: number, g: number, b: number) => `#${hex2(r)}${hex2(g)}${hex2(b)}`.toUpperCase();
 export function fromHex(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
@@ -712,7 +721,17 @@ export async function processFile(file: File): Promise<Processed> {
     }
     for (const id of [daypart, seasonTag(exif.takenAt, exif.lat), toneTag]) if (id && !suggested.includes(id)) suggested.push(id);
 
-    return { exif, width, height, variants: { s, m, l }, thumbhash, palette: colors.map((c) => c.hex), toneTag, sha256, suggestedTagIds: suggested };
+    return {
+      exif,
+      width,
+      height,
+      variants: { s, m, l },
+      thumbhash,
+      palette: colors.map((c) => c.hex),
+      toneTag,
+      sha256,
+      suggestedTagIds: suggested
+    };
   } finally {
     decoded.close();
     for (const c of canvases) release(c);

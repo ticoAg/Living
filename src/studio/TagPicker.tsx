@@ -26,7 +26,21 @@ function flatten(nodes: TagNode[], out: TagNode[] = []): TagNode[] {
   return out;
 }
 
-function Chip({ tag, tree, pressed, suggested, disabled, onToggle }: { tag: Tag; tree: TagTree; pressed: boolean; suggested?: boolean; disabled?: boolean; onToggle: () => void }) {
+function Chip({
+  tag,
+  tree,
+  pressed,
+  suggested,
+  disabled,
+  onToggle
+}: {
+  tag: Tag;
+  tree: TagTree;
+  pressed: boolean;
+  suggested?: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
   const path = tree.path(tag.id).join(' / ');
   return (
     <button
@@ -41,7 +55,11 @@ function Chip({ tag, tree, pressed, suggested, disabled, onToggle }: { tag: Tag;
     >
       {isSwatch(tag) && <span className="tp-dot" style={{ background: swatchFill(tag.color) }} aria-hidden="true" />}
       <span>{tag.name}</span>
-      {suggested && <span className="tp-sug" aria-hidden="true">建议</span>}
+      {suggested && (
+        <span className="tp-sug" aria-hidden="true">
+          建议
+        </span>
+      )}
       {!suggested && pressed && <Icon name="close" size={13} />}
     </button>
   );
@@ -73,7 +91,10 @@ export default function TagPicker({ value, onChange, suggested = [], disabled }:
   const selected = useMemo(() => new Set(value), [value]);
   const suggestedTags = suggested.map((s) => tree.byId.get(s)).filter((t): t is TagNode => !!t);
   const suggestedSet = new Set(suggested);
-  const chosen = value.filter((v) => !suggestedSet.has(v)).map((v) => tree.byId.get(v)).filter((t): t is TagNode => !!t);
+  const chosen = value
+    .filter((v) => !suggestedSet.has(v))
+    .map((v) => tree.byId.get(v))
+    .filter((t): t is TagNode => !!t);
 
   const toggle = (tagId: string) => {
     if (disabled) return;
@@ -172,7 +193,14 @@ export default function TagPicker({ value, onChange, suggested = [], disabled }:
                   <span className="tp-pick-name">{n.name}</span>
                   {on && <Icon name="check" size={15} />}
                 </button>
-                <button type="button" className="tp-add" aria-label={`在「${n.name}」下新建标签`} title="新建子标签" disabled={disabled} onClick={() => startCreate(n.id)}>
+                <button
+                  type="button"
+                  className="tp-add"
+                  aria-label={`在「${n.name}」下新建标签`}
+                  title="新建子标签"
+                  disabled={disabled}
+                  onClick={() => startCreate(n.id)}
+                >
                   <Icon name="plus" size={15} />
                 </button>
               </div>
@@ -193,7 +221,15 @@ export default function TagPicker({ value, onChange, suggested = [], disabled }:
           <span className="tp-label">建议</span>
           <div className="tp-chips">
             {suggestedTags.map((t) => (
-              <Chip key={t.id} tag={t} tree={tree} suggested pressed={selected.has(t.id)} disabled={disabled} onToggle={() => toggle(t.id)} />
+              <Chip
+                key={t.id}
+                tag={t}
+                tree={tree}
+                suggested
+                pressed={selected.has(t.id)}
+                disabled={disabled}
+                onToggle={() => toggle(t.id)}
+              />
             ))}
           </div>
         </div>
@@ -205,8 +241,17 @@ export default function TagPicker({ value, onChange, suggested = [], disabled }:
           {chosen.map((t) => (
             <Chip key={t.id} tag={t} tree={tree} pressed disabled={disabled} onToggle={() => toggle(t.id)} />
           ))}
-          {chosen.length === 0 && <span className="small muted tp-none">{suggestedTags.length ? '还没有手动添加的标签' : '还没有标签'}</span>}
-          <button type="button" className="btn btn-quiet tp-open" aria-expanded={panel} aria-controls={`${id}-panel`} onClick={openPanel} disabled={disabled}>
+          {chosen.length === 0 && (
+            <span className="small muted tp-none">{suggestedTags.length ? '还没有手动添加的标签' : '还没有标签'}</span>
+          )}
+          <button
+            type="button"
+            className="btn btn-quiet tp-open"
+            aria-expanded={panel}
+            aria-controls={`${id}-panel`}
+            onClick={openPanel}
+            disabled={disabled}
+          >
             <Icon name={panel ? 'close' : 'plus'} size={16} />
             {panel ? '收起' : '添加标签'}
           </button>
@@ -218,14 +263,27 @@ export default function TagPicker({ value, onChange, suggested = [], disabled }:
           {loading && <p className="small muted">标签加载中…</p>}
           {error != null && !kept && (
             <p className="error-text" role="alert">
-              标签加载失败。<button type="button" className="btn btn-quiet" onClick={reload}>重试</button>
+              标签加载失败。
+              <button type="button" className="btn btn-quiet" onClick={reload}>
+                重试
+              </button>
             </p>
           )}
           {kept && (
             <>
               <div className="field">
-                <label className="label" htmlFor={`${id}-q`}>搜索标签</label>
-                <input id={`${id}-q`} className="input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="输入标签名" autoComplete="off" />
+                <label className="label" htmlFor={`${id}-q`}>
+                  搜索标签
+                </label>
+                <input
+                  id={`${id}-q`}
+                  className="input"
+                  type="search"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="输入标签名"
+                  autoComplete="off"
+                />
               </div>
 
               <div className="tp-scroll">
@@ -234,11 +292,23 @@ export default function TagPicker({ value, onChange, suggested = [], disabled }:
                     <ul className="tp-tree" data-depth="0">
                       {matches.map((n) => {
                         const on = selected.has(n.id);
-                        const trail = tree.ancestors(n.id).map((a) => tree.byId.get(a)?.name ?? a).join(' / ');
+                        const trail = tree
+                          .ancestors(n.id)
+                          .map((a) => tree.byId.get(a)?.name ?? a)
+                          .join(' / ');
                         return (
                           <li key={n.id}>
                             <div className="tp-node" data-selected={on}>
-                              <button type="button" className="tp-pick" aria-pressed={on} disabled={disabled} onClick={() => { setAnchor(n.id); toggle(n.id); }}>
+                              <button
+                                type="button"
+                                className="tp-pick"
+                                aria-pressed={on}
+                                disabled={disabled}
+                                onClick={() => {
+                                  setAnchor(n.id);
+                                  toggle(n.id);
+                                }}
+                              >
                                 {isSwatch(n) && <span className="tp-dot" style={{ background: swatchFill(n.color) }} aria-hidden="true" />}
                                 <span className="tp-pick-name">{n.name}</span>
                                 {trail && <span className="small muted tp-trail">{trail}</span>}
@@ -270,8 +340,16 @@ export default function TagPicker({ value, onChange, suggested = [], disabled }:
               ) : (
                 <form className="tp-create" onSubmit={create}>
                   <div className="field">
-                    <label className="label" htmlFor={`${id}-parent`}>上级</label>
-                    <select id={`${id}-parent`} className="input select" value={parent} onChange={(e) => setParent(e.target.value)} disabled={busy}>
+                    <label className="label" htmlFor={`${id}-parent`}>
+                      上级
+                    </label>
+                    <select
+                      id={`${id}-parent`}
+                      className="input select"
+                      value={parent}
+                      onChange={(e) => setParent(e.target.value)}
+                      disabled={busy}
+                    >
                       <option value="">无（作为根标签）</option>
                       {all.map((n) => (
                         <option key={n.id} value={n.id}>
@@ -282,13 +360,41 @@ export default function TagPicker({ value, onChange, suggested = [], disabled }:
                     </select>
                   </div>
                   <div className="field">
-                    <label className="label" htmlFor={`${id}-name`}>名称</label>
-                    <input id={`${id}-name`} className="input" value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={24} placeholder="如 西湖" disabled={busy} required autoFocus />
+                    <label className="label" htmlFor={`${id}-name`}>
+                      名称
+                    </label>
+                    <input
+                      id={`${id}-name`}
+                      className="input"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      maxLength={24}
+                      placeholder="如 西湖"
+                      disabled={busy}
+                      required
+                      autoFocus
+                    />
                   </div>
-                  {problem && <p className="error-text" role="alert">{problem}</p>}
+                  {problem && (
+                    <p className="error-text" role="alert">
+                      {problem}
+                    </p>
+                  )}
                   <div className="row">
-                    <button type="submit" className="btn btn-primary" disabled={busy || !newName.trim()}>{busy ? '添加中…' : '添加并选中'}</button>
-                    <button type="button" className="btn btn-quiet" onClick={() => { setCreating(false); setProblem(null); }} disabled={busy}>取消</button>
+                    <button type="submit" className="btn btn-primary" disabled={busy || !newName.trim()}>
+                      {busy ? '添加中…' : '添加并选中'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-quiet"
+                      onClick={() => {
+                        setCreating(false);
+                        setProblem(null);
+                      }}
+                      disabled={busy}
+                    >
+                      取消
+                    </button>
                   </div>
                 </form>
               )}

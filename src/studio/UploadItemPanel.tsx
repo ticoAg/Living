@@ -34,7 +34,9 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
       {item.stage === 'error' && (
         <div className="notice up-fail" role="alert">
           <p className="error-text">{item.error}</p>
-          <button type="button" className="btn btn-quiet" onClick={() => onRetryProcess(item.id)}>重试</button>
+          <button type="button" className="btn btn-quiet" onClick={() => onRetryProcess(item.id)}>
+            重试
+          </button>
         </div>
       )}
       {(item.stage === 'queued' || item.stage === 'processing') && (
@@ -61,7 +63,11 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
           <ExifList x={{ ...item.p.exif, width: item.p.width, height: item.p.height, bytes: item.file.size }} />
           {item.publish.state !== 'done' && (
             <p className="small muted up-variants">
-              已生成 {(['s', 'm', 'l'] as const).map((k) => `${item.p!.variants[k].w}×${item.p!.variants[k].h}（${fmtBytes(item.p!.variants[k].blob.size)}）`).join(' · ')}，不含 EXIF。
+              已生成{' '}
+              {(['s', 'm', 'l'] as const)
+                .map((k) => `${item.p!.variants[k].w}×${item.p!.variants[k].h}（${fmtBytes(item.p!.variants[k].blob.size)}）`)
+                .join(' · ')}
+              ，不含 EXIF。
             </p>
           )}
 
@@ -83,7 +89,9 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
               disabled={busy}
             />
           </section>
-          {!coords && place == null && !item.p.exif.takenAt && <p className="small muted">这张照片既没有位置也没有拍摄时间，没法按时间推断，请搜索地点。</p>}
+          {!coords && place == null && !item.p.exif.takenAt && (
+            <p className="small muted">这张照片既没有位置也没有拍摄时间，没法按时间推断，请搜索地点。</p>
+          )}
         </>
       )}
     </div>

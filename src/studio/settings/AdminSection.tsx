@@ -78,7 +78,9 @@ export default function AdminSection({ user }: { user: SessionUser }) {
     setMaking(true);
     setProblem(null);
     try {
-      const res = await api<{ invite: Invite }>('/api/admin/invites', { json: { role, note: note.trim() || undefined, expiresInDays: days ?? undefined } });
+      const res = await api<{ invite: Invite }>('/api/admin/invites', {
+        json: { role, note: note.trim() || undefined, expiresInDays: days ?? undefined }
+      });
       invalidate('/api/admin/invites');
       setMade(res.invite);
       setNote('');
@@ -116,17 +118,33 @@ export default function AdminSection({ user }: { user: SessionUser }) {
 
   return (
     <section className="se-section sf-panel" id="admin" aria-labelledby="se-admin-h">
-      <h2 className="sf-h" id="se-admin-h">站点管理</h2>
+      <h2 className="sf-h" id="se-admin-h">
+        站点管理
+      </h2>
 
       <div className="stack" style={{ ['--gap' as string]: '10px' }}>
         {registration ? (
-          <Seg label="注册方式" value={registration} options={REGISTRATION} onChange={(v) => void setRegistration(v)} disabled={regBusy} hint={REG_NOTE[registration]} />
+          <Seg
+            label="注册方式"
+            value={registration}
+            options={REGISTRATION}
+            onChange={(v) => void setRegistration(v)}
+            disabled={regBusy}
+            hint={REG_NOTE[registration]}
+          />
         ) : settingsReq.error != null ? (
-          <p className="error-text">注册方式加载失败。<button type="button" className="btn btn-quiet" onClick={settingsReq.reload}>重试</button></p>
+          <p className="error-text">
+            注册方式加载失败。
+            <button type="button" className="btn btn-quiet" onClick={settingsReq.reload}>
+              重试
+            </button>
+          </p>
         ) : (
           <p className="small muted">加载中…</p>
         )}
-        <span className="small" role="status" aria-live="polite">{regMsg && <span className={regMsg.ok ? 'sf-ok' : 'error-text'}>{regMsg.text}</span>}</span>
+        <span className="small" role="status" aria-live="polite">
+          {regMsg && <span className={regMsg.ok ? 'sf-ok' : 'error-text'}>{regMsg.text}</span>}
+        </span>
       </div>
 
       <form className="se-zone-form stack" style={{ ['--gap' as string]: '16px' }} onSubmit={create} aria-label="生成邀请码">
@@ -144,21 +162,45 @@ export default function AdminSection({ user }: { user: SessionUser }) {
             />
           )}
           <div className="field se-grow">
-            <label className="label" htmlFor="se-inv-note">备注（可不填）</label>
-            <input id="se-inv-note" className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="给谁的，如 小林" />
+            <label className="label" htmlFor="se-inv-note">
+              备注（可不填）
+            </label>
+            <input
+              id="se-inv-note"
+              className="input"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={200}
+              placeholder="给谁的，如 小林"
+            />
           </div>
           <div className="field">
-            <label className="label" htmlFor="se-inv-days">有效期</label>
-            <select id="se-inv-days" className="input select" value={days ?? ''} onChange={(e) => setDays(e.target.value ? Number(e.target.value) : null)}>
+            <label className="label" htmlFor="se-inv-days">
+              有效期
+            </label>
+            <select
+              id="se-inv-days"
+              className="input select"
+              value={days ?? ''}
+              onChange={(e) => setDays(e.target.value ? Number(e.target.value) : null)}
+            >
               {EXPIRY.map((o) => (
-                <option key={o.label} value={o.days ?? ''}>{o.label}</option>
+                <option key={o.label} value={o.days ?? ''}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
         </div>
         <div className="row">
-          <button type="submit" className="btn btn-primary" disabled={making}>{making ? '生成中…' : '生成邀请码'}</button>
-          {problem && <span className="error-text small" role="alert">{problem}</span>}
+          <button type="submit" className="btn btn-primary" disabled={making}>
+            {making ? '生成中…' : '生成邀请码'}
+          </button>
+          {problem && (
+            <span className="error-text small" role="alert">
+              {problem}
+            </span>
+          )}
         </div>
       </form>
 
@@ -167,8 +209,12 @@ export default function AdminSection({ user }: { user: SessionUser }) {
           <span className="small muted">新邀请码</span>
           <code className="se-code mono">{made.code}</code>
           <div className="row">
-            <button type="button" className="btn" onClick={() => void copy('made', made.code)}>{copied === 'made' ? '已复制' : '复制邀请码'}</button>
-            <button type="button" className="btn btn-quiet" onClick={() => void copy('made-link', link(made.code))}>{copied === 'made-link' ? '已复制' : '复制注册链接'}</button>
+            <button type="button" className="btn" onClick={() => void copy('made', made.code)}>
+              {copied === 'made' ? '已复制' : '复制邀请码'}
+            </button>
+            <button type="button" className="btn btn-quiet" onClick={() => void copy('made-link', link(made.code))}>
+              {copied === 'made-link' ? '已复制' : '复制注册链接'}
+            </button>
           </div>
         </div>
       )}
@@ -176,7 +222,14 @@ export default function AdminSection({ user }: { user: SessionUser }) {
       <div className="stack" style={{ ['--gap' as string]: '10px' }}>
         <h3 className="sf-sub">邀请码</h3>
         {!invites && !invitesReq.error && <p className="small muted">加载中…</p>}
-        {invitesReq.error != null && !invites && <p className="error-text">邀请码加载失败。<button type="button" className="btn btn-quiet" onClick={invitesReq.reload}>重试</button></p>}
+        {invitesReq.error != null && !invites && (
+          <p className="error-text">
+            邀请码加载失败。
+            <button type="button" className="btn btn-quiet" onClick={invitesReq.reload}>
+              重试
+            </button>
+          </p>
+        )}
         {invites && invites.length === 0 && <p className="small muted">还没有邀请码。</p>}
         {invites && invites.length > 0 && (
           <ul className="se-invites">
@@ -191,7 +244,10 @@ export default function AdminSection({ user }: { user: SessionUser }) {
                     <span className="se-invite-meta small">
                       <span className="tm-badge">{ROLE_LABEL[i.role]}</span>
                       {used ? (
-                        <span className="muted">已使用{who ? ` · @${who}` : ''}{i.usedAt ? ` · ${day(i.usedAt)}` : ''}</span>
+                        <span className="muted">
+                          已使用{who ? ` · @${who}` : ''}
+                          {i.usedAt ? ` · ${day(i.usedAt)}` : ''}
+                        </span>
                       ) : dead ? (
                         <span className="error-text">已过期 · {day(i.expiresAt!)}</span>
                       ) : (
@@ -202,18 +258,36 @@ export default function AdminSection({ user }: { user: SessionUser }) {
                     <span className="se-invite-actions">
                       {!used && !dead && (
                         <>
-                          <button type="button" className="btn btn-quiet" onClick={() => void copy(i.code, i.code)}>{copied === i.code ? '已复制' : '复制'}</button>
-                          <button type="button" className="btn btn-quiet" onClick={() => void copy(`${i.code}-link`, link(i.code))}>{copied === `${i.code}-link` ? '已复制' : '复制链接'}</button>
+                          <button type="button" className="btn btn-quiet" onClick={() => void copy(i.code, i.code)}>
+                            {copied === i.code ? '已复制' : '复制'}
+                          </button>
+                          <button type="button" className="btn btn-quiet" onClick={() => void copy(`${i.code}-link`, link(i.code))}>
+                            {copied === `${i.code}-link` ? '已复制' : '复制链接'}
+                          </button>
                         </>
                       )}
                       {!used && (
-                        <button type="button" className="btn btn-quiet" aria-expanded={removing === i.code} aria-label={`删除邀请码 ${i.code}`} onClick={() => setRemoving(removing === i.code ? null : i.code)}>
+                        <button
+                          type="button"
+                          className="btn btn-quiet"
+                          aria-expanded={removing === i.code}
+                          aria-label={`删除邀请码 ${i.code}`}
+                          onClick={() => setRemoving(removing === i.code ? null : i.code)}
+                        >
                           删除
                         </button>
                       )}
                     </span>
                   </div>
-                  {removing === i.code && <ConfirmBar prompt={`删除邀请码 ${i.code}？拿着它的人将无法注册。`} confirmLabel="确认删除" busy={removeBusy} onConfirm={() => void remove(i.code)} onCancel={() => setRemoving(null)} />}
+                  {removing === i.code && (
+                    <ConfirmBar
+                      prompt={`删除邀请码 ${i.code}？拿着它的人将无法注册。`}
+                      confirmLabel="确认删除"
+                      busy={removeBusy}
+                      onConfirm={() => void remove(i.code)}
+                      onCancel={() => setRemoving(null)}
+                    />
+                  )}
                 </li>
               );
             })}

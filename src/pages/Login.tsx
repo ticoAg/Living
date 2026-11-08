@@ -50,13 +50,38 @@ export default function Login() {
         <h1 className="display display-m au-title">登录</h1>
         <form className="stack" style={{ ['--gap' as string]: '20px' }} onSubmit={submit}>
           <div className="field">
-            <label className="label" htmlFor="au-handle">用户名</label>
-            <input id="au-handle" className="input" value={handle} onChange={(e) => setHandle(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={24} required autoFocus />
+            <label className="label" htmlFor="au-handle">
+              用户名
+            </label>
+            <input
+              id="au-handle"
+              className="input"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={24}
+              required
+              autoFocus
+            />
           </div>
           <div className="field">
-            <label className="label" htmlFor="au-password">密码</label>
+            <label className="label" htmlFor="au-password">
+              密码
+            </label>
             <div className="au-pw">
-              <input id="au-password" className="input" type={show ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" maxLength={256} required />
+              <input
+                id="au-password"
+                className="input"
+                type={show ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                maxLength={256}
+                required
+              />
               <button type="button" className="btn btn-quiet au-pw-toggle" aria-pressed={show} onClick={() => setShow((s) => !s)}>
                 {show ? '隐藏' : '显示'}
               </button>
@@ -72,11 +97,15 @@ export default function Login() {
 
         <p className="au-alt small muted">
           {site?.needsSetup ? (
-            <>站点还没有账号。<Link href={registerHref}>用站长邀请码创建第一个账号</Link></>
+            <>
+              站点还没有账号。<Link href={registerHref}>用站长邀请码创建第一个账号</Link>
+            </>
           ) : site?.registration === 'closed' ? (
             <>站点暂不开放注册。</>
           ) : (
-            <>还没有账号？<Link href={registerHref}>注册</Link></>
+            <>
+              还没有账号？<Link href={registerHref}>注册</Link>
+            </>
           )}
         </p>
       </div>

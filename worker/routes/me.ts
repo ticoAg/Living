@@ -32,7 +32,10 @@ me.patch('/', async (c) => {
   }
   if (sets.length) {
     params.push(user.id);
-    await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?${params.length}`).bind(...params).run();
+    await db
+      .prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?${params.length}`)
+      .bind(...params)
+      .run();
   }
   const row = await db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?1`).bind(user.id).first<Parameters<typeof toSessionUser>[0]>();
   return c.json({ user: toSessionUser(row!) });
@@ -47,6 +50,8 @@ me.post('/password', async (c) => {
   if (next.length > 256) throw invalid('新密码最多 256 个字符');
   const row = await c.env.DB.prepare('SELECT password_hash FROM users WHERE id = ?1').bind(user.id).first<{ password_hash: string }>();
   if (!row || !(await verifyPassword(current, row.password_hash))) throw invalid('当前密码不对');
-  await c.env.DB.prepare('UPDATE users SET password_hash = ?1 WHERE id = ?2').bind(await hashPassword(next), user.id).run();
+  await c.env.DB.prepare('UPDATE users SET password_hash = ?1 WHERE id = ?2')
+    .bind(await hashPassword(next), user.id)
+    .run();
   return c.json({ ok: true });
 });

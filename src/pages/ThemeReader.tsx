@@ -122,7 +122,8 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
   }, []);
 
   const points = useMemo<MapPoint[]>(
-    () => model.places.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, label: p.name, onClick: () => scrollToItem(model.firstAt.get(p.id)) })),
+    () =>
+      model.places.map((p) => ({ id: p.id, lat: p.lat, lng: p.lng, label: p.name, onClick: () => scrollToItem(model.firstAt.get(p.id)) })),
     [model, scrollToItem]
   );
   const shapes = useMemo<MapShapes>(() => ({ lines: model.route.length > 1 ? [{ id: 'route', coords: model.route }] : [] }), [model.route]);

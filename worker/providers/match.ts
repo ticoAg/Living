@@ -106,7 +106,11 @@ export function score(p: RawPlace, at: { lat: number; lng: number; heading: numb
   };
 }
 
-const nameKey = (s: string) => s.normalize('NFKC').toLowerCase().replace(/[\s·・\-_()（）]/g, '');
+const nameKey = (s: string) =>
+  s
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s·・\-_()（）]/g, '');
 
 /** Drops provider results that duplicate a local place (same source id, or same name within 80 m) or each other. */
 export function dedupe(local: RawPlace[], external: RawPlace[], at?: { lat: number; lng: number }): RawPlace[] {
@@ -143,7 +147,9 @@ function nearby(env: Env, provider: 'amap' | 'osm', lat: number, lng: number, ra
   const qLat = Number(lat.toFixed(4));
   const qLng = Number(lng.toFixed(4));
   const key = `poi:near:${provider}:${qLat.toFixed(4)}:${qLng.toFixed(4)}:${Math.round(radius)}`;
-  return kvCached(env.KV, key, () => (provider === 'amap' ? amapAround(env.AMAP_KEY as string, qLat, qLng, radius) : overpassAround(qLat, qLng, radius)));
+  return kvCached(env.KV, key, () =>
+    provider === 'amap' ? amapAround(env.AMAP_KEY as string, qLat, qLng, radius) : overpassAround(qLat, qLng, radius)
+  );
 }
 
 export function reverse(env: Env, provider: 'amap' | 'osm', lat: number, lng: number): Promise<Geocode> {
@@ -177,7 +183,8 @@ export async function matchPlaces(env: Env, userId: string, input: MatchInput): 
   ]);
 
   const local = localRows.map(fromPoiRow);
-  if (!external.ok) console.warn(`match: ${provider} nearby search failed`, external.error instanceof Error ? external.error.message : external.error);
+  if (!external.ok)
+    console.warn(`match: ${provider} nearby search failed`, external.error instanceof Error ? external.error.message : external.error);
   if (!geo.ok) console.warn(`match: ${provider} reverse geocode failed`, geo.error instanceof Error ? geo.error.message : geo.error);
 
   const area: Geocode = geo.ok ? geo.value : { city: null, district: null };

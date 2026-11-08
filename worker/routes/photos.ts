@@ -2,11 +2,32 @@ import { Hono } from 'hono';
 import { distance } from '../../shared/geo';
 import type { GeoPrivacy, PoiMethod, Variants, Visibility } from '../../shared/types';
 import type { AppEnv } from '../env';
-import { duplicate, forbidden, invalid, listCache, notFound, paramId, readJson, tooLarge, unauthenticated, upstream, type Ctx } from '../lib/http';
+import {
+  duplicate,
+  forbidden,
+  invalid,
+  listCache,
+  notFound,
+  paramId,
+  readJson,
+  tooLarge,
+  unauthenticated,
+  upstream,
+  type Ctx
+} from '../lib/http';
 import { newId } from '../lib/ids';
 import { purgeVariantCache } from '../lib/mediaCache';
 import {
-  GEO_PRIVACIES, isFile, MAX_ORIGINAL_BYTES, MAX_REQUEST_BYTES, MAX_VARIANT_BYTES, originalKind, parseCreateMeta, POI_METHODS, variantKind, VISIBILITIES
+  GEO_PRIVACIES,
+  isFile,
+  MAX_ORIGINAL_BYTES,
+  MAX_REQUEST_BYTES,
+  MAX_VARIANT_BYTES,
+  originalKind,
+  parseCreateMeta,
+  POI_METHODS,
+  variantKind,
+  VISIBILITIES
 } from '../lib/photoInput';
 import { loadPhotoDetail, loadPhotoRow, PHOTO_FROM, SUMMARY_COLS, toSummary, type PhotoRow } from '../lib/photos';
 import { findOrCreatePoi, getPoiRow, parseNewPoi, type PoiRow } from '../lib/poi';
@@ -37,7 +58,14 @@ photos.get('/', async (c) => {
 
   let ids: string[] | null = null;
   if (idsParam !== undefined) {
-    ids = [...new Set(idsParam.split(',').map((s) => s.trim()).filter(Boolean))];
+    ids = [
+      ...new Set(
+        idsParam
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+    ];
     if (ids.length > IDS_LIMIT) throw invalid(`一次最多指定 ${IDS_LIMIT} 张照片`);
   }
 
@@ -89,7 +117,8 @@ photos.post('/', async (c) => {
   const db = c.env.DB;
 
   if (Number(c.req.header('content-length') ?? 0) > MAX_REQUEST_BYTES) throw tooLarge('上传内容太大：原图不能超过 50 MB');
-  if (!(c.req.header('content-type') ?? '').toLowerCase().startsWith('multipart/form-data')) throw invalid('上传需要使用 multipart/form-data');
+  if (!(c.req.header('content-type') ?? '').toLowerCase().startsWith('multipart/form-data'))
+    throw invalid('上传需要使用 multipart/form-data');
 
   let form: FormData;
   try {
@@ -130,7 +159,10 @@ photos.post('/', async (c) => {
 
   // Same owner + same bytes → 409 with the existing photo.
   if (meta.sha256) {
-    const dup = await db.prepare('SELECT id FROM photos WHERE owner_id = ?1 AND sha256 = ?2').bind(user.id, meta.sha256).first<{ id: string }>();
+    const dup = await db
+      .prepare('SELECT id FROM photos WHERE owner_id = ?1 AND sha256 = ?2')
+      .bind(user.id, meta.sha256)
+      .first<{ id: string }>();
     if (dup) throw duplicate('这张照片已经上传过了', { photoId: dup.id });
   }
 
@@ -185,7 +217,11 @@ photos.post('/', async (c) => {
     if (!poi && meta.newPoi) poi = await findOrCreatePoi(db, meta.newPoi, user.id);
     const hasPoint = meta.lat !== null && meta.lng !== null;
     // The server owns the distance whenever it can compute it.
-    const poiDistance = poi ? (hasPoint ? round1(distance(meta.lat as number, meta.lng as number, poi.lat, poi.lng)) : meta.poiDistance) : null;
+    const poiDistance = poi
+      ? hasPoint
+        ? round1(distance(meta.lat as number, meta.lng as number, poi.lat, poi.lng))
+        : meta.poiDistance
+      : null;
     const poiMethod: PoiMethod | null = poi ? (meta.poiMethod ?? 'manual') : null;
     const now = nowIso();
 
@@ -198,18 +234,65 @@ photos.post('/', async (c) => {
            sha256, uploaded_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23,
            ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38)`,
-        photoId, user.id, meta.title, meta.note, meta.takenAt, meta.tz, meta.lat, meta.lng, meta.alt, meta.heading, geoPrivacy,
-        meta.city, meta.district, poi?.id ?? null, poiDistance, poiMethod, meta.camera, meta.lens, meta.focal, meta.focal35,
-        meta.aperture, meta.shutter, meta.iso, meta.width, meta.height, originalKey, originalType.type, original.size,
-        JSON.stringify(variants), meta.thumbhash, meta.palette ? JSON.stringify(meta.palette) : null,
-        meta.focus?.[0] ?? null, meta.focus?.[1] ?? null, meta.visibility, meta.inLiving, meta.favorite, meta.sha256, now
+        photoId,
+        user.id,
+        meta.title,
+        meta.note,
+        meta.takenAt,
+        meta.tz,
+        meta.lat,
+        meta.lng,
+        meta.alt,
+        meta.heading,
+        geoPrivacy,
+        meta.city,
+        meta.district,
+        poi?.id ?? null,
+        poiDistance,
+        poiMethod,
+        meta.camera,
+        meta.lens,
+        meta.focal,
+        meta.focal35,
+        meta.aperture,
+        meta.shutter,
+        meta.iso,
+        meta.width,
+        meta.height,
+        originalKey,
+        originalType.type,
+        original.size,
+        JSON.stringify(variants),
+        meta.thumbhash,
+        meta.palette ? JSON.stringify(meta.palette) : null,
+        meta.focus?.[0] ?? null,
+        meta.focus?.[1] ?? null,
+        meta.visibility,
+        meta.inLiving,
+        meta.favorite,
+        meta.sha256,
+        now
       )
     ];
     if (manualTags.length) {
-      statements.push(prep(db, `INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, source) SELECT ?1, value, 'manual' FROM json_each(?2)`, photoId, JSON.stringify(manualTags)));
+      statements.push(
+        prep(
+          db,
+          `INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, source) SELECT ?1, value, 'manual' FROM json_each(?2)`,
+          photoId,
+          JSON.stringify(manualTags)
+        )
+      );
     }
     if (suggestedTags.length) {
-      statements.push(prep(db, `INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, source) SELECT ?1, value, 'suggested' FROM json_each(?2)`, photoId, JSON.stringify(suggestedTags)));
+      statements.push(
+        prep(
+          db,
+          `INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, source) SELECT ?1, value, 'suggested' FROM json_each(?2)`,
+          photoId,
+          JSON.stringify(suggestedTags)
+        )
+      );
     }
     for (const themeId of themeIds) {
       statements.push(
@@ -217,7 +300,9 @@ photos.post('/', async (c) => {
           db,
           `INSERT INTO theme_items (id, theme_id, position, kind, photo_id)
            VALUES (?1, ?2, (SELECT COALESCE(MAX(position), -1) + 1 FROM theme_items WHERE theme_id = ?2), 'photo', ?3)`,
-          newId.item(), themeId, photoId
+          newId.item(),
+          themeId,
+          photoId
         ),
         prep(db, 'UPDATE themes SET updated_at = ?1 WHERE id = ?2', now, themeId)
       );
@@ -227,7 +312,10 @@ photos.post('/', async (c) => {
     await c.env.MEDIA.delete(keys).catch(() => {});
     if (isUniqueViolation(e) && meta.sha256) {
       // Lost a race with an identical upload.
-      const dup = await db.prepare('SELECT id FROM photos WHERE owner_id = ?1 AND sha256 = ?2').bind(user.id, meta.sha256).first<{ id: string }>();
+      const dup = await db
+        .prepare('SELECT id FROM photos WHERE owner_id = ?1 AND sha256 = ?2')
+        .bind(user.id, meta.sha256)
+        .first<{ id: string }>();
       if (dup) throw duplicate('这张照片已经上传过了', { photoId: dup.id });
     }
     throw e;
@@ -317,7 +405,14 @@ photos.patch('/:id', async (c) => {
   if (tagIds !== undefined) {
     statements.push(prep(db, 'DELETE FROM photo_tags WHERE photo_id = ?1', row.id));
     if (tagIds.length) {
-      statements.push(prep(db, `INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, source) SELECT ?1, value, 'manual' FROM json_each(?2)`, row.id, JSON.stringify(tagIds)));
+      statements.push(
+        prep(
+          db,
+          `INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, source) SELECT ?1, value, 'manual' FROM json_each(?2)`,
+          row.id,
+          JSON.stringify(tagIds)
+        )
+      );
     }
   }
   if (statements.length) await db.batch(statements);

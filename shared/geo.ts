@@ -123,7 +123,24 @@ export function dms(v: number, pos: string, neg: string, secDigits = 0): string 
 export const fmtLat = (v: number) => dms(v, 'N', 'S');
 export const fmtLng = (v: number) => dms(v, 'E', 'W');
 
-const DIRS = ['北', '北偏东', '东北', '东偏北', '东', '东偏南', '东南', '南偏东', '南', '南偏西', '西南', '西偏南', '西', '西偏北', '西北', '北偏西'];
+const DIRS = [
+  '北',
+  '北偏东',
+  '东北',
+  '东偏北',
+  '东',
+  '东偏南',
+  '东南',
+  '南偏东',
+  '南',
+  '南偏西',
+  '西南',
+  '西偏南',
+  '西',
+  '西偏北',
+  '西北',
+  '北偏西'
+];
 /** 16-wind Chinese compass name for a heading. */
 export function compass(heading: number): string {
   return DIRS[Math.round((((heading % 360) + 360) % 360) / 22.5) % 16];
@@ -137,6 +154,21 @@ export function fmtDistance(m: number): string {
 
 /** Default matching radius per POI category, metres. */
 export const CATEGORY_RADIUS: Record<string, number> = {
-  桥: 60, 堤: 150, 湖: 600, 山: 400, 塔: 120, 寺: 150, 亭: 40, 园: 200, 岛: 200, 村: 300,
-  景: 120, 街区: 200, 建筑: 60, 美术馆: 80, 海岸: 300, 店: 30, 道路: 40
+  桥: 60,
+  堤: 150,
+  湖: 600,
+  山: 400,
+  塔: 120,
+  寺: 150,
+  亭: 40,
+  园: 200,
+  岛: 200,
+  村: 300,
+  景: 120,
+  街区: 200,
+  建筑: 60,
+  美术馆: 80,
+  海岸: 300,
+  店: 30,
+  道路: 40
 };

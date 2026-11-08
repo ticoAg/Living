@@ -6,13 +6,13 @@
 
 ## 技术栈
 
-| 层 | 选择 |
-|---|---|
+| 层   | 选择                                                                                  |
+| ---- | ------------------------------------------------------------------------------------- |
 | 前端 | React 19、wouter、Vite；MapLibre（OpenFreeMap 瓦片）；`exifr`、`thumbhash`、`suncalc` |
-| 后端 | Cloudflare Worker + Hono；同一个 Worker 提供静态资源、`/api` 和 `/media` |
-| 数据 | D1（SQLite）、R2（原图与尺寸图）、KV（会话与缓存） |
-| 图片 | 浏览器端解码、缩放、生成 ThumbHash 与 SHA-256，Worker 只校验和存储 |
-| 发布 | GitHub 推送 `main`，Cloudflare Workers Builds 自动构建、迁移、部署 |
+| 后端 | Cloudflare Worker + Hono；同一个 Worker 提供静态资源、`/api` 和 `/media`              |
+| 数据 | D1（SQLite）、R2（原图与尺寸图）、KV（会话与缓存）                                    |
+| 图片 | 浏览器端解码、缩放、生成 ThumbHash 与 SHA-256，Worker 只校验和存储                    |
+| 发布 | GitHub 推送 `main`，Cloudflare Workers Builds 自动构建、迁移、部署                    |
 
 ## 仓库结构
 
@@ -42,11 +42,11 @@ npm run dev                # 前端：http://localhost:5173，代理 /api 和 /m
 
 其他常用命令：
 
-| 命令 | 作用 |
-|---|---|
-| `npm run typecheck` | 类型检查前端与 Worker |
-| `npm run build` | 类型检查加前端构建，与线上构建命令相同 |
-| `npm run db:migrate:local` | 对本地 D1 应用迁移 |
+| 命令                       | 作用                                   |
+| -------------------------- | -------------------------------------- |
+| `npm run typecheck`        | 类型检查前端与 Worker                  |
+| `npm run build`            | 类型检查加前端构建，与线上构建命令相同 |
+| `npm run db:migrate:local` | 对本地 D1 应用迁移                     |
 
 ## 部署
 
@@ -56,12 +56,12 @@ npm run dev                # 前端：http://localhost:5173，代理 /api 和 /m
 
 文档在 [`docs/`](docs/index.md)，按 [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.2 组织：每个文件讲一个概念，frontmatter 的 `type` 标明种类，`index.md` 是目录，`log.md` 记录变更。
 
-| 想知道 | 看 |
-|---|---|
-| 做什么、为谁做 | [产品](docs/product/index.md) |
+| 想知道                   | 看                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| 做什么、为谁做           | [产品](docs/product/index.md)                                                        |
 | 系统怎么搭、为什么这样选 | [架构](docs/architecture/index.md)、[决策记录](docs/architecture/decisions/index.md) |
-| 表、KV、R2 的结构 | [数据](docs/data/index.md) |
-| HTTP 接口 | [接口](docs/api/index.md) |
-| 怎么跑、怎么发布 | [运行手册](docs/runbooks/index.md) |
+| 表、KV、R2 的结构        | [数据](docs/data/index.md)                                                           |
+| HTTP 接口                | [接口](docs/api/index.md)                                                            |
+| 怎么跑、怎么发布         | [运行手册](docs/runbooks/index.md)                                                   |
 
 修改迁移、类型或接口时，同一个 PR 里更新对应文档，见 [决策：文档采用 OKF](docs/architecture/decisions/0005-okf-docs.md)。

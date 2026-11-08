@@ -55,7 +55,16 @@ admin.post('/invites', async (c) => {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = inviteCode();
     try {
-      await prep(db, 'INSERT INTO invites (code, created_by, role, note, expires_at, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)', code, user.id, role, note, expiresAt, nowIso()).run();
+      await prep(
+        db,
+        'INSERT INTO invites (code, created_by, role, note, expires_at, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)',
+        code,
+        user.id,
+        role,
+        note,
+        expiresAt,
+        nowIso()
+      ).run();
     } catch (e) {
       if (isUniqueViolation(e)) continue; // the 31^10 space makes this practically unreachable
       throw e;
@@ -70,7 +79,9 @@ admin.delete('/invites/:code', async (c) => {
   requireRole(await requireUser(c), 'owner', 'admin');
   const code = c.req.param('code');
   if (!/^[A-Za-z0-9]{1,32}$/.test(code)) throw notFound('邀请码不存在');
-  const row = await c.env.DB.prepare('SELECT used_by, used_at FROM invites WHERE code = ?1 COLLATE NOCASE').bind(code).first<{ used_by: string | null; used_at: string | null }>();
+  const row = await c.env.DB.prepare('SELECT used_by, used_at FROM invites WHERE code = ?1 COLLATE NOCASE')
+    .bind(code)
+    .first<{ used_by: string | null; used_at: string | null }>();
   if (!row) throw notFound('邀请码不存在');
   if (row.used_by || row.used_at) throw conflict('这个邀请码已经被使用，不能删除');
   await c.env.DB.prepare('DELETE FROM invites WHERE code = ?1 COLLATE NOCASE AND used_by IS NULL').bind(code).run();
@@ -87,7 +98,9 @@ admin.patch('/settings', async (c) => {
   const body = await readJson(c);
   if (!has(body, 'registration')) throw invalid('请提供 registration');
   const registration = optEnum<Registration>(body.registration, '注册方式', REGISTRATION_MODES);
-  await c.env.DB.prepare(`INSERT INTO settings (key, value) VALUES ('registration', ?1) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+  await c.env.DB.prepare(
+    `INSERT INTO settings (key, value) VALUES ('registration', ?1) ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+  )
     .bind(registration)
     .run();
   return c.json({ registration: await getRegistration(c.env.DB) });

@@ -41,7 +41,13 @@ interface ThemeRow {
 // ---- reading ----------------------------------------------------------------------------------------------------
 
 /** Theme summaries matching `where` (already bound on `q`). Counts and covers only involve photos `viewer` can open. */
-async function selectThemes(db: D1Database, viewer: string | null, q: Sql, where: string, limit = LIST_LIMIT): Promise<{ row: ThemeRow; summary: ThemeSummary }[]> {
+async function selectThemes(
+  db: D1Database,
+  viewer: string | null,
+  q: Sql,
+  where: string,
+  limit = LIST_LIMIT
+): Promise<{ row: ThemeRow; summary: ThemeSummary }[]> {
   const vis = photoById(q, viewer, 'p');
   const res = await prepQ(
     db,
@@ -57,7 +63,11 @@ async function selectThemes(db: D1Database, viewer: string | null, q: Sql, where
   ).all<ThemeRow>();
 
   // Cover = the chosen photo when the viewer can see it, else the first photo they can see.
-  const covers = await summariesByIds(db, viewer, res.results.map((r) => r.cover_id ?? r.first_id).filter((x): x is string => Boolean(x)));
+  const covers = await summariesByIds(
+    db,
+    viewer,
+    res.results.map((r) => r.cover_id ?? r.first_id).filter((x): x is string => Boolean(x))
+  );
   return res.results.map((row) => {
     const cover = covers.get(row.cover_id ?? row.first_id ?? '');
     const summary: ThemeSummary = {
@@ -115,9 +125,15 @@ export async function loadThemeDetail(db: D1Database, id: string, viewer: string
     ).all<PoiRow>()
   ]);
 
-  const photos = await summariesByIds(db, viewer, itemsRes.results.map((i) => i.photo_id).filter((x): x is string => Boolean(x)), true);
+  const photos = await summariesByIds(
+    db,
+    viewer,
+    itemsRes.results.map((i) => i.photo_id).filter((x): x is string => Boolean(x)),
+    true
+  );
   const items: ThemeItem[] = itemsRes.results.map((i): ThemeItem => {
-    if (i.kind === 'photo') return { id: i.id, kind: 'photo', photoId: i.photo_id as string, text: i.text, photo: photos.get(i.photo_id as string) ?? null };
+    if (i.kind === 'photo')
+      return { id: i.id, kind: 'photo', photoId: i.photo_id as string, text: i.text, photo: photos.get(i.photo_id as string) ?? null };
     if (i.kind === 'day') return { id: i.id, kind: 'day', day: i.day ?? '', text: i.text };
     return { id: i.id, kind: 'text', text: i.text ?? '' };
   });
@@ -219,7 +235,14 @@ interface NewItem {
 
 /** One statement inserting all items; positions follow array order from 0. */
 function insertItems(db: D1Database, themeId: string, items: NewItem[]): D1PreparedStatement {
-  const rows = items.map((it, i) => ({ id: newId.item(), pos: i, kind: it.kind, photoId: it.photoId ?? null, text: it.text ?? null, day: it.day ?? null }));
+  const rows = items.map((it, i) => ({
+    id: newId.item(),
+    pos: i,
+    kind: it.kind,
+    photoId: it.photoId ?? null,
+    text: it.text ?? null,
+    day: it.day ?? null
+  }));
   return prep(
     db,
     `INSERT INTO theme_items (id, theme_id, position, kind, photo_id, text, day)
@@ -247,7 +270,11 @@ function seedTrip(ids: string[], info: Map<string, PhotoInfo>): { items: NewItem
     items.push({ kind: 'photo', photoId: id });
   }
   for (const id of undated) items.push({ kind: 'photo', photoId: id });
-  return { items, first: dated.length ? (info.get(dated[0])!.taken_at as string).slice(0, 10) : null, last: dated.length ? (info.get(dated[dated.length - 1])!.taken_at as string).slice(0, 10) : null };
+  return {
+    items,
+    first: dated.length ? (info.get(dated[0])!.taken_at as string).slice(0, 10) : null,
+    last: dated.length ? (info.get(dated[dated.length - 1])!.taken_at as string).slice(0, 10) : null
+  };
 }
 
 themes.post('/', async (c) => {
@@ -279,7 +306,17 @@ themes.post('/', async (c) => {
       db,
       `INSERT INTO themes (id, owner_id, kind, title, subtitle, intro, cover_photo_id, start_date, end_date, visibility, created_at, updated_at, published_at)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11, ?12)`,
-      id, user.id, kind, f.title, f.subtitle ?? null, f.intro ?? null, f.coverPhotoId ?? null, startDate, endDate, visibility, now,
+      id,
+      user.id,
+      kind,
+      f.title,
+      f.subtitle ?? null,
+      f.intro ?? null,
+      f.coverPhotoId ?? null,
+      startDate,
+      endDate,
+      visibility,
+      now,
       visibility === 'public' ? now : null
     )
   ];
@@ -296,7 +333,9 @@ interface OwnedTheme {
 }
 
 async function ownedTheme(c: Ctx, user: SessionUser, id: string): Promise<OwnedTheme> {
-  const row = await c.env.DB.prepare('SELECT id, owner_id, visibility, published_at FROM themes WHERE id = ?1').bind(id).first<OwnedTheme>();
+  const row = await c.env.DB.prepare('SELECT id, owner_id, visibility, published_at FROM themes WHERE id = ?1')
+    .bind(id)
+    .first<OwnedTheme>();
   if (!row) throw notFound('主题不存在');
   if (row.owner_id !== user.id) {
     if (row.visibility === 'private') throw notFound('主题不存在');

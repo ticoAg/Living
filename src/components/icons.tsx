@@ -21,10 +21,25 @@ const CATEGORY: Record<string, string> = {
   道路: 'M8 3 5 21M16 3l3 18M12 4v2M12 9v2M12 14v2M12 19v1'
 };
 
-export function CategoryIcon({ category, size = 16, ...rest }: { category: string | null | undefined; size?: number } & SVGProps<SVGSVGElement>) {
+export function CategoryIcon({
+  category,
+  size = 16,
+  ...rest
+}: { category: string | null | undefined; size?: number } & SVGProps<SVGSVGElement>) {
   const d = (category && CATEGORY[category]) || CATEGORY['景'];
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...rest}
+    >
       <path d={d} />
     </svg>
   );

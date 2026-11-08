@@ -29,19 +29,17 @@ export function LoadError({
       <p className="bw-state-title">{missing ? notFound.title : '加载失败'}</p>
       <p className="bw-state-hint">{missing ? notFound.hint : error instanceof ApiError ? error.message : '网络不太顺畅，请稍后再试。'}</p>
       <div className="row" style={{ justifyContent: 'center' }}>
-        {missing ? (
-          notFound.back && (
-            <Link href={notFound.back.href} className="btn">
-              {notFound.back.label}
-            </Link>
-          )
-        ) : (
-          onRetry && (
-            <button type="button" className="btn" onClick={onRetry}>
-              重试
-            </button>
-          )
-        )}
+        {missing
+          ? notFound.back && (
+              <Link href={notFound.back.href} className="btn">
+                {notFound.back.label}
+              </Link>
+            )
+          : onRetry && (
+              <button type="button" className="btn" onClick={onRetry}>
+                重试
+              </button>
+            )}
       </div>
     </div>
   );
@@ -51,7 +49,11 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
   return (
     <div className="bw-state">
       <p className="bw-state-title">{title}</p>
-      {children && <div className="row" style={{ justifyContent: 'center' }}>{children}</div>}
+      {children && (
+        <div className="row" style={{ justifyContent: 'center' }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

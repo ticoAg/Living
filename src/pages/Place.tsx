@@ -42,7 +42,11 @@ export default function Place() {
   useScrollTop(id);
 
   const rows = useMemo(
-    () => (photos ?? []).slice().sort(byTakenDesc).map((p) => ({ p, part: partOf(p), season: seasonOf(p, tree) })),
+    () =>
+      (photos ?? [])
+        .slice()
+        .sort(byTakenDesc)
+        .map((p) => ({ p, part: partOf(p), season: seasonOf(p, tree) })),
     [photos, tree]
   );
   const visible = useMemo(() => rows.filter((r) => (!part || r.part === part) && (!season || r.season === season)), [rows, part, season]);
@@ -249,7 +253,9 @@ export default function Place() {
               return (
                 <li key={n.id}>
                   <Link href={`/place/${n.id}`} className="plc-near-item">
-                    <span className="plc-near-thumb">{thumb ? <Img photo={thumb} ratio="1 / 1" sizes="72px" alt="" /> : <CategoryIcon category={n.category} size={24} />}</span>
+                    <span className="plc-near-thumb">
+                      {thumb ? <Img photo={thumb} ratio="1 / 1" sizes="72px" alt="" /> : <CategoryIcon category={n.category} size={24} />}
+                    </span>
                     <span className="plc-near-text">
                       <span className="plc-near-name">
                         <CategoryIcon category={n.category} />

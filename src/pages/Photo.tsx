@@ -51,11 +51,23 @@ function PhotoMap({ photo, precise }: { photo: PhotoDetail; precise: boolean }) 
     }
     const d = poi ? distance(lat, lng, poi.lat, poi.lng) : 0;
     if (heading != null) s.cones = [{ id: 'view', lat, lng, heading, radius: d > 0 ? clamp(d * 0.75, 30, 240) : 80 }];
-    if (poi) s.lines = [{ id: 'link', coords: [[lat, lng], [poi.lat, poi.lng]], dashed: true }];
+    if (poi)
+      s.lines = [
+        {
+          id: 'link',
+          coords: [
+            [lat, lng],
+            [poi.lat, poi.lng]
+          ],
+          dashed: true
+        }
+      ];
     return s;
   }, [poi, precise, lat, lng, heading]);
   if (!points.length && !shapes.circles) return null;
-  return <MapView className="pho-map" ariaLabel={poi ? `拍摄位置，${poi.name}` : '拍摄位置'} points={points} shapes={shapes} maxZoom={17} />;
+  return (
+    <MapView className="pho-map" ariaLabel={poi ? `拍摄位置，${poi.name}` : '拍摄位置'} points={points} shapes={shapes} maxZoom={17} />
+  );
 }
 
 /** Other photos at the same place, as a horizontal strip with the current one marked. */
@@ -121,7 +133,12 @@ export default function PhotoPage() {
   const ids = useMemo(() => {
     const ctx = getBrowseList();
     if (ctx && ctx.includes(id)) return ctx;
-    return all ? all.slice().sort(byTakenDesc).map((p) => p.id) : [];
+    return all
+      ? all
+          .slice()
+          .sort(byTakenDesc)
+          .map((p) => p.id)
+      : [];
   }, [id, all]);
   const idx = ids.indexOf(id);
   const prevId = idx > 0 ? ids[idx - 1] : null;
@@ -140,7 +157,8 @@ export default function PhotoPage() {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       const t = e.target;
       // typing in a field or panning the map with the arrow keys must not turn the page
-      if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.map-frame'))) return;
+      if (t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('.map-frame')))
+        return;
       if (e.key === 'ArrowLeft' && prevId) {
         e.preventDefault();
         navigate(`/p/${prevId}`, { replace: true });
@@ -180,7 +198,7 @@ export default function PhotoPage() {
   }, [photo, tree]);
 
   const poi = photo?.poi ?? null;
-  const title = photo ? photo.title ?? poi?.name ?? photo.city ?? '无题' : null;
+  const title = photo ? (photo.title ?? poi?.name ?? photo.city ?? '无题') : null;
   useDocTitle(title);
   useScrollTop(id);
 
@@ -206,8 +224,7 @@ export default function PhotoPage() {
   const isOwner = !!user && user.id === photo.ownerId;
   const precise = isOwner || photo.geoPrivacy === 'exact';
   const hasPos = photo.lat != null && photo.lng != null;
-  const poiDistance =
-    photo.poiDistance ?? (precise && poi && hasPos ? distance(photo.lat!, photo.lng!, poi.lat, poi.lng) : null);
+  const poiDistance = photo.poiDistance ?? (precise && poi && hasPos ? distance(photo.lat!, photo.lng!, poi.lat, poi.lng) : null);
 
   const exif: [string, ReactNode][] = [];
   if (photo.camera) exif.push(['相机', photo.camera]);
@@ -347,8 +364,12 @@ export default function PhotoPage() {
                         </>
                       ) : (
                         <>
-                          <span>约 {Math.abs(photo.lat!).toFixed(3)}°{photo.lat! >= 0 ? 'N' : 'S'}</span>
-                          <span>{Math.abs(photo.lng!).toFixed(3)}°{photo.lng! >= 0 ? 'E' : 'W'}</span>
+                          <span>
+                            约 {Math.abs(photo.lat!).toFixed(3)}°{photo.lat! >= 0 ? 'N' : 'S'}
+                          </span>
+                          <span>
+                            {Math.abs(photo.lng!).toFixed(3)}°{photo.lng! >= 0 ? 'E' : 'W'}
+                          </span>
                           <small>WGS-84</small>
                         </>
                       )}

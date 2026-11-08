@@ -92,10 +92,7 @@ export default function Living() {
   const theme = useMemo(() => unwrap<ThemeDetail>(themeRes.data, 'theme'), [themeRes.data]);
   const themeTitle = useRef('');
   if (theme?.title) themeTitle.current = theme.title;
-  const themePhotos = useMemo(
-    () => theme?.items?.flatMap((it) => (it.kind === 'photo' && it.photo ? [it.photo] : [])),
-    [theme]
-  );
+  const themePhotos = useMemo(() => theme?.items?.flatMap((it) => (it.kind === 'photo' && it.photo ? [it.photo] : [])), [theme]);
   const listed = source.src === 'theme' ? themePhotos : photosRes.data?.photos;
 
   // Keep the last good list while a refresh is in flight, so a midnight reload never blanks the screen.
@@ -118,7 +115,8 @@ export default function Living() {
 
   const activeRes = source.src === 'theme' ? themeRes : photosRes;
   const tagsPending = source.src === 'tags' && source.tags.length > 0 && !tagsRes.data && !tagsRes.error;
-  const status: 'loading' | 'error' | 'ready' = !pool && activeRes.error ? 'error' : pool && !tagsPending && !startPending ? 'ready' : 'loading';
+  const status: 'loading' | 'error' | 'ready' =
+    !pool && activeRes.error ? 'error' : pool && !tagsPending && !startPending ? 'ready' : 'loading';
 
   const tree = useMemo(() => (tagsRes.data?.tags ? buildTagTree(tagsRes.data.tags) : null), [tagsRes.data]);
   const poiById = useMemo(() => new Map((poisRes.data?.pois ?? []).map((p) => [p.id, p] as const)), [poisRes.data]);
@@ -383,7 +381,10 @@ export default function Living() {
   const poi = cur?.poiId ? (poiById.get(cur.poiId) ?? null) : null;
   const tagName = useCallback((id: string) => tree?.byId.get(id)?.name ?? null, [tree]);
   const caption = useMemo(
-    () => (cur ? buildCaption(cur, { fields: fieldSet, poi, tagName, detail: detail && detail.id === cur.id ? detail : null, today: now }) : null),
+    () =>
+      cur
+        ? buildCaption(cur, { fields: fieldSet, poi, tagName, detail: detail && detail.id === cur.id ? detail : null, today: now })
+        : null,
     [cur, fieldSet, poi, tagName, detail, now]
   );
   const showCaption = !!cur && hasCaption(caption);
@@ -415,7 +416,9 @@ export default function Living() {
     const counts =
       source.src === 'tags' && tree && photos
         ? inclusiveCounts(
-            photos.filter((p) => p.inLiving !== false && (!source.city || p.city === source.city)).map((p) => (p.tagIds ? p : { ...p, tagIds: [] })),
+            photos
+              .filter((p) => p.inLiving !== false && (!source.city || p.city === source.city))
+              .map((p) => (p.tagIds ? p : { ...p, tagIds: [] })),
             tree
           )
         : null;
@@ -436,7 +439,10 @@ export default function Living() {
       key: 'theme',
       label: `主题 · ${themeTitle.current || '指定主题'}`,
       on: source.src === 'theme',
-      onToggle: () => (source.src === 'theme' ? changeSource({ src: 'all', order: 'shuffle' }) : changeSource({ src: 'theme', theme: scope0.theme, order: 'time' }))
+      onToggle: () =>
+        source.src === 'theme'
+          ? changeSource({ src: 'all', order: 'shuffle' })
+          : changeSource({ src: 'theme', theme: scope0.theme, order: 'time' })
     });
   }
   if (scope0.city) {
@@ -444,7 +450,10 @@ export default function Living() {
       key: 'city',
       label: `城市 · ${scope0.city}`,
       on: !!source.city,
-      onToggle: () => (source.city ? changeSource({ city: '', ...(source.src === 'city' ? { src: 'all' as const } : {}) }) : changeSource({ city: scope0.city }))
+      onToggle: () =>
+        source.city
+          ? changeSource({ city: '', ...(source.src === 'city' ? { src: 'all' as const } : {}) })
+          : changeSource({ city: scope0.city })
     });
   }
   if (scope0.user) {
@@ -476,8 +485,22 @@ export default function Living() {
         if (e.pointerType !== 'touch') ui.poke();
       }}
     >
-      <div className="lv-stage" onPointerDown={onStageDown} onPointerUp={onStageUp} onPointerCancel={() => (swipe.current = null)} onClick={onStageClick}>
-        <Stage photo={cur} fit={settings.fit} fx={effectiveFx} everySec={settings.every} paused={holding} onShown={onShown} onBroken={onBroken} />
+      <div
+        className="lv-stage"
+        onPointerDown={onStageDown}
+        onPointerUp={onStageUp}
+        onPointerCancel={() => (swipe.current = null)}
+        onClick={onStageClick}
+      >
+        <Stage
+          photo={cur}
+          fit={settings.fit}
+          fx={effectiveFx}
+          everySec={settings.every}
+          paused={holding}
+          onShown={onShown}
+          onBroken={onBroken}
+        />
       </div>
 
       {dimmed && <div className="lv-dim" aria-hidden="true" />}
@@ -501,7 +524,15 @@ export default function Living() {
       )}
 
       {showCaption && caption && cur && (
-        <Caption data={caption} photoId={cur.id} visible={captionVisible} pos={settings.pos} size={settings.size} barUp={barShown} animate={effectiveFx !== 'cut'} />
+        <Caption
+          data={caption}
+          photoId={cur.id}
+          visible={captionVisible}
+          pos={settings.pos}
+          size={settings.size}
+          barUp={barShown}
+          animate={effectiveFx !== 'cut'}
+        />
       )}
 
       {empty && (

@@ -148,7 +148,14 @@ export function writeStored(s: Settings): void {
 }
 
 export function sourceFromQuery(q: URLSearchParams): Source {
-  const tags = Array.from(new Set((q.get('tags') ?? '').split(',').map((s) => s.trim()).filter(Boolean)));
+  const tags = Array.from(
+    new Set(
+      (q.get('tags') ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    )
+  );
   const place = (q.get('place') ?? '').trim();
   const city = (q.get('city') ?? '').trim();
   const theme = (q.get('theme') ?? '').trim();

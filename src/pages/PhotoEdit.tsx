@@ -21,7 +21,15 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
 /** The preview: click (or use the arrow keys) to say where the subject is, so square and wide crops keep it. */
-function FocusStage({ photo, focus, onChange }: { photo: PhotoDetail; focus: [number, number] | null; onChange: (f: [number, number] | null) => void }) {
+function FocusStage({
+  photo,
+  focus,
+  onChange
+}: {
+  photo: PhotoDetail;
+  focus: [number, number] | null;
+  onChange: (f: [number, number] | null) => void;
+}) {
   const box = useRef<HTMLDivElement>(null);
 
   const place = (e: MouseEvent) => {
@@ -45,17 +53,36 @@ function FocusStage({ photo, focus, onChange }: { photo: PhotoDetail; focus: [nu
       className="pe-stage"
       tabIndex={0}
       role="group"
-      aria-label={focus ? `焦点在横向 ${Math.round(focus[0] * 100)}%、纵向 ${Math.round(focus[1] * 100)}%。点击图片重设，或用方向键微调。` : '还没有设置焦点。点击图片设置，或用方向键开始。'}
+      aria-label={
+        focus
+          ? `焦点在横向 ${Math.round(focus[0] * 100)}%、纵向 ${Math.round(focus[1] * 100)}%。点击图片重设，或用方向键微调。`
+          : '还没有设置焦点。点击图片设置，或用方向键开始。'
+      }
       onClick={place}
       onKeyDown={onKey}
     >
-      <img src={mediaUrl(photo.variants.m.key)} alt={photo.title ?? '照片预览'} draggable={false} style={{ aspectRatio: `${photo.width} / ${photo.height}` }} />
+      <img
+        src={mediaUrl(photo.variants.m.key)}
+        alt={photo.title ?? '照片预览'}
+        draggable={false}
+        style={{ aspectRatio: `${photo.width} / ${photo.height}` }}
+      />
       {focus && <span className="pe-focus" style={{ left: `${focus[0] * 100}%`, top: `${focus[1] * 100}%` }} aria-hidden="true" />}
     </div>
   );
 }
 
-function PlaceEditor({ photo, value, onChange, disabled }: { photo: PhotoDetail; value: PlaceChoice | null; onChange: (c: PlaceChoice | null) => void; disabled?: boolean }) {
+function PlaceEditor({
+  photo,
+  value,
+  onChange,
+  disabled
+}: {
+  photo: PhotoDetail;
+  value: PlaceChoice | null;
+  onChange: (c: PlaceChoice | null) => void;
+  disabled?: boolean;
+}) {
   const coords = photo.lat != null && photo.lng != null ? { lat: photo.lat, lng: photo.lng } : null;
   const m = useMatch(coords ? { ...coords, heading: photo.heading } : null);
   const [open, setOpen] = useState(false);
@@ -185,12 +212,18 @@ function Editor({ id }: { id: string }) {
         <PageHead title="编辑照片" />
         {error ? (
           <div className="notice stack" role="alert">
-            <p className="error-text" style={{ margin: 0 }}>{notFound ? '找不到这张照片，它可能已被删除，或者不是你的。' : errMsg(error, '加载失败')}</p>
+            <p className="error-text" style={{ margin: 0 }}>
+              {notFound ? '找不到这张照片，它可能已被删除，或者不是你的。' : errMsg(error, '加载失败')}
+            </p>
             <div className="row">
               {!notFound && (
-                <button type="button" className="btn" onClick={reload}>重试</button>
+                <button type="button" className="btn" onClick={reload}>
+                  重试
+                </button>
               )}
-              <Link href="/" className="btn btn-quiet">回到图库</Link>
+              <Link href="/" className="btn btn-quiet">
+                回到图库
+              </Link>
             </div>
           </div>
         ) : (
@@ -207,7 +240,9 @@ function Editor({ id }: { id: string }) {
         <div className="notice stack">
           <p style={{ margin: 0 }}>只有照片的主人可以编辑它。</p>
           <div className="row">
-            <Link href={`/p/${base.id}`} className="btn">查看照片</Link>
+            <Link href={`/p/${base.id}`} className="btn">
+              查看照片
+            </Link>
           </div>
         </div>
       </main>
@@ -220,14 +255,18 @@ function Editor({ id }: { id: string }) {
   return (
     <main className="page pe">
       <PageHead title="编辑照片" caption={caption || undefined}>
-        <Link href={`/p/${base.id}`} className="btn btn-quiet">查看照片</Link>
+        <Link href={`/p/${base.id}`} className="btn btn-quiet">
+          查看照片
+        </Link>
       </PageHead>
 
       <div className="pe-grid">
         <div className="pe-side stack" style={{ ['--gap' as string]: '20px' }}>
           <FocusStage photo={base} focus={draft.focus} onChange={(f) => patch({ focus: f })} />
           <div className="pe-focus-bar">
-            <p className="small muted" style={{ margin: 0 }}>点击图片，标出主体的位置。方形和横幅裁切会以它为中心。</p>
+            <p className="small muted" style={{ margin: 0 }}>
+              点击图片，标出主体的位置。方形和横幅裁切会以它为中心。
+            </p>
             <button type="button" className="btn btn-quiet" onClick={() => patch({ focus: null })} disabled={!draft.focus || busy}>
               清除焦点
             </button>
@@ -275,11 +314,23 @@ function Editor({ id }: { id: string }) {
             <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={!dirty || busy}>
               {saving ? '保存中…' : '保存修改'}
             </button>
-            <button type="button" className="btn btn-quiet" onClick={() => { setDraft(draftOf(base)); setMsg(null); }} disabled={!dirty || busy}>
+            <button
+              type="button"
+              className="btn btn-quiet"
+              onClick={() => {
+                setDraft(draftOf(base));
+                setMsg(null);
+              }}
+              disabled={!dirty || busy}
+            >
               还原
             </button>
             <span className="small pe-state" role="status" aria-live="polite">
-              {msg ? <span className={msg.ok ? 'sf-ok' : 'error-text'}>{msg.text}</span> : dirty ? <span className="muted">有未保存的修改</span> : null}
+              {msg ? (
+                <span className={msg.ok ? 'sf-ok' : 'error-text'}>{msg.text}</span>
+              ) : dirty ? (
+                <span className="muted">有未保存的修改</span>
+              ) : null}
             </span>
           </div>
 
