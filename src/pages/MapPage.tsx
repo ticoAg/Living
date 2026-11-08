@@ -9,12 +9,13 @@ import { lightTags, SEASONS, seasonOf } from '../browse/facets';
 import { useBoxSize, useDocTitle, useScrollTop } from '../browse/hooks';
 import { livingPlace } from '../browse/links';
 import { fitViewport } from '../browse/mapfit';
+import SwapMap from '../browse/SwapMap';
 import { byTakenDesc } from '../browse/sort';
 import { LoadError, Loading } from '../browse/ui';
 import { replaceQuery, splitIds, useQuery } from '../browse/url';
 import Img from '../components/Img';
 import { CategoryIcon, Icon } from '../components/icons';
-import MapView, { type MapPoint } from '../components/MapView';
+import type { MapPoint } from '../components/MapView';
 import { fmtDay } from '../lib/format';
 import '../styles/browse.css';
 
@@ -201,15 +202,7 @@ export default function MapPage() {
       <div className="mpg-body">
         <div ref={boxRef} className="mpg-map">
           {pois && size ? (
-            <MapView
-              key={city || 'all'}
-              ariaLabel="有照片的地点"
-              points={points}
-              fit={false}
-              center={viewport?.center}
-              zoom={viewport?.zoom ?? 11}
-              className="mpg-frame"
-            />
+            <SwapMap viewKey={city || 'all'} viewport={viewport} ariaLabel="有照片的地点" points={points} />
           ) : (
             <Loading label="地图加载中" />
           )}

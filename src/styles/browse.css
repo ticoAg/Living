@@ -192,7 +192,10 @@ a.pho-strip-all:hover { color: var(--ink); }
 .mpg-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
 .mpg-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 28px 40px; }
 .mpg-map { position: relative; flex: 999 1 620px; min-width: 0; height: clamp(420px, calc(100vh - 250px), 760px); border: 1px solid #C9CDC6; background: var(--land); }
-.mpg-map .mpg-frame { position: absolute; inset: 0; border: 0; }
+.swapmap { position: absolute; inset: 0; }
+.swapmap-layer { position: absolute; inset: 0; transition: opacity 0.26s ease; }
+.swapmap-layer[data-pending='true'] { opacity: 0; pointer-events: none; }
+.swapmap-layer .swapmap-frame { position: absolute; inset: 0; border: 0; }
 .mpg-map .map-pt { min-height: 44px; }
 .mpg-map > .loading { padding: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
 .mpg-none { position: absolute; left: 0; right: 0; bottom: 24px; margin: 0; text-align: center; pointer-events: none; font: 500 16px var(--serif); letter-spacing: 0.12em; color: var(--ink-2); }
