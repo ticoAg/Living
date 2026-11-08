@@ -1,14 +1,19 @@
 // Per-file upload pipeline, run in the browser before anything is sent to the server:
 // EXIF → decode (orientation applied) → three WebP/JPEG sizes → ThumbHash → palette → tone → SHA-256.
 // The generated sizes carry no EXIF. Heavy libraries (exifr, thumbhash, suncalc) are imported lazily so
-// they only load on the upload page. Files are processed one at a time by the caller to bound memory.
+// they only load on the upload page; a HEIC/HEIF file the browser cannot open itself is decoded by libheif
+// (WebAssembly, in a worker) loaded only for that file, see heic.ts. Files are processed one at a time by the
+// caller to bound memory.
 // Docs: /docs/product/features/upload.md, /docs/product/features/hierarchical-tags.md
+
+import { isComplete, isHeif } from './heif';
 
 export const MAX_ORIGINAL_BYTES = 50 * 1024 * 1024;
 export const VARIANT_EDGES = { s: 480, m: 1600, l: 2560 } as const;
 export type VariantKey = keyof typeof VARIANT_EDGES;
 
-export const HEIC_MESSAGE = '浏览器无法解码这张图（HEIC 请在 Safari 上传或先转成 JPEG）';
+/** What `processFile` is doing when it is more specific than "reading and resizing": getting the HEIC decoder, then decoding. */
+export type ProcessPhase = 'heic-load' | 'heic-decode';
 
 export interface ExifSummary {
   /** Local wall-clock capture time, `YYYY-MM-DDTHH:mm:ss` */
@@ -589,9 +594,8 @@ interface Decoded {
   close(): void;
 }
 
-const isHeic = (file: File) => /hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
-
-async function decodeImage(file: File): Promise<Decoded> {
+/** The browser's own decoder, with the file's orientation applied; null when it cannot open the file. */
+async function decodeNatively(file: File): Promise<Decoded | null> {
   if (typeof createImageBitmap === 'function') {
     for (const opts of [{ imageOrientation: 'from-image' as const }, undefined]) {
       try {
@@ -612,7 +616,24 @@ async function decodeImage(file: File): Promise<Decoded> {
     return { source: img, width: img.naturalWidth, height: img.naturalHeight, close: () => URL.revokeObjectURL(url) };
   } catch {
     URL.revokeObjectURL(url);
-    throw new Error(isHeic(file) ? HEIC_MESSAGE : '无法解码这张图片（文件可能已损坏或格式不受支持）');
+    return null;
+  }
+}
+
+async function decodeImage(file: File, onPhase?: (phase: ProcessPhase | null) => void): Promise<Decoded> {
+  const native = await decodeNatively(file);
+  if (native) return native;
+  if (!(await isHeif(file))) throw new Error('无法解码这张图片（文件可能已损坏或格式不受支持）');
+  if (!(await isComplete(file))) throw new Error('这张 HEIC 不完整或已损坏，文件可能在复制或下载时被截断。请重新导出后再上传。');
+
+  // A HEIC/HEIF the browser cannot open (Safari can; Chrome and Firefox cannot): decode it with libheif in a worker. The
+  // pixels come back already upright (libheif applies the file's rotation), so they go through the same pipeline as any other.
+  try {
+    const { decodeHeic } = await import('./heic');
+    const { image, width, height } = await decodeHeic(file, (stage) => onPhase?.(stage === 'load' ? 'heic-load' : 'heic-decode'));
+    return { source: image, width, height, close: () => image.close() };
+  } finally {
+    onPhase?.(null);
   }
 }
 
@@ -638,8 +659,9 @@ function toBase64(bytes: Uint8Array): string {
 /**
  * Run the whole pipeline for one file. Throws an Error with a user-facing Chinese message on failure.
  * Callers process files sequentially; every bitmap and scratch canvas is released before returning.
+ * `onPhase` hears about the HEIC decoder being fetched and running, and `null` when that part is over.
  */
-export async function processFile(file: File): Promise<Processed> {
+export async function processFile(file: File, onPhase?: (phase: ProcessPhase | null) => void): Promise<Processed> {
   if (!file.size) throw new Error('文件是空的');
   if (file.size > MAX_ORIGINAL_BYTES) throw new Error('原图超过 50 MB，无法上传');
   if (/svg/i.test(file.type) || /\.svg$/i.test(file.name)) throw new Error('不支持 SVG，请选择照片文件');
@@ -648,7 +670,7 @@ export async function processFile(file: File): Promise<Processed> {
   await tick();
 
   const out = await pickOutput();
-  const decoded = await decodeImage(file);
+  const decoded = await decodeImage(file, onPhase);
   const canvases: HTMLCanvasElement[] = [];
   try {
     const { width, height } = decoded;

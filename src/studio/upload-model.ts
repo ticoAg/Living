@@ -1,6 +1,6 @@
 import type { CreatePhotoMeta, GeoPrivacy, Visibility } from '../../shared/types';
 import { initialMatch, placeFields, shouldAutoMatch, choiceFromCandidate, type MatchState, type PlaceChoice } from './match';
-import { subjectTagsForCategory, type Processed } from './process';
+import { subjectTagsForCategory, type ProcessPhase, type Processed } from './process';
 import { uid } from './util';
 import type { MatchResponse } from '../../shared/types';
 
@@ -8,6 +8,12 @@ import type { MatchResponse } from '../../shared/types';
 // inferred places, tag suggestions and the POST /api/photos metadata from it.
 
 export type Stage = 'queued' | 'processing' | 'ready' | 'error';
+
+/** What a photo that is `processing` is waiting on when it is more than "reading and resizing": short for the queue row, long for the panel. */
+export const PHASE_TEXT: Record<ProcessPhase, { short: string; long: string }> = {
+  'heic-load': { short: '加载 HEIC 解码器…', long: '这个浏览器不能直接打开 HEIC，正在加载解码器（只在第一张 HEIC 时加载）…' },
+  'heic-decode': { short: '解码 HEIC…', long: '正在解码 HEIC，大尺寸的照片需要几秒…' }
+};
 export interface PublishInfo {
   state: 'idle' | 'sending' | 'done' | 'duplicate' | 'failed';
   /** 0..1 while sending */
@@ -20,6 +26,8 @@ export interface Item {
   id: string;
   file: File;
   stage: Stage;
+  /** while `processing`: the HEIC decoder step in progress, if any */
+  phase: ProcessPhase | null;
   error: string | null;
   p: Processed | null;
   /** object URL of the 480 px variant */
@@ -52,6 +60,7 @@ export function newItem(file: File): Item {
     id: uid(),
     file,
     stage: 'queued',
+    phase: null,
     error: null,
     p: null,
     thumbUrl: null,

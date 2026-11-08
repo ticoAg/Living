@@ -63,7 +63,7 @@ sources:
 | `width` | INTEGER | 非空 | 显示方向下的像素宽度，瀑布流据此占位 |
 | `height` | INTEGER | 非空 | 显示方向下的像素高度 |
 | `file_key` | TEXT | 非空 | 原图的 R2 键 `o/<ownerId>/<photoId>.<ext>`，见 [R2 媒体文件](/data/media.md) |
-| `file_type` | TEXT | 可空 | 原图的 MIME 类型 |
+| `file_type` | TEXT | 可空 | 原图的 MIME 类型，如 `image/jpeg`、`image/heic`、`image/heif` |
 | `file_size` | INTEGER | 可空 | 原图字节数 |
 | `variants` | TEXT | 非空 | JSON：`{"s":{"key","w","h"},"m":{…},"l":{…}}`，`key` 如 `v/<photoId>/s.webp`，长边 480 / 1600 / 2560 |
 | `thumbhash` | TEXT | 可空 | ThumbHash 编码串，浏览器生成，加载前的模糊占位 |

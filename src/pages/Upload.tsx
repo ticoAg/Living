@@ -203,7 +203,9 @@ export default function Upload() {
     patch(next.id, { stage: 'processing', error: null });
     void (async () => {
       try {
-        const p = await processFile(next.file);
+        const p = await processFile(next.file, (phase) => {
+          if (alive.current) patch(next.id, { phase });
+        });
         if (!alive.current) return;
         if (!itemsRef.current.some((i) => i.id === next.id)) return; // removed while processing
         const twin = p.sha256 ? itemsRef.current.find((o) => o.id !== next.id && o.p?.sha256 === p.sha256) : undefined;
@@ -215,7 +217,7 @@ export default function Upload() {
         patch(next.id, { stage: 'ready', p, thumbUrl: URL.createObjectURL(p.variants.s.blob), match: positioned ? freshMatch() : null });
         if (positioned) enqueueMatch(next.id);
       } catch (e) {
-        if (alive.current) patch(next.id, { stage: 'error', error: errMsg(e, '处理失败') });
+        if (alive.current) patch(next.id, { stage: 'error', phase: null, error: errMsg(e, '处理失败') });
       } finally {
         busy.current = false;
         if (alive.current) setKick((k) => k + 1);
@@ -399,7 +401,9 @@ export default function Upload() {
         <Icon name="upload" size={items.length ? 22 : 30} />
         <span className="up-drop-text">
           <span className="up-drop-title serif">{dragging ? '松开以添加' : '拖入照片，或点击选择'}</span>
-          <span className="small muted">JPEG、PNG、WebP、AVIF；HEIC 需在 Safari 中上传。单张不超过 50 MB。</span>
+          <span className="small muted">
+            JPEG、PNG、WebP、AVIF、HEIC（iPhone 照片）。单张不超过 50 MB。Safari 以外的浏览器会先在本地解码 HEIC，比 JPEG 慢一些。
+          </span>
         </span>
       </label>
 

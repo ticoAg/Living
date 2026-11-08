@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from 'react';
 import { Icon } from '../components/icons';
 import { fmtBytes, fmtStamp } from './util';
-import { statusOf, type Item, type Status } from './upload-model';
+import { PHASE_TEXT, statusOf, type Item, type Status } from './upload-model';
 
 /** Status pill for the item in the details panel. */
 export function StatusChip({ item, all }: { item: Item; all: Item[] }) {
@@ -41,7 +41,9 @@ const Row = memo(function Row({ it, statusKey, statusLabel, selected, onSelect, 
         </span>
         <span className="up-q-text">
           <span className="up-q-name">{it.file.name}</span>
-          <span className="up-q-meta small muted mono">{it.p?.exif.takenAt ? fmtStamp(it.p.exif.takenAt) : fmtBytes(it.file.size)}</span>
+          <span className="up-q-meta small muted mono">
+            {it.phase ? PHASE_TEXT[it.phase].short : it.p?.exif.takenAt ? fmtStamp(it.p.exif.takenAt) : fmtBytes(it.file.size)}
+          </span>
           <Chip status={{ key: statusKey, label: statusLabel }} progress={it.publish.progress} />
         </span>
       </button>

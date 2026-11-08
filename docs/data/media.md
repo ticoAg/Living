@@ -21,7 +21,7 @@ R2 存储桶默认私有。启用公开访问会绕过 Worker 里的权限判断
 
 | 键 | 内容 | 谁能读 |
 |---|---|---|
-| `o/<ownerId>/<photoId>.<ext>` | 原图，原样保存（含 EXIF），`<ext>` 随原文件类型 | 只有所有者，经 `/media/o/<ownerId>/<photoId>.<ext>` |
+| `o/<ownerId>/<photoId>.<ext>` | 原图，原样保存（含 EXIF）。`<ext>` 由浏览器报告的 MIME 类型决定，没有类型时看文件扩展名：`jpg`、`png`、`webp`、`avif`、`heic`、`heif` 等 | 只有所有者，经 `/media/o/<ownerId>/<photoId>.<ext>` |
 | `v/<photoId>/<s\|m\|l>.<webp\|jpg>` | 尺寸图 | 按照片可见性，经 `/media/v/<photoId>/<file>` |
 
 [photos](/data/photos.md) 的 `file_key` 存原图的键，`variants` 存三个尺寸图的键和像素尺寸。D1 里的键就是 R2 的键，访问路径是 `/media/` 加上键。
@@ -36,6 +36,7 @@ R2 存储桶默认私有。启用公开访问会绕过 Worker 里的权限判断
 
 - 由浏览器生成：旋正、缩放，重新编码为 WebP，浏览器不支持时用 JPEG。重新编码的图片不带 EXIF，位置和相机序列号等元数据不会随尺寸图公开。见 [决策：浏览器端处理图片](/architecture/decisions/0002-client-side-images.md)。
 - 原图保留全部 EXIF，只有所有者能下载。
+- iPhone 的 HEIC/HEIF 也照原样存成 `.heic` 或 `.heif`，不转码，`file_type` 记 `image/heic` 或 `image/heif`；大多数浏览器显示不了它，所以公开展示只用尺寸图，查看者不需要解码 HEIC。浏览器自己解不开 HEIC 时，由 WebAssembly 解码器解出像素再生成尺寸图，见 [上传与整理](/product/features/upload.md#heic-与-heif)。
 - 前端的响应式图片组件按显示宽度从三档里选用，见 [前端分区](/architecture/frontend.md)。
 - 一张照片共 4 个对象：1 个原图加 3 个尺寸图。
 
