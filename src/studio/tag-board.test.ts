@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { Tag } from '../../shared/types';
 import { buildTagTree } from '../lib/tags';
-import { boardRows, EXCLUSIVE, mergeTags, searchBoard, toggleTag, withTag } from './tag-board';
+import { applyTagEdit, boardChoices, boardRows, commonTags, EXCLUSIVE, firstChoice, searchBoard, toggleTag, withTag } from './tag-board';
 
 const tag = (id: string, name: string, parentId: string | null, sort = 0, over: Partial<Tag> = {}): Tag => ({
   id,
@@ -70,18 +70,45 @@ describe('toggleTag and withTag', () => {
   });
 });
 
-describe('mergeTags', () => {
-  it('adds the tags another photo does not have yet, keeping its own', () => {
-    expect(mergeTags(['food'], ['lake', 'fog'])).toEqual(['food', 'lake', 'fog']);
-    expect(mergeTags(['lake'], ['lake', 'fog'])).toEqual(['lake', 'fog']);
+describe('applyTagEdit', () => {
+  it('adds at the end and takes off', () => {
+    expect(applyTagEdit(['food'], { op: 'add', id: 'lake' })).toEqual(['food', 'lake']);
+    expect(applyTagEdit(['food', 'lake'], { op: 'remove', id: 'food' })).toEqual(['lake']);
+    expect(applyTagEdit(['lake'], { op: 'remove', id: 'fog' })).toEqual(['lake']);
   });
 
-  it('lets the applied season, light or tone replace the other photo’s', () => {
-    expect(mergeTags(['spring', 'food', 'morning'], ['autumn', 'night'])).toEqual(['food', 'autumn', 'night']);
+  it('leaves a photo that has the tag already as it is (several photos get the same tag at once)', () => {
+    expect(applyTagEdit(['lake', 'fog'], { op: 'add', id: 'lake' })).toEqual(['lake', 'fog']);
   });
 
-  it('changes nothing with nothing to add', () => {
-    expect(mergeTags(['spring'], [])).toEqual(['spring']);
+  it('lets an added season, light or tone replace the photo’s own', () => {
+    expect(applyTagEdit(['spring', 'food', 'morning'], { op: 'add', id: 'autumn' })).toEqual(['food', 'morning', 'autumn']);
+    expect(applyTagEdit(['spring', 'food', 'morning'], { op: 'add', id: 'night' })).toEqual(['spring', 'food', 'night']);
+  });
+});
+
+describe('commonTags', () => {
+  it('splits the tags into those every photo has and those only some have', () => {
+    expect(
+      commonTags([
+        ['lake', 'fog', 'spring'],
+        ['fog', 'lake'],
+        ['lake', 'rain', 'fog']
+      ])
+    ).toEqual({
+      all: ['lake', 'fog'],
+      some: ['spring', 'rain']
+    });
+  });
+
+  it('treats one photo as having all of its tags, and no photos as having none', () => {
+    expect(commonTags([['lake', 'fog']])).toEqual({ all: ['lake', 'fog'], some: [] });
+    expect(commonTags([])).toEqual({ all: [], some: [] });
+    expect(commonTags([[], ['lake']])).toEqual({ all: [], some: ['lake'] });
+  });
+
+  it('is not fooled by a tag listed twice', () => {
+    expect(commonTags([['lake', 'lake'], ['fog']])).toEqual({ all: [], some: ['lake', 'fog'] });
   });
 });
 
@@ -138,5 +165,42 @@ describe('searchBoard', () => {
     expect(searchBoard(rows, ' 孩 子 ').rows.map((row) => row.items.map((i) => i.node.name))).toEqual([['孩子']]);
     expect(searchBoard(rows, '咖啡')).toEqual({ rows: [], exact: false });
     expect(searchBoard(rows, '  ').rows).toHaveLength(5);
+  });
+});
+
+describe('boardChoices and firstChoice', () => {
+  const rows = boardRows(TREE);
+
+  it('offers groups and tags in reading order, a person’s own root included, preset roots not', () => {
+    expect(boardChoices(rows).map((n) => n.name)).toEqual([
+      '自然',
+      '湖',
+      '西湖',
+      '山',
+      '生活',
+      '美食',
+      '光线',
+      '晨光',
+      '夜',
+      '天气',
+      '雾',
+      '雨',
+      '春',
+      '秋',
+      '暖',
+      '蓝',
+      '人物',
+      '孩子'
+    ]);
+  });
+
+  it('starts Enter at the exact name, else at the first match', () => {
+    const lake = boardChoices(searchBoard(rows, '湖').rows);
+    expect(lake.map((n) => n.name)).toEqual(['湖', '西湖']);
+    expect(firstChoice(lake, '湖')).toBe(0);
+    expect(firstChoice(boardChoices(searchBoard(rows, '西湖').rows), '西湖')).toBe(0);
+    const weather = boardChoices(searchBoard(rows, '光与天气').rows);
+    expect(firstChoice(weather, '天气')).toBe(weather.findIndex((n) => n.name === '天气'));
+    expect(firstChoice(weather, '光与天气')).toBe(0);
   });
 });

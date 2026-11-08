@@ -1,7 +1,7 @@
 import type { TagNode, TagTree } from '../lib/tags';
 
-// The logic behind the tag board (TagPicker): which preset tags exclude each other, how a selection changes when a
-// tag is toggled or a batch's tags are applied to another photo, and how the tree is laid out as one row per root.
+// The logic behind the tag board (TagPicker): which preset tags exclude each other, how a photo's tags change when one
+// is added or taken off, what several photos have in common, and how the tree is laid out as one row per root.
 // Docs: /docs/product/features/hierarchical-tags.md#打标签
 
 /**
@@ -30,11 +30,35 @@ export function toggleTag(value: readonly string[], id: string): string[] {
   return value.includes(id) ? value.filter((v) => v !== id) : withTag(value, id);
 }
 
-/** Another photo's tags plus `add`; where they clash, `add` wins (applying 秋 to a photo tagged 春 makes it 秋). */
-export function mergeTags(value: readonly string[], add: readonly string[]): string[] {
-  let out = [...value];
-  for (const id of add) if (!out.includes(id)) out = withTag(out, id);
-  return out;
+/** One change to the tags of the photo, or photos, being edited. */
+export interface TagEdit {
+  op: 'add' | 'remove';
+  id: string;
+}
+
+/**
+ * A photo's tags after an edit: an added tag drops the ones it excludes, so 秋 added to a photo tagged 春 makes it 秋;
+ * a photo that has the tag already keeps its tags as they are.
+ */
+export function applyTagEdit(value: readonly string[], e: TagEdit): string[] {
+  if (e.op === 'remove') return value.filter((v) => v !== e.id);
+  return value.includes(e.id) ? [...value] : withTag(value, e.id);
+}
+
+/** For several photos: the tags all of them have and the tags only some have, each in order of first appearance. */
+export function commonTags(lists: readonly (readonly string[])[]): { all: string[]; some: string[] } {
+  const order: string[] = [];
+  const count = new Map<string, number>();
+  for (const list of lists) {
+    for (const id of new Set(list)) {
+      if (!count.has(id)) order.push(id);
+      count.set(id, (count.get(id) ?? 0) + 1);
+    }
+  }
+  return {
+    all: order.filter((id) => count.get(id) === lists.length),
+    some: order.filter((id) => count.get(id)! < lists.length)
+  };
 }
 
 export interface BoardItem {
@@ -89,4 +113,15 @@ export function searchBoard(rows: readonly BoardRow[], query: string): { rows: B
     if (items.length) out.push({ root: row.root, items: items.map((it) => ({ ...it, group: false })) });
   }
   return { rows: out, exact };
+}
+
+/** The tags a (searched) board offers, in reading order: what ↑ ↓ walk through and Enter takes from the search box. */
+export function boardChoices(rows: readonly BoardRow[]): TagNode[] {
+  return rows.flatMap((r) => [...(r.root.ownerId ? [r.root] : []), ...r.items.map((it) => it.node)]);
+}
+
+/** Where Enter starts: the tag named exactly like the query, else the first one offered. */
+export function firstChoice(choices: readonly TagNode[], query: string): number {
+  const at = choices.findIndex((n) => n.name === query.trim());
+  return at >= 0 ? at : 0;
 }

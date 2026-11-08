@@ -1,21 +1,26 @@
-import { useId, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link } from 'wouter';
 import type { Tag } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { api } from '../lib/api';
 import { buildTagTree, isSwatch, swatchFill, type TagNode } from '../lib/tags';
 import { invalidate, useApi } from '../lib/useApi';
-import { boardRows, searchBoard, toggleTag, withTag, type BoardItem } from './tag-board';
+import { boardChoices, boardRows, firstChoice, searchBoard, type BoardItem, type TagEdit } from './tag-board';
 import { errMsg, useKeep } from './util';
 
-// Tag board for the upload form and the photo editor: every tag in view, one row per root (题材 · 光与天气 · 季节 ·
-// 色调 · people's own roots), each a toggle; groups such as 自然 or 天气 start their run of tags. A season, a light and
-// a tone exclude the others of their kind (tag-board.ts). The search box narrows the board and offers to create a tag
-// that does not exist yet. Controlled: `value` is every selected id.
+// Tag board for the upload form, the upload batch panel and the photo editor. The search box holds the chosen tags as
+// tokens; typing narrows the board, ↑ ↓ move through the matches, Enter adds the highlighted one (or offers to create
+// the tag), Backspace in an empty box takes off the last token. Below it every tag is in view, one row per root (题材 ·
+// 光与天气 · 季节 · 色调 · people's own roots), each a toggle; groups such as 自然 or 天气 start their run of tags. A
+// season, a light and a tone exclude the others of their kind (tag-board.ts). Editing several photos at once, a tag
+// only some of them have is drawn half-on; clicking it gives it to all. Docs: /docs/product/features/hierarchical-tags.md#打标签
 
 interface Props {
-  value: string[];
-  onChange: (ids: string[]) => void;
+  /** tags the photo has; editing several, tags every one of them has */
+  value: readonly string[];
+  /** editing several photos: tags only some of them have */
+  mixed?: readonly string[];
+  onEdit: (e: TagEdit) => void;
   disabled?: boolean;
 }
 
@@ -30,15 +35,25 @@ function runs(items: readonly BoardItem[]): BoardItem[][] {
   return out;
 }
 
-export default function TagPicker({ value, onChange, disabled }: Props) {
+export default function TagPicker({ value, mixed = [], onEdit, disabled }: Props) {
   const id = useId();
   const { data, error, reload } = useApi<{ tags: Tag[] }>('/api/tags');
   const kept = useKeep(data);
   const [extra, setExtra] = useState<Tag[]>([]);
   const [q, setQ] = useState('');
+  const [active, setActive] = useState(0);
   const [creating, setCreating] = useState<{ name: string; parent: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const parentRef = useRef<HTMLSelectElement>(null);
+  /** the create form was opened from the keyboard: put the caret on "放在" */
+  const fromKeys = useRef(false);
+  const open = creating !== null;
+  useEffect(() => {
+    if (open && fromKeys.current) parentRef.current?.focus();
+    fromKeys.current = false;
+  }, [open]);
 
   const tags = useMemo(() => {
     const base = kept?.tags ?? [];
@@ -48,12 +63,51 @@ export default function TagPicker({ value, onChange, disabled }: Props) {
   const tree = useMemo(() => buildTagTree(tags), [tags]);
   const rows = useMemo(() => boardRows(tree), [tree]);
   const shown = useMemo(() => searchBoard(rows, q), [rows, q]);
-  const selected = new Set(value);
   const term = q.trim();
+  const choices = useMemo(() => (term ? boardChoices(shown.rows) : []), [shown, term]);
+  const on = new Set(value);
+  const half = new Set(mixed.filter((t) => !on.has(t)));
+  const activeId = choices[Math.min(active, choices.length - 1)]?.id ?? null;
 
   const toggle = (tagId: string) => {
-    if (!disabled) onChange(toggleTag(value, tagId));
+    if (!disabled) onEdit({ op: on.has(tagId) ? 'remove' : 'add', id: tagId });
   };
+
+  const search = (next: string) => {
+    setQ(next);
+    setCreating(null);
+    const t = next.trim();
+    setActive(t ? firstChoice(boardChoices(searchBoard(rows, t).rows), t) : 0);
+  };
+
+  const offerCreate = (keys = false) => {
+    fromKeys.current = keys;
+    setProblem(null);
+    setCreating({ name: term, parent: '' });
+  };
+
+  function onKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.nativeEvent.isComposing) return; // an IME is still turning keystrokes into characters
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!choices.length) return;
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      setActive((a) => (Math.min(a, choices.length - 1) + step + choices.length) % choices.length);
+    } else if (e.key === 'Enter') {
+      if (!term) return;
+      e.preventDefault();
+      if (activeId) {
+        if (!on.has(activeId)) onEdit({ op: 'add', id: activeId });
+        search('');
+      } else offerCreate(true);
+    } else if (e.key === 'Backspace' && !q) {
+      const last = value.length ? value[value.length - 1] : mixed[mixed.length - 1];
+      if (last) onEdit({ op: 'remove', id: last });
+    } else if (e.key === 'Escape' && q) {
+      e.preventDefault();
+      search('');
+    }
+  }
 
   async function create(e: FormEvent) {
     e.preventDefault();
@@ -70,9 +124,10 @@ export default function TagPicker({ value, onChange, disabled }: Props) {
       const res = await api<{ tag: Tag }>('/api/tags', { json: { name, parentId: creating.parent || null } });
       setExtra((prev) => [...prev, res.tag]);
       invalidate('/api/tags');
-      onChange(withTag(value, res.tag.id));
+      onEdit({ op: 'add', id: res.tag.id });
       setCreating(null);
-      setQ('');
+      search('');
+      input.current?.focus();
     } catch (err) {
       setProblem(errMsg(err, '新建标签失败'));
     } finally {
@@ -80,12 +135,16 @@ export default function TagPicker({ value, onChange, disabled }: Props) {
     }
   }
 
+  const name = (tagId: string) => tree.byId.get(tagId)?.name ?? extra.find((t) => t.id === tagId)?.name;
+  const tokens = [...value, ...half].filter((t) => name(t) !== undefined);
+
   const chip = (n: TagNode, group = false) => (
     <button
       key={n.id}
       type="button"
       className={group ? 'tp-grp' : 'tp-chip'}
-      aria-pressed={selected.has(n.id)}
+      aria-pressed={on.has(n.id) ? true : half.has(n.id) ? 'mixed' : false}
+      data-active={n.id === activeId || undefined}
       title={tree.path(n.id).join(' / ')}
       disabled={disabled}
       onClick={() => toggle(n.id)}
@@ -98,26 +157,40 @@ export default function TagPicker({ value, onChange, disabled }: Props) {
   return (
     <div className="tp">
       <div className="tp-bar">
-        <label className="visually-hidden" htmlFor={`${id}-q`}>
-          搜索标签
-        </label>
-        <span className="tp-search">
+        {/* the chosen tags sit in the search box, so what a photo has is always in one place */}
+        <label className="tp-search" htmlFor={`${id}-q`}>
           <Icon name="search" size={15} />
+          {tokens.map((t) => (
+            <span key={t} className="tp-token" data-mixed={half.has(t) || undefined} title={tree.path(t).join(' / ')}>
+              {name(t)}
+              <button
+                type="button"
+                className="tp-token-x"
+                aria-label={`去掉 ${name(t)}`}
+                disabled={disabled}
+                onClick={() => onEdit({ op: 'remove', id: t })}
+              >
+                <Icon name="close" size={11} />
+              </button>
+            </span>
+          ))}
           <input
+            ref={input}
             id={`${id}-q`}
+            aria-label="搜索标签"
             className="tp-q"
             type="search"
             value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setCreating(null);
-            }}
-            placeholder="搜索或新建标签"
+            onChange={(e) => search(e.target.value)}
+            onKeyDown={onKey}
+            placeholder={tokens.length ? '' : '搜索或新建标签'}
             autoComplete="off"
+            enterKeyHint="done"
             maxLength={24}
             disabled={disabled}
+            aria-describedby={term ? `${id}-hint` : undefined}
           />
-        </span>
+        </label>
         <Link href="/studio/tags" className="tp-manage small" target="_blank" rel="noopener">
           管理
         </Link>
@@ -153,20 +226,16 @@ export default function TagPicker({ value, onChange, disabled }: Props) {
             </div>
           ))}
           {term && !shown.exact && !creating && (
-            <button
-              type="button"
-              className="tp-new"
-              disabled={disabled}
-              onClick={() => {
-                setProblem(null);
-                setCreating({ name: term, parent: '' });
-              }}
-            >
+            <button type="button" className="tp-new" disabled={disabled} onClick={() => offerCreate()}>
               <Icon name="plus" size={14} />
               新建「{term}」
             </button>
           )}
-          {term && shown.rows.length === 0 && !creating && <p className="small muted tp-note">没有叫「{term}」的标签</p>}
+          {term && (
+            <p id={`${id}-hint`} className="visually-hidden">
+              {activeId ? `回车添加「${name(activeId)}」` : `回车新建「${term}」`}
+            </p>
+          )}
         </div>
       )}
 
@@ -176,6 +245,7 @@ export default function TagPicker({ value, onChange, disabled }: Props) {
             放在
           </label>
           <select
+            ref={parentRef}
             id={`${id}-parent`}
             className="input select tp-parent"
             value={creating.parent}
@@ -207,7 +277,15 @@ export default function TagPicker({ value, onChange, disabled }: Props) {
           <button type="submit" className="btn btn-primary" disabled={busy || !creating.name.trim()}>
             {busy ? '添加中…' : '添加'}
           </button>
-          <button type="button" className="btn btn-quiet" onClick={() => setCreating(null)} disabled={busy}>
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => {
+              setCreating(null);
+              input.current?.focus();
+            }}
+            disabled={busy}
+          >
             取消
           </button>
           {problem && (

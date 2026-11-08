@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import type { GeoPrivacy, Visibility } from '../../shared/types';
+import { applyTagEdit } from './tag-board';
 import TagPicker from './TagPicker';
 import type { SegOption } from './ui';
 import { Toggle } from './ui';
@@ -16,12 +17,12 @@ export interface FieldsValue {
   favorite: boolean;
 }
 
-const VISIBILITY: SegOption<Visibility>[] = [
+export const VISIBILITY: SegOption<Visibility>[] = [
   { value: 'public', label: '公开', hint: '出现在图库、地图和 Living' },
   { value: 'unlisted', label: '仅链接', hint: '只有拿到链接的人能看到' },
   { value: 'private', label: '仅自己', hint: '只有你自己能看到' }
 ];
-const GEO: SegOption<GeoPrivacy>[] = [
+export const GEO: SegOption<GeoPrivacy>[] = [
   { value: 'exact', label: '精确', hint: '他人看到原始坐标' },
   { value: 'fuzzy', label: '约 500 m', hint: '他人只看到约 500 米精度的位置' },
   { value: 'hidden', label: '隐藏', hint: '他人看不到位置和地点' }
@@ -38,7 +39,8 @@ interface Props {
   disabled?: boolean;
 }
 
-function SegRow<T extends string>({
+/** A labelled row of segmented buttons; `value` null presses none (photos edited together that differ). */
+export function SegRow<T extends string>({
   label,
   value,
   options,
@@ -47,7 +49,7 @@ function SegRow<T extends string>({
   note
 }: {
   label: string;
-  value: T;
+  value: T | null;
   options: SegOption<T>[];
   onChange: (v: T) => void;
   disabled?: boolean;
@@ -124,7 +126,7 @@ export default function PhotoFields({ value, onChange, tags, geoLocked, toggles 
       <div className="pf-row pf-top">
         <span className="pf-k">标签</span>
         <div className="pf-v">
-          <TagPicker value={tags.value} onChange={tags.onChange} disabled={disabled} />
+          <TagPicker value={tags.value} onEdit={(e) => tags.onChange(applyTagEdit(tags.value, e))} disabled={disabled} />
         </div>
       </div>
 

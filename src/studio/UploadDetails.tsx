@@ -1,78 +1,29 @@
 import { Link } from 'wouter';
-import type { ThemeSummary } from '../../shared/types';
-import { useApi } from '../lib/useApi';
 import PhotoFields from './PhotoFields';
-import { statusOf, canPublish, type Item } from './upload-model';
-import { useKeep } from './util';
-
-function ThemePicker({ value, onChange, disabled }: { value: string[]; onChange: (ids: string[]) => void; disabled?: boolean }) {
-  const { data, error, reload } = useApi<{ themes: ThemeSummary[] }>('/api/themes?mine=1');
-  const kept = useKeep(data);
-  const themes = kept?.themes ?? [];
-  if (!kept && !error) return <p className="small muted">主题加载中…</p>;
-  if (!kept && error) {
-    return (
-      <p className="small error-text">
-        主题加载失败。
-        <button type="button" className="btn btn-quiet" onClick={reload}>
-          重试
-        </button>
-      </p>
-    );
-  }
-  if (!themes.length) {
-    return (
-      <p className="small muted up-themes-none">
-        还没有主题，
-        <Link href="/themes/new" target="_blank" rel="noopener">
-          新建一个
-        </Link>
-      </p>
-    );
-  }
-  return (
-    <div className="up-themes" role="group" aria-label="加入主题">
-      {themes.map((t) => {
-        const on = value.includes(t.id);
-        return (
-          <button
-            key={t.id}
-            type="button"
-            className="chip chip-outline up-theme"
-            aria-pressed={on}
-            disabled={disabled}
-            onClick={() => onChange(on ? value.filter((x) => x !== t.id) : [...value, t.id])}
-          >
-            <span>{t.title}</span>
-            <span className="small up-theme-kind">{t.kind === 'trip' ? '旅程' : '专题'}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+import ThemePicker from './ThemePicker';
+import { statusOf, canPublish, isLocked, type Item } from './upload-model';
 
 interface Props {
   item: Item;
   all: Item[];
   onPatch: (id: string, patch: Partial<Item>) => void;
   onPublish: (id: string) => void;
-  onApplyRest: (id: string) => void;
-  unpublishedOthers: number;
 }
 
-/** Right column: title, note, tags, privacy and themes, with the publish bar pinned to its foot. */
-export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRest, unpublishedOthers }: Props) {
+/** Right column for one photo: title, note, tags, privacy and themes, with the publish bar pinned to its foot. */
+export default function UploadDetails({ item, all, onPatch, onPublish }: Props) {
   const status = statusOf(item, all);
   const ready = item.stage === 'ready' && !!item.p;
-  const locked = item.publish.state === 'sending' || item.publish.state === 'done' || item.publish.state === 'duplicate';
+  // the form opens while the file is still being read; only publishing waits for it
+  const open = item.stage !== 'error';
+  const locked = isLocked(item);
   const zone = item.match?.res?.privacyZone ?? null;
   const unplaced = ready && (status.key === 'review' || status.key === 'nogps');
 
   return (
     <div className="up-panel up-details">
-      {!ready && <p className="muted small">照片处理完成后可以填写。</p>}
-      {ready && (
+      {!open && <p className="muted small">这张不会发布。</p>}
+      {open && (
         <>
           <div className="up-form">
             <PhotoFields
@@ -86,7 +37,11 @@ export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRe
             <div className="pf-row pf-top">
               <span className="pf-k">主题</span>
               <div className="pf-v">
-                <ThemePicker value={item.themeIds} onChange={(ids) => onPatch(item.id, { themeIds: ids })} disabled={locked} />
+                <ThemePicker
+                  value={item.themeIds}
+                  onToggle={(id, on) => onPatch(item.id, { themeIds: on ? [...item.themeIds, id] : item.themeIds.filter((x) => x !== id) })}
+                  disabled={locked}
+                />
               </div>
             </div>
           </div>
@@ -135,21 +90,13 @@ export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRe
                 disabled={!canPublish(item, all)}
                 onClick={() => onPublish(item.id)}
               >
-                {item.publish.state === 'sending'
-                  ? `发布中 ${Math.round(item.publish.progress * 100)}%`
-                  : item.publish.state === 'failed'
-                    ? '重试发布'
-                    : '发布'}
-              </button>
-            )}
-            {!locked && unpublishedOthers > 0 && (
-              <button
-                type="button"
-                className="btn btn-quiet up-apply"
-                title="标签加到其余照片上；公开范围、位置精度和主题照这张设置"
-                onClick={() => onApplyRest(item.id)}
-              >
-                标签和设置套用到其余 {unpublishedOthers} 张
+                {!ready
+                  ? '处理中…'
+                  : item.publish.state === 'sending'
+                    ? `发布中 ${Math.round(item.publish.progress * 100)}%`
+                    : item.publish.state === 'failed'
+                      ? '重试发布'
+                      : '发布'}
               </button>
             )}
           </div>

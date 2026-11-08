@@ -177,9 +177,61 @@ export function canPublish(it: Item, all: Item[]): boolean {
   return s !== 'processing' && s !== 'sending' && s !== 'published' && s !== 'duplicate';
 }
 
-/** Photos that "发布全部已匹配" sends. */
-export const isBulkReady = (it: Item, all: Item[]) =>
-  it.stage === 'ready' && it.publish.state === 'idle' && statusOf(it, all).key === 'matched';
+/** Sent, being sent or already on the site: nothing left to edit or send. */
+export const isLocked = (it: Item) => it.publish.state === 'sending' || it.publish.state === 'done' || it.publish.state === 'duplicate';
+
+/** Can still be edited, alone or in a selection: not locked and not a file that could not be read. */
+export const isEditable = (it: Item) => it.stage !== 'error' && !isLocked(it);
+
+/** Will "全部发布" send it, now or once it is processed: not on the site, not in flight, not unreadable. */
+export const inBulk = (it: Item) => it.stage !== 'error' && (it.publish.state === 'idle' || it.publish.state === 'failed');
+
+const unsettled = (o: Item) => o.stage === 'queued' || o.stage === 'processing' || !!o.match?.loading;
+
+/**
+ * Can "全部发布" send it right now, as it is: processed and its place match back. A photo without GPS whose place may
+ * come from a neighbour taken around the same time also waits until no other photo is still being read or matched.
+ */
+export function bulkSendable(it: Item, all: Item[]): boolean {
+  if (it.stage !== 'ready' || !it.p || !inBulk(it) || it.match?.loading) return false;
+  if (!hasGps(it) && !it.place && !it.cleared) return !all.some((o) => o.id !== it.id && unsettled(o));
+  return true;
+}
+
+/**
+ * How a click in the queue picks: a plain click shows one photo; ctrl/⌘ adds or drops a photo, starting from the one
+ * on screen as in a file manager; a checkbox adds or drops just its own photo; shift takes the run from the last click.
+ */
+export type PickHow = 'one' | 'toggle' | 'check' | 'range';
+
+/**
+ * The queue's selection after a click on `id`: the photo on screen, and the checked photos in queue order. Two or
+ * more checked photos are edited together; with one checked, the checkboxes stay out while the next is picked.
+ */
+export function pickRows(
+  order: readonly string[],
+  checked: readonly string[],
+  current: string | null,
+  id: string,
+  how: PickHow,
+  from: string | null
+): { checked: string[]; current: string } {
+  if (how === 'one') return { checked: [], current: id };
+  let set: Set<string>;
+  if (how === 'range') {
+    const a = order.indexOf(from ?? current ?? id);
+    const b = order.indexOf(id);
+    set = new Set(a < 0 || b < 0 ? [id] : order.slice(Math.min(a, b), Math.max(a, b) + 1));
+  } else {
+    set = new Set(checked.length || how === 'check' || !current ? checked : [current]);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+  }
+  const list = order.filter((x) => set.has(x));
+  if (!list.length) return { checked: [], current: id };
+  const keep = set.has(id) ? id : current;
+  return { checked: list, current: keep && set.has(keep) ? keep : list[list.length - 1] };
+}
 
 /** What happens when a match response arrives: record it and make the automatic decision once. */
 export function applyMatch(cur: Item, res: MatchResponse, radius: number): Partial<Item> {

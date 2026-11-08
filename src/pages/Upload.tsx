@@ -1,31 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
-import type { Poi } from '../../shared/types';
+import type { Poi, Tag } from '../../shared/types';
 import { Icon } from '../components/icons';
-import { invalidate } from '../lib/useApi';
+import { invalidate, useApi } from '../lib/useApi';
 import { DEFAULT_RADIUS, initialMatch, matchPois, type PlaceChoice } from '../studio/match';
 import { processFile } from '../studio/process';
 import { uploadPhoto } from '../studio/publish';
-import { mergeTags } from '../studio/tag-board';
 import { PageHead } from '../studio/ui';
+import UploadBatch from '../studio/UploadBatch';
 import UploadDetails from '../studio/UploadDetails';
 import UploadItemPanel from '../studio/UploadItemPanel';
 import UploadQueue from '../studio/UploadQueue';
 import {
   applyMatch,
   buildForm,
+  bulkSendable,
   coordsOf,
   freshMatch,
-  isBulkReady,
+  inBulk,
+  isEditable,
   newItem,
+  pickRows,
+  placeOf,
   statusOf,
   type Item,
+  type PickHow,
   type StatusKey
 } from '../studio/upload-model';
-import { errMsg, useLeaveGuard, useRequireLogin, useTitle } from '../studio/util';
+import { errMsg, useKeep, useLeaveGuard, useRequireLogin, useTitle } from '../studio/util';
 import '../styles/studio.css';
 
-// /upload — drop photos, let the browser read and resize them, confirm places, publish.
-// Docs: /docs/product/features/upload.md and poi-matching.md
+// /upload — drop photos, let the browser read and resize them, confirm places, tag them one by one or several at a
+// time, publish one, a selection or everything. Docs: /docs/product/features/upload.md and poi-matching.md
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|avif|heic|heif|gif|bmp|tiff?)$/i;
 const isImage = (f: File) => f.type.startsWith('image/') || IMAGE_EXT.test(f.name);
@@ -45,6 +50,15 @@ const SUMMARY: { key: StatusKey; label: string }[] = [
 
 const EMPTY_BLOB = new Blob([]);
 
+/** The line a publishing run leaves behind. */
+function runSummary(t: { done: number; duplicate: number; failed: number }, stopped: boolean): string | null {
+  const parts = [`已发布 ${t.done} 张`];
+  if (t.duplicate) parts.push(`${t.duplicate} 张以前传过`);
+  if (t.failed) parts.push(`${t.failed} 张失败，可以重试`);
+  if (!stopped && !t.duplicate && !t.failed && !t.done) return null;
+  return `${stopped ? '已停止。' : ''}${parts.join('，')}。`;
+}
+
 export default function Upload() {
   useTitle('上传');
   const { ready } = useRequireLogin();
@@ -52,6 +66,8 @@ export default function Upload() {
   const [items, setItems] = useState<Item[]>([]);
   const itemsRef = useRef<Item[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** checked photos, in queue order; two or more are edited together */
+  const [checked, setChecked] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [extras, setExtras] = useState<Poi[]>([]);
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
@@ -62,10 +78,20 @@ export default function Upload() {
   const busy = useRef(false);
   const dragDepth = useRef(0);
   const stopBulk = useRef(false);
+  const bulkOn = useRef(false);
+  const rangeFrom = useRef<string | null>(null);
+  /** a publishing run waiting for photos to be processed or matched */
+  const waiters = useRef<(() => void)[]>([]);
   const inflight = useRef(new Set<string>());
   const matchChain = useRef<Promise<void>>(Promise.resolve());
   const matchSeq = useRef(new Map<string, number>());
   const radiusTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  const wake = useCallback(() => {
+    const ws = waiters.current;
+    waiters.current = [];
+    for (const w of ws) w();
+  }, []);
 
   useEffect(() => {
     alive.current = true;
@@ -74,15 +100,20 @@ export default function Upload() {
       alive.current = false;
       timers.forEach(clearTimeout);
       for (const it of itemsRef.current) if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+      wake();
     };
-  }, []);
+  }, [wake]);
 
   /** All queue changes go through here so `itemsRef` is always current for async code. */
-  const update = useCallback((fn: (prev: Item[]) => Item[]) => {
-    const next = fn(itemsRef.current);
-    itemsRef.current = next;
-    setItems(next);
-  }, []);
+  const update = useCallback(
+    (fn: (prev: Item[]) => Item[]) => {
+      const next = fn(itemsRef.current);
+      itemsRef.current = next;
+      setItems(next);
+      wake();
+    },
+    [wake]
+  );
   const patch = useCallback(
     (id: string, p: Partial<Item> | ((cur: Item) => Partial<Item>)) =>
       update((prev) => prev.map((it) => (it.id === id ? { ...it, ...(typeof p === 'function' ? p(it) : p) } : it))),
@@ -287,25 +318,57 @@ export default function Upload() {
     [publishOne]
   );
 
-  const publishAll = useCallback(async () => {
-    const ids = itemsRef.current.filter((i) => isBulkReady(i, itemsRef.current)).map((i) => i.id);
-    if (!ids.length) return;
-    stopBulk.current = false;
-    setBulk({ done: 0, total: ids.length });
-    let done = 0;
-    for (const id of ids) {
-      if (stopBulk.current || !alive.current) break;
-      const cur = itemsRef.current.find((i) => i.id === id);
-      if (!cur || !isBulkReady(cur, itemsRef.current)) {
-        done++;
-        continue; // changed since the click
+  /**
+   * Publish these photos as they are, one after another. Photos still being read or matched are waited for; each
+   * photo is tried once, and one sent by hand meanwhile is left alone.
+   */
+  const publishMany = useCallback(
+    async (ids: readonly string[]) => {
+      if (bulkOn.current) return;
+      const left = new Set(ids.filter((id) => itemsRef.current.some((i) => i.id === id && inBulk(i))));
+      const total = left.size;
+      if (!total) return;
+      bulkOn.current = true;
+      stopBulk.current = false;
+      const tally = { done: 0, duplicate: 0, failed: 0 };
+      setBulk({ done: 0, total });
+      setNotice(null);
+      try {
+        while (left.size && !stopBulk.current && alive.current) {
+          const list = itemsRef.current;
+          let next: string | null = null;
+          for (const id of left) {
+            const it = list.find((i) => i.id === id);
+            if (!it || !inBulk(it)) left.delete(id); // removed, unreadable, or sent by hand
+            else if (!next && bulkSendable(it, list)) next = id;
+          }
+          if (next) {
+            left.delete(next);
+            await publishOne(next);
+            const state = itemsRef.current.find((i) => i.id === next)?.publish.state;
+            if (state === 'done') tally.done++;
+            else if (state === 'duplicate') tally.duplicate++;
+            else if (state === 'failed') tally.failed++;
+          } else if (left.size) {
+            await new Promise<void>((resolve) => waiters.current.push(resolve));
+          }
+          if (alive.current) setBulk({ done: total - left.size, total });
+        }
+      } finally {
+        bulkOn.current = false;
+        if (alive.current) {
+          setBulk(null);
+          setNotice(runSummary(tally, left.size > 0));
+        }
       }
-      await publishOne(id);
-      done++;
-      if (alive.current) setBulk({ done, total: ids.length });
-    }
-    if (alive.current) setBulk(null);
-  }, [publishOne]);
+    },
+    [publishOne]
+  );
+
+  const stopPublishing = useCallback(() => {
+    stopBulk.current = true;
+    wake();
+  }, [wake]);
 
   /* ------------------------------------------------------------ item actions */
 
@@ -339,45 +402,86 @@ export default function Upload() {
   const onCreated = useCallback((poi: Poi) => setExtras((prev) => (prev.some((x) => x.id === poi.id) ? prev : [...prev, poi])), []);
   const onRetryProcess = useCallback((id: string) => patch(id, { stage: 'queued', error: null }), [patch]);
 
-  const settled = (i: Item) => i.publish.state === 'done' || i.publish.state === 'duplicate' || i.publish.state === 'sending';
-  const applyRest = useCallback(
-    (fromId: string) => {
-      const src = itemsRef.current.find((i) => i.id === fromId);
-      if (!src) return;
-      update((prev) =>
-        prev.map((it) =>
-          it.id === fromId || it.stage !== 'ready' || settled(it)
-            ? it
-            : {
-                ...it,
-                tags: mergeTags(it.tags, src.tags),
-                visibility: src.visibility,
-                geoPrivacy: it.match?.res?.privacyZone ? 'hidden' : src.geoPrivacy,
-                geoTouched: it.geoTouched || src.geoTouched,
-                themeIds: [...src.themeIds]
-              }
-        )
-      );
-      setNotice('已套用到其余未发布的照片。');
+  /* ------------------------------------------------------------ selection */
+
+  const onPickRow = useCallback(
+    (id: string, how: PickHow) => {
+      const order = itemsRef.current.map((i) => i.id);
+      const cur = itemsRef.current.some((i) => i.id === selectedId) ? selectedId : (order[0] ?? null);
+      const next = pickRows(order, checked, cur, id, how, rangeFrom.current);
+      if (how !== 'range') rangeFrom.current = id;
+      setChecked(next.checked);
+      setSelectedId(next.current);
     },
-    [update]
+    [checked, selectedId]
   );
+
+  /** Change every selected photo that can still be edited. */
+  const editPicked = useCallback(
+    (fn: (it: Item) => Partial<Item>) => {
+      const ids = new Set(checked);
+      update((prev) => prev.map((it) => (ids.has(it.id) && isEditable(it) ? { ...it, ...fn(it) } : it)));
+    },
+    [checked, update]
+  );
+
+  const publishPicked = useCallback(async () => {
+    await publishMany(checked);
+    if (!alive.current) return;
+    // what did not go out stays checked, so it can be fixed and sent again
+    setChecked(checked.filter((id) => itemsRef.current.some((i) => i.id === id && inBulk(i))));
+  }, [checked, publishMany]);
 
   /* ------------------------------------------------------------ derived */
 
+  const { data: tagData } = useApi<{ tags: Tag[] }>(ready ? '/api/tags' : null);
+  const tagList = useKeep(tagData)?.tags;
+  const tagNames = useMemo(() => new Map((tagList ?? []).map((t) => [t.id, t.name])), [tagList]);
+
   const selected = useMemo(() => items.find((i) => i.id === selectedId) ?? items[0] ?? null, [items, selectedId]);
   const statuses = useMemo(() => items.map((it) => statusOf(it, items)), [items]);
+  const places = useMemo(
+    () => items.map((it, i) => (statuses[i].key === 'matched' ? (placeOf(it, items)?.name ?? null) : null)),
+    [items, statuses]
+  );
+  const tagLines = useMemo(
+    () =>
+      items.map((it) =>
+        it.tags
+          .map((id) => tagNames.get(id))
+          .filter(Boolean)
+          .join(' · ')
+      ),
+    [items, tagNames]
+  );
   const counts = useMemo(() => {
     const c = new Map<StatusKey, number>();
     for (const s of statuses) c.set(s.key, (c.get(s.key) ?? 0) + 1);
     return c;
   }, [statuses]);
-  const bulkCount = useMemo(
-    () => items.filter((it, i) => it.stage === 'ready' && it.publish.state === 'idle' && statuses[i].key === 'matched').length,
-    [items, statuses]
-  );
+  const picked = useMemo(() => {
+    const ids = new Set(checked);
+    return items.filter((i) => ids.has(i.id));
+  }, [items, checked]);
+  const batch = picked.length > 1;
+  const pickedIds = useMemo(() => new Set(picked.map((i) => i.id)), [picked]);
+  const toSend = items.filter(inBulk).length;
+  const selectable = items.filter(isEditable);
+  const allPicked = selectable.length > 0 && selectable.every((i) => pickedIds.has(i.id));
   const publishedCount = (counts.get('published') ?? 0) + (counts.get('duplicate') ?? 0);
-  const othersOpen = selected ? items.filter((i) => i.id !== selected.id && i.stage === 'ready' && !settled(i)).length : 0;
+
+  // Esc drops a selection (but not while typing in a field)
+  const selecting = picked.length > 0;
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (e.target instanceof Element && e.target.closest('input:not([type=checkbox]), textarea, select, [contenteditable]')) return;
+      setChecked([]);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selecting]);
 
   // Unpublished photos live only in this tab.
   const unsaved = items.some((i) => i.stage !== 'error' && i.publish.state !== 'done' && i.publish.state !== 'duplicate');
@@ -396,6 +500,7 @@ export default function Upload() {
       onDrop={onDrop}
       data-dragging={dragging}
       data-filled={filled}
+      data-batch={batch}
     >
       {!filled && <PageHead title="上传" caption="照片在浏览器里处理，确认后才会发到站点。关掉页面，没发布的照片不会入库。" />}
 
@@ -425,9 +530,21 @@ export default function Upload() {
         <div className="up-grid">
           <aside className="up-col up-col-queue" aria-label="队列">
             <div className="up-queue-head">
-              <h2 className="up-h serif">
-                队列 <span className="mono">{items.length}</span>
-              </h2>
+              <div className="up-queue-title">
+                <h2 className="up-h serif">
+                  队列 <span className="mono">{items.length}</span>
+                </h2>
+                {selectable.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-quiet up-pickall"
+                    aria-pressed={allPicked}
+                    onClick={() => setChecked(allPicked ? [] : selectable.map((i) => i.id))}
+                  >
+                    {allPicked ? '取消全选' : '全选'}
+                  </button>
+                )}
+              </div>
               <div className="up-summary small" aria-label="状态统计">
                 {SUMMARY.filter((s) => counts.get(s.key)).map((s) => (
                   <span key={s.key} className="up-chip" data-status={s.key}>
@@ -436,11 +553,17 @@ export default function Upload() {
                 ))}
               </div>
               <div className="up-bulk">
-                <button type="button" className="btn btn-primary" disabled={!!bulk || bulkCount === 0} onClick={() => void publishAll()}>
-                  {bulk ? `发布中 ${bulk.done} / ${bulk.total}` : `发布全部已匹配（${bulkCount}）`}
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!!bulk || toSend === 0}
+                  title="照原样发布队列里所有还没发的照片；没确认地点的不关联地点"
+                  onClick={() => void publishMany(items.filter(inBulk).map((i) => i.id))}
+                >
+                  {bulk ? `发布中 ${bulk.done} / ${bulk.total}` : `全部发布（${toSend}）`}
                 </button>
                 {bulk && (
-                  <button type="button" className="btn btn-quiet" onClick={() => (stopBulk.current = true)}>
+                  <button type="button" className="btn btn-quiet" onClick={stopPublishing}>
                     停止
                   </button>
                 )}
@@ -451,7 +574,17 @@ export default function Upload() {
                 )}
               </div>
             </div>
-            <UploadQueue items={items} statuses={statuses} selectedId={selected.id} onSelect={setSelectedId} onRemove={remove} />
+            <UploadQueue
+              items={items}
+              statuses={statuses}
+              places={places}
+              tagLines={tagLines}
+              currentId={selected.id}
+              checked={pickedIds}
+              selecting={selecting}
+              onPick={onPickRow}
+              onRemove={remove}
+            />
           </aside>
 
           <section className="up-col up-col-match" aria-label="照片与地点">
@@ -469,15 +602,25 @@ export default function Upload() {
           </section>
 
           <section className="up-col up-col-details" aria-label="整理">
-            <UploadDetails
-              key={selected.id}
-              item={selected}
-              all={items}
-              onPatch={onPatch}
-              onPublish={(id) => void publishAndAdvance(id)}
-              onApplyRest={applyRest}
-              unpublishedOthers={othersOpen}
-            />
+            {batch ? (
+              <UploadBatch
+                items={picked}
+                onEdit={editPicked}
+                onPublish={() => void publishPicked()}
+                onClear={() => setChecked([])}
+                onShow={setSelectedId}
+                shownId={selected.id}
+                bulk={bulk}
+              />
+            ) : (
+              <UploadDetails
+                key={selected.id}
+                item={selected}
+                all={items}
+                onPatch={onPatch}
+                onPublish={(id) => void publishAndAdvance(id)}
+              />
+            )}
           </section>
         </div>
       )}
