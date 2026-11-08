@@ -5,6 +5,7 @@ import { invalidate } from '../lib/useApi';
 import { DEFAULT_RADIUS, initialMatch, matchPois, type PlaceChoice } from '../studio/match';
 import { processFile } from '../studio/process';
 import { uploadPhoto } from '../studio/publish';
+import { mergeTags } from '../studio/tag-board';
 import { PageHead } from '../studio/ui';
 import UploadDetails from '../studio/UploadDetails';
 import UploadItemPanel from '../studio/UploadItemPanel';
@@ -349,6 +350,7 @@ export default function Upload() {
             ? it
             : {
                 ...it,
+                tags: mergeTags(it.tags, src.tags),
                 visibility: src.visibility,
                 geoPrivacy: it.match?.res?.privacyZone ? 'hidden' : src.geoPrivacy,
                 geoTouched: it.geoTouched || src.geoTouched,
@@ -383,6 +385,8 @@ export default function Upload() {
 
   if (!ready) return <p className="loading">加载中</p>;
 
+  const filled = items.length > 0;
+
   return (
     <main
       className="page up"
@@ -391,25 +395,31 @@ export default function Upload() {
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       data-dragging={dragging}
+      data-filled={filled}
     >
-      <PageHead title="上传" caption="照片在浏览器里处理，确认后才会发到站点。关掉页面，没发布的照片不会入库。" />
+      {!filled && <PageHead title="上传" caption="照片在浏览器里处理，确认后才会发到站点。关掉页面，没发布的照片不会入库。" />}
 
-      <label className="up-drop" data-active={dragging} data-compact={items.length > 0}>
-        <input type="file" multiple accept="image/*,.heic,.heif,.avif" className="visually-hidden" onChange={onPick} />
-        <Icon name="upload" size={items.length ? 22 : 30} />
-        <span className="up-drop-text">
-          <span className="up-drop-title serif">{dragging ? '松开以添加' : '拖入照片，或点击选择'}</span>
-          <span className="small muted">
-            JPEG、PNG、WebP、AVIF、HEIC（iPhone 照片）。单张不超过 50 MB。Safari 以外的浏览器会先在本地解码 HEIC，比 JPEG 慢一些。
+      {/* with photos queued, the heading and the drop zone shrink to one bar so the workspace below fits the window */}
+      <div className="up-top">
+        {filled && <h1 className="display up-title">上传</h1>}
+        <label className="up-drop" data-active={dragging} data-compact={filled}>
+          <input type="file" multiple accept="image/*,.heic,.heif,.avif" className="visually-hidden" onChange={onPick} />
+          <Icon name="upload" size={filled ? 20 : 30} />
+          <span className="up-drop-text">
+            <span className="up-drop-title serif">{dragging ? '松开以添加' : filled ? '添加照片' : '拖入照片，或点击选择'}</span>
+            <span className="small muted">
+              {filled
+                ? '拖入或点击 · JPEG、PNG、WebP、AVIF、HEIC，单张不超过 50 MB'
+                : 'JPEG、PNG、WebP、AVIF、HEIC（iPhone 照片）。单张不超过 50 MB。Safari 以外的浏览器会先在本地解码 HEIC，比 JPEG 慢一些。'}
+            </span>
           </span>
-        </span>
-      </label>
-
-      {notice && (
-        <p className="notice up-notice" role="status">
-          {notice}
-        </p>
-      )}
+        </label>
+        {notice && (
+          <p className="notice up-notice small" role="status">
+            {notice}
+          </p>
+        )}
+      </div>
 
       {items.length > 0 && selected && (
         <div className="up-grid">

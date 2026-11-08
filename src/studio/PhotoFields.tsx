@@ -1,9 +1,11 @@
 import { useId } from 'react';
 import type { GeoPrivacy, Visibility } from '../../shared/types';
 import TagPicker from './TagPicker';
-import { Seg, Toggle } from './ui';
+import type { SegOption } from './ui';
+import { Toggle } from './ui';
 
-// The fields shared by the upload details column and the photo editor.
+// The fields shared by the upload details column and the photo editor, laid out as a compact form: a short label on
+// the left of each control, so the whole set fits beside the photo without scrolling.
 
 export interface FieldsValue {
   title: string;
@@ -14,21 +16,21 @@ export interface FieldsValue {
   favorite: boolean;
 }
 
-const VISIBILITY = [
-  { value: 'public' as const, label: '公开', hint: '出现在图库、地图和 Living' },
-  { value: 'unlisted' as const, label: '仅链接', hint: '只有拿到链接的人能看到' },
-  { value: 'private' as const, label: '仅自己', hint: '只有你自己能看到' }
+const VISIBILITY: SegOption<Visibility>[] = [
+  { value: 'public', label: '公开', hint: '出现在图库、地图和 Living' },
+  { value: 'unlisted', label: '仅链接', hint: '只有拿到链接的人能看到' },
+  { value: 'private', label: '仅自己', hint: '只有你自己能看到' }
 ];
-const GEO = [
-  { value: 'exact' as const, label: '精确', hint: '他人看到原始坐标' },
-  { value: 'fuzzy' as const, label: '约 500 m', hint: '他人只看到约 500 米精度的位置' },
-  { value: 'hidden' as const, label: '隐藏', hint: '他人看不到位置和地点' }
+const GEO: SegOption<GeoPrivacy>[] = [
+  { value: 'exact', label: '精确', hint: '他人看到原始坐标' },
+  { value: 'fuzzy', label: '约 500 m', hint: '他人只看到约 500 米精度的位置' },
+  { value: 'hidden', label: '隐藏', hint: '他人看不到位置和地点' }
 ];
 
 interface Props {
   value: FieldsValue;
   onChange: (patch: Partial<FieldsValue>) => void;
-  tags: { value: string[]; suggested?: string[]; onChange: (ids: string[]) => void };
+  tags: { value: string[]; onChange: (ids: string[]) => void };
   /** why location precision cannot be changed (photo inside a privacy zone) */
   geoLocked?: string | null;
   /** show the Living and favourite switches (the photo editor does; the upload form keeps their defaults) */
@@ -36,73 +38,125 @@ interface Props {
   disabled?: boolean;
 }
 
+function SegRow<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+  note
+}: {
+  label: string;
+  value: T;
+  options: SegOption<T>[];
+  onChange: (v: T) => void;
+  disabled?: boolean;
+  note?: string;
+}) {
+  const id = useId();
+  return (
+    <div className="pf-row">
+      <span className="pf-k" id={id}>
+        {label}
+      </span>
+      <div className="pf-v">
+        <div className="seg sf-seg pf-seg" role="group" aria-labelledby={id}>
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={value === o.value}
+              title={o.hint}
+              disabled={disabled}
+              onClick={() => onChange(o.value)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        {note && <span className="small muted pf-note">{note}</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function PhotoFields({ value, onChange, tags, geoLocked, toggles = true, disabled }: Props) {
   const id = useId();
   return (
-    <div className="stack pf" style={{ ['--gap' as string]: '20px' }}>
-      <div className="field">
-        <label className="label" htmlFor={`${id}-title`}>
-          标题（可不填）
+    <div className="pf">
+      <div className="pf-row">
+        <label className="pf-k" htmlFor={`${id}-title`}>
+          标题
         </label>
-        <input
-          id={`${id}-title`}
-          className="input"
-          value={value.title}
-          onChange={(e) => onChange({ title: e.target.value })}
-          maxLength={120}
-          disabled={disabled}
-          autoComplete="off"
-        />
+        <div className="pf-v">
+          <input
+            id={`${id}-title`}
+            className="input pf-input"
+            value={value.title}
+            onChange={(e) => onChange({ title: e.target.value })}
+            maxLength={120}
+            placeholder="可不填"
+            disabled={disabled}
+            autoComplete="off"
+          />
+        </div>
       </div>
 
-      <div className="field">
-        <label className="label" htmlFor={`${id}-note`}>
+      <div className="pf-row pf-top">
+        <label className="pf-k" htmlFor={`${id}-note`}>
           笔记
         </label>
-        <textarea
-          id={`${id}-note`}
-          className="textarea"
-          value={value.note}
-          onChange={(e) => onChange({ note: e.target.value })}
-          maxLength={5000}
-          rows={4}
-          placeholder="写几句：当时的天气、人、路线……"
-          disabled={disabled}
-        />
-        {value.note.length > 4000 && <span className="small muted mono pf-count">{value.note.length} / 5000</span>}
+        <div className="pf-v">
+          <textarea
+            id={`${id}-note`}
+            className="textarea pf-input"
+            value={value.note}
+            onChange={(e) => onChange({ note: e.target.value })}
+            maxLength={5000}
+            rows={3}
+            placeholder="当时的天气、人、路线……"
+            disabled={disabled}
+          />
+          {value.note.length > 4000 && <span className="small muted mono pf-count">{value.note.length} / 5000</span>}
+        </div>
       </div>
 
-      <div className="field">
-        <span className="label">标签</span>
-        <TagPicker value={tags.value} suggested={tags.suggested} onChange={tags.onChange} disabled={disabled} />
+      <div className="pf-row pf-top">
+        <span className="pf-k">标签</span>
+        <div className="pf-v">
+          <TagPicker value={tags.value} onChange={tags.onChange} disabled={disabled} />
+        </div>
       </div>
 
-      <Seg
-        label="公开范围"
+      <SegRow
+        label="公开"
         value={value.visibility}
         options={VISIBILITY}
         onChange={(v) => onChange({ visibility: v })}
         disabled={disabled}
       />
-      <Seg
-        label="位置精度"
+      <SegRow
+        label="位置"
         value={value.geoPrivacy}
         options={GEO}
         onChange={(v) => onChange({ geoPrivacy: v })}
         disabled={disabled || !!geoLocked}
-        hint={geoLocked ?? '对他人生效，你自己始终看到原值'}
+        note={geoLocked ?? undefined}
       />
 
       {toggles && (
-        <div className="pf-toggles">
-          <Toggle
-            label="进入 Living"
-            hint="参与全屏轮播"
-            checked={value.inLiving}
-            onChange={(v) => onChange({ inLiving: v })}
-            disabled={disabled}
-          />
-          <Toggle label="收藏" checked={value.favorite} onChange={(v) => onChange({ favorite: v })} disabled={disabled} />
+        <div className="pf-row">
+          <span className="pf-k" aria-hidden="true" />
+          <div className="pf-v pf-toggles">
+            <Toggle
+              label="进入 Living"
+              hint="参与全屏轮播"
+              checked={value.inLiving}
+              onChange={(v) => onChange({ inLiving: v })}
+              disabled={disabled}
+            />
+            <Toggle label="收藏" checked={value.favorite} onChange={(v) => onChange({ favorite: v })} disabled={disabled} />
+          </div>
         </div>
       )}
     </div>

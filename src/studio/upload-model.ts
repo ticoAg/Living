@@ -1,11 +1,11 @@
 import type { CreatePhotoMeta, GeoPrivacy, Visibility } from '../../shared/types';
 import { initialMatch, placeFields, shouldAutoMatch, choiceFromCandidate, type MatchState, type PlaceChoice } from './match';
-import { subjectTagsForCategory, type ProcessPhase, type Processed } from './process';
+import type { ProcessPhase, Processed } from './process';
 import { uid } from './util';
 import type { MatchResponse } from '../../shared/types';
 
 // The upload queue's data model: one Item per file, plus the pure functions that derive status,
-// inferred places, tag suggestions and the POST /api/photos metadata from it.
+// inferred places and the POST /api/photos metadata from it.
 
 export type Stage = 'queued' | 'processing' | 'ready' | 'error';
 
@@ -41,10 +41,8 @@ export interface Item {
   cleared: boolean;
   title: string;
   note: string;
-  /** tags chosen by hand */
-  picked: string[];
-  /** suggestions the user switched off */
-  dismissed: string[];
+  /** tag ids, in the order they were chosen */
+  tags: string[];
   visibility: Visibility;
   geoPrivacy: GeoPrivacy;
   /** the user changed location precision themselves */
@@ -70,8 +68,7 @@ export function newItem(file: File): Item {
     cleared: false,
     title: '',
     note: '',
-    picked: [],
-    dismissed: [],
+    tags: [],
     visibility: 'public',
     geoPrivacy: 'exact',
     geoTouched: false,
@@ -155,29 +152,6 @@ export function customAtFor(it: Item, all: Item[]): { lat: number; lng: number }
   return hit ? coordsOf(hit.other) : null;
 }
 
-export function suggestionsFor(it: Item, all: Item[]): string[] {
-  if (!it.p) return [];
-  const out: string[] = [];
-  for (const id of [...subjectTagsForCategory(placeOf(it, all)?.category), ...it.p.suggestedTagIds]) if (!out.includes(id)) out.push(id);
-  return out;
-}
-
-/** Every selected tag id (accepted suggestions plus hand-picked) and the suggestion list. */
-export function tagState(it: Item, all: Item[]): { value: string[]; suggested: string[] } {
-  const suggested = suggestionsFor(it, all);
-  const off = new Set(it.dismissed);
-  const value = suggested.filter((id) => !off.has(id));
-  for (const id of it.picked) if (!value.includes(id)) value.push(id);
-  return { value, suggested };
-}
-
-/** Turn the picker's new selection back into hand-picked tags and dismissed suggestions. */
-export function tagPatch(it: Item, all: Item[], next: string[]): Pick<Item, 'picked' | 'dismissed'> {
-  const suggested = suggestionsFor(it, all);
-  const set = new Set(next);
-  return { picked: next.filter((id) => !suggested.includes(id)), dismissed: suggested.filter((id) => !set.has(id)) };
-}
-
 export type StatusKey = 'processing' | 'matched' | 'review' | 'nogps' | 'hidden' | 'sending' | 'published' | 'duplicate' | 'failed';
 export interface Status {
   key: StatusKey;
@@ -227,9 +201,6 @@ export function buildMeta(it: Item, all: Item[]): CreatePhotoMeta {
   const x = p.exif;
   const place = placeOf(it, all);
   const pf = placeFields(place);
-  const { suggested } = tagState(it, all);
-  const off = new Set(it.dismissed);
-  const suggestedTagIds = suggested.filter((id) => !off.has(id) && !it.picked.includes(id));
   const res = it.match?.res;
   return {
     title: it.title.trim() || null,
@@ -269,8 +240,7 @@ export function buildMeta(it: Item, all: Item[]): CreatePhotoMeta {
     inLiving: it.inLiving,
     favorite: it.favorite,
     sha256: p.sha256,
-    tagIds: [...it.picked],
-    suggestedTagIds,
+    tagIds: [...it.tags],
     themeIds: [...it.themeIds]
   };
 }

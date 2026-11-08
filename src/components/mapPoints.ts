@@ -6,8 +6,8 @@ export interface MapPoint {
   id: string;
   lat: number;
   lng: number;
-  /** number shown in the marker; omit for a plain photo dot */
-  count?: number;
+  /** number (or letter) shown in the marker; omit for a plain photo dot */
+  count?: number | string;
   label?: string;
   selected?: boolean;
   muted?: boolean;

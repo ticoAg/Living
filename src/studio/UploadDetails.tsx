@@ -2,7 +2,7 @@ import { Link } from 'wouter';
 import type { ThemeSummary } from '../../shared/types';
 import { useApi } from '../lib/useApi';
 import PhotoFields from './PhotoFields';
-import { statusOf, tagPatch, tagState, canPublish, type Item } from './upload-model';
+import { statusOf, canPublish, type Item } from './upload-model';
 import { useKeep } from './util';
 
 function ThemePicker({ value, onChange, disabled }: { value: string[]; onChange: (ids: string[]) => void; disabled?: boolean }) {
@@ -22,10 +22,10 @@ function ThemePicker({ value, onChange, disabled }: { value: string[]; onChange:
   }
   if (!themes.length) {
     return (
-      <p className="small muted">
-        还没有主题。
+      <p className="small muted up-themes-none">
+        还没有主题，
         <Link href="/themes/new" target="_blank" rel="noopener">
-          新建主题
+          新建一个
         </Link>
       </p>
     );
@@ -61,33 +61,34 @@ interface Props {
   unpublishedOthers: number;
 }
 
-/** Right column: title, note, tags, privacy, themes, and the publish button. */
+/** Right column: title, note, tags, privacy and themes, with the publish bar pinned to its foot. */
 export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRest, unpublishedOthers }: Props) {
   const status = statusOf(item, all);
   const ready = item.stage === 'ready' && !!item.p;
   const locked = item.publish.state === 'sending' || item.publish.state === 'done' || item.publish.state === 'duplicate';
-  const tags = tagState(item, all);
   const zone = item.match?.res?.privacyZone ?? null;
   const unplaced = ready && (status.key === 'review' || status.key === 'nogps');
 
   return (
-    <div className="up-panel stack" style={{ ['--gap' as string]: '20px' }}>
-      <h2 className="up-h serif">整理</h2>
+    <div className="up-panel up-details">
       {!ready && <p className="muted small">照片处理完成后可以填写。</p>}
       {ready && (
         <>
-          <PhotoFields
-            value={item}
-            onChange={(patch) => onPatch(item.id, 'geoPrivacy' in patch ? { ...patch, geoTouched: true } : patch)}
-            tags={{ value: tags.value, suggested: tags.suggested, onChange: (ids) => onPatch(item.id, tagPatch(item, all, ids)) }}
-            geoLocked={zone ? `在隐私区域「${zone}」内，位置固定为隐藏` : null}
-            toggles={false}
-            disabled={locked}
-          />
-
-          <div className="field">
-            <span className="label">加入主题</span>
-            <ThemePicker value={item.themeIds} onChange={(ids) => onPatch(item.id, { themeIds: ids })} disabled={locked} />
+          <div className="up-form">
+            <PhotoFields
+              value={item}
+              onChange={(patch) => onPatch(item.id, 'geoPrivacy' in patch ? { ...patch, geoTouched: true } : patch)}
+              tags={{ value: item.tags, onChange: (ids) => onPatch(item.id, { tags: ids }) }}
+              geoLocked={zone ? `在隐私区域「${zone}」内，位置固定为隐藏` : null}
+              toggles={false}
+              disabled={locked}
+            />
+            <div className="pf-row pf-top">
+              <span className="pf-k">主题</span>
+              <div className="pf-v">
+                <ThemePicker value={item.themeIds} onChange={(ids) => onPatch(item.id, { themeIds: ids })} disabled={locked} />
+              </div>
+            </div>
           </div>
 
           <div className="up-publish">
@@ -125,7 +126,7 @@ export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRe
                 )}
               </p>
             )}
-            {unplaced && item.publish.state !== 'sending' && <p className="small muted">还没有选择地点，发布后这张照片不会关联地点。</p>}
+            {unplaced && item.publish.state !== 'sending' && <p className="small muted">没有地点，发布后不关联地点。</p>}
 
             {item.publish.state !== 'done' && item.publish.state !== 'duplicate' && (
               <button
@@ -142,8 +143,13 @@ export default function UploadDetails({ item, all, onPatch, onPublish, onApplyRe
               </button>
             )}
             {!locked && unpublishedOthers > 0 && (
-              <button type="button" className="btn btn-quiet" onClick={() => onApplyRest(item.id)}>
-                把公开范围、位置精度、Living、收藏和主题套用到其余 {unpublishedOthers} 张
+              <button
+                type="button"
+                className="btn btn-quiet up-apply"
+                title="标签加到其余照片上；公开范围、位置精度和主题照这张设置"
+                onClick={() => onApplyRest(item.id)}
+              >
+                标签和设置套用到其余 {unpublishedOthers} 张
               </button>
             )}
           </div>
