@@ -4,7 +4,7 @@ title: 接口约定
 description: 所有 /api 接口共用的格式、认证、错误、可见性与位置精度规则；类型定义在 shared/types.ts。
 tags: [api]
 sources:
-  - uri: /shared/types.ts
+  - resource: https://github.com/ticoAg/Living/blob/main/shared/types.ts
     title: 接口类型
 ---
 # 格式

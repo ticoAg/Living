@@ -4,7 +4,7 @@ title: Cloudflare 资源
 description: Living 在 Cloudflare 账号 6f12e69d… 下使用的 Worker、D1、R2、KV、自定义域名与构建配置。
 tags: [architecture, cloudflare]
 sources:
-  - uri: /wrangler.jsonc
+  - resource: https://github.com/ticoAg/Living/blob/main/wrangler.jsonc
     title: Wrangler 配置
 ---
 # 资源

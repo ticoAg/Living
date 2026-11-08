@@ -30,4 +30,4 @@ tags: [api, tags]
 
 # DELETE /api/tags/:id
 
-删除该标签及全部子孙（递归 CTE），并删除对应的 `photo_tags` → `{ "ok": true, "deleted": <数量> }`。权限同 PATCH。子孙中若有他人的标签（他人挂在预置标签下的标签不会受影响，因为只有预置标签可以被他人挂接，而预置标签只有管理员能删），一并删除并计数。
+删除该标签及全部子孙（递归 CTE），并删除对应的 `photo_tags` → `{ "ok": true, "deleted": <数量> }`。权限同 PATCH。删除预置标签（只有 owner/admin 能删）时，其他用户挂在它下面的标签也会一并删除并计入数量。

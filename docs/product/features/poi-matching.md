@@ -8,7 +8,7 @@ area: api
 # 候选来源
 
 1. 站内已有地点（D1 `pois`，大家共用），优先级最高。
-2. 配置了高德 Web 服务 Key 时用高德周边搜索；否则用 OpenStreetMap（Overpass）。高德使用 GCJ-02 坐标，查询前把照片的 WGS-84 坐标转换过去，结果再转回 WGS-84。
+2. 配置了高德 Web 服务 Key 且照片在中国境内时用高德周边搜索；否则用 OpenStreetMap（Overpass）。高德使用 GCJ-02 坐标，查询前把照片的 WGS-84 坐标转换过去，结果再转回 WGS-84。
 3. 逆地理编码得到城市和区县：高德 regeo，或 OpenStreetMap Nominatim。
 4. 外部结果缓存在 KV 7 天，同一位置不重复请求。
 

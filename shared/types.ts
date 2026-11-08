@@ -287,6 +287,8 @@ export interface Invite {
   role: Role;
   note: string | null;
   usedBy: string | null;
+  /** Handle of `usedBy`, so the admin list can show who used a code. */
+  usedByHandle?: string | null;
   usedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
@@ -305,4 +307,6 @@ export interface SiteInfo {
 export interface ApiErrorBody {
   error: string;
   message: string;
+  /** Present on 409 `duplicate` from POST /api/photos: the photo that already has these bytes. */
+  photoId?: string;
 }
