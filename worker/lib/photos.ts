@@ -18,8 +18,10 @@ export interface PhotoRow {
   alt?: number | null;
   heading: number | null;
   geo_privacy: GeoPrivacy;
+  /** '' once looked up without a result; reads as null */
+  province: string | null;
   city: string | null;
-  district?: string | null;
+  district: string | null;
   poi_id: string | null;
   poi_distance?: number | null;
   poi_method?: PoiMethod | null;
@@ -50,11 +52,11 @@ const TAG_IDS = `(SELECT group_concat(pt.tag_id) FROM photo_tags pt WHERE pt.pho
 
 /** Columns for list payloads. The note text itself is left out; only whether one exists. */
 export const SUMMARY_COLS = `p.id, p.owner_id, u.handle AS owner_handle, p.title, p.taken_at, p.width, p.height, p.thumbhash, p.variants, p.palette,
-  p.poi_id, p.city, p.visibility, p.geo_privacy, p.lat, p.lng, p.heading, p.in_living, p.favorite, p.focus_x, p.focus_y,
-  (p.note IS NOT NULL AND p.note != '') AS has_note, ${TAG_IDS}`;
+  p.poi_id, p.province, p.city, p.district, p.visibility, p.geo_privacy, p.lat, p.lng, p.heading, p.in_living, p.favorite,
+  p.focus_x, p.focus_y, (p.note IS NOT NULL AND p.note != '') AS has_note, ${TAG_IDS}`;
 
 /** Summary plus everything the detail view and the edit page need. */
-export const DETAIL_COLS = `${SUMMARY_COLS}, p.note, p.tz, p.alt, p.district, p.poi_distance, p.poi_method, p.camera, p.lens, p.focal,
+export const DETAIL_COLS = `${SUMMARY_COLS}, p.note, p.tz, p.alt, p.poi_distance, p.poi_method, p.camera, p.lens, p.focal,
   p.focal35, p.aperture, p.shutter, p.iso, p.file_key, p.uploaded_at, p.updated_at`;
 
 export const PHOTO_FROM = `photos p JOIN users u ON u.id = p.owner_id`;
@@ -85,7 +87,9 @@ export function toSummary(r: PhotoRow, viewer: string | null): PhotoSummary {
     variants: parseJson<Variants>(r.variants) as Variants,
     palette: parseJson<string[]>(r.palette),
     poiId: g.level === 'hidden' ? null : r.poi_id,
+    province: r.province || null,
     city: r.city,
+    district: g.level === 'hidden' ? null : (r.district ?? null),
     tagIds: r.tag_ids ? r.tag_ids.split(',') : [],
     visibility: r.visibility,
     geoPrivacy: r.geo_privacy,
@@ -118,7 +122,6 @@ export async function toDetail(db: D1Database, r: PhotoRow, viewer: string | nul
     note: r.note ?? null,
     tz: r.tz ?? null,
     alt: g.level === 'exact' ? (r.alt ?? null) : null,
-    district: hidden ? null : (r.district ?? null),
     poi: poiRow ? toPoi(poiRow) : null,
     poiDistance: hidden ? null : (r.poi_distance ?? null),
     poiMethod: hidden ? null : (r.poi_method ?? null),

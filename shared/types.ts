@@ -72,7 +72,11 @@ export interface PhotoSummary {
   /** Dominant colours, hex, most dominant first. */
   palette: string[] | null;
   poiId: string | null;
+  /** Province-level division (省、自治区、直辖市), from reverse geocoding; null when unknown. Always shown, like `city`. */
+  province: string | null;
   city: string | null;
+  /** District or county (区、县); hidden from others with `geoPrivacy: 'hidden'`. */
+  district: string | null;
   tagIds: string[];
   visibility: Visibility;
   geoPrivacy: GeoPrivacy;
@@ -91,7 +95,6 @@ export interface PhotoDetail extends PhotoSummary {
   note: string | null;
   tz: string | null;
   alt: number | null;
-  district: string | null;
   poi: Poi | null;
   poiDistance: number | null;
   poiMethod: PoiMethod | null;
@@ -198,6 +201,8 @@ export interface MatchRequest {
 }
 export interface MatchResponse {
   candidates: MatchCandidate[];
+  /** province-level division of the point, from the reverse geocode only */
+  province: string | null;
   city: string | null;
   district: string | null;
   provider: 'amap' | 'osm' | 'local';
@@ -227,6 +232,7 @@ export interface CreatePhotoMeta {
   alt?: number | null;
   heading?: number | null;
   geoPrivacy?: GeoPrivacy;
+  province?: string | null;
   city?: string | null;
   district?: string | null;
   /** existing POI id */

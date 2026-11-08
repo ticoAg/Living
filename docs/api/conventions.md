@@ -55,7 +55,7 @@ sources:
 | `fuzzy` | `shared/geo.ts` 的 `fuzz()` 取整 | null | 原值 | 原值 |
 | `hidden` | null | null | null | null |
 
-`city` 始终返回。
+`province` 和 `city` 始终返回。列表（`PhotoSummary`）和详情（`PhotoDetail`）都带 `district`，按上表处理。
 
 # 缓存
 

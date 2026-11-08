@@ -32,6 +32,7 @@ describe('parseCreateMeta', () => {
       alt: null,
       heading: null,
       geoPrivacy: 'exact',
+      province: null,
       city: null,
       district: null,
       poiId: null,
@@ -73,6 +74,7 @@ describe('parseCreateMeta', () => {
       alt: 12.5,
       heading: 370,
       geoPrivacy: 'fuzzy',
+      province: ' 浙江省 ',
       city: '杭州',
       district: '西湖区',
       poiId: 'poi_01',
@@ -107,6 +109,7 @@ describe('parseCreateMeta', () => {
       alt: 12.5,
       heading: 10,
       geoPrivacy: 'fuzzy',
+      province: '浙江省',
       city: '杭州',
       district: '西湖区',
       poiId: 'poi_01',
@@ -287,6 +290,7 @@ describe('parseCreateMeta', () => {
       expect(invalidMessage(() => parseCreateMeta({ ...minimal(), title: '题'.repeat(201) }))).toBe('标题最多 200 个字符');
       expect(invalidMessage(() => parseCreateMeta({ ...minimal(), note: '笔'.repeat(5001) }))).toBe('笔记最多 5000 个字符');
       expect(invalidMessage(() => parseCreateMeta({ ...minimal(), city: '城'.repeat(61) }))).toBe('城市最多 60 个字符');
+      expect(invalidMessage(() => parseCreateMeta({ ...minimal(), province: '省'.repeat(61) }))).toBe('省份最多 60 个字符');
       expect(invalidMessage(() => parseCreateMeta({ ...minimal(), shutter: '1'.repeat(31) }))).toBe('快门最多 30 个字符');
       expect(invalidMessage(() => parseCreateMeta({ ...minimal(), title: 42 }))).toBe('标题需要是文字');
     });

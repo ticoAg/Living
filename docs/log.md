@@ -1,6 +1,9 @@
 # Directory Update Log
 
 ## 2026-11-08
+* **Update**: 地图改为图集（小图册）：所有带位置的照片都上地图，包括没有匹配地点的；缩小时按省，放大依次按市、区县、地点直到单张，挤在一起的合并并按组成命名（整市 → 杭州，部分 → 西湖区等地，跨省 → 浙江等地）；圆片轮播最多 4 张、叠层表示一组、标签写名称和数量，当前层级的行政区边界画成虚线；点击区域放大到它拆开的那一级，侧栏列出下一层的组成；`?area=浙江,杭州` 选中区域。原来的数字聚合标记去掉，见 [地图](/product/features/map.md)。
+* **Update**: 照片记录省份（迁移 `0003_photo_province.sql`），地点匹配返回 `province`，上传时写入；照片列表返回 `province` 和 `district`；Nominatim 缺地级市时以 zoom 7 再查一次，乡镇不再被当成城市，县级市归入区县，见 [photos](/data/photos.md#省市区县) 和 [地点接口](/api/pois.md#post-apipoismatch-登录)；逆地理缓存键改为 `geo:rev2:`，见 [KV](/data/kv.md)。
+* **Creation**: 每小时的定时任务（Cron 触发器）补全没有省份的照片，包括之前上传的，见 [Cloudflare 资源](/architecture/cloudflare.md#定时任务)。
 * **Update**: 地点匹配改用真实地图：拍摄位置、匹配半径、镜头朝向和编号候选都画在地图上，点编号即可选中，见 [地点匹配](/product/features/poi-matching.md)。
 * **Update**: 附近地点改用免费的 Photon（线上从 Workers 请求 Overpass 全部超时，Overpass 改作后备），列出半径内所有带名称的地点；名称搜索在有坐标时只找照片附近约 6 千米；上传页不再显示"进入 Living"和"收藏"，见 [地点匹配](/product/features/poi-matching.md) 和 [地点接口](/api/pois.md)。
 * **Update**: 带内容哈希的 `/assets/*` 让浏览器缓存一年（`public/_headers`）；各层缓存整理在 [Cloudflare 资源](/architecture/cloudflare.md#缓存)。

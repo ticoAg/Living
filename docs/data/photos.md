@@ -33,8 +33,9 @@ sources:
 | `alt` | REAL | 可空 | 海拔（米） |
 | `heading` | REAL | 可空 | 镜头朝向，度，自北顺时针 0–360 |
 | `geo_privacy` | TEXT | 非空，默认 `'exact'`，取值 `exact` `fuzzy` `hidden` | 位置精度，对他人生效 |
-| `city` | TEXT | 可空 | 逆地理得到的城市，始终对所有人可见 |
-| `district` | TEXT | 可空 | 区县；`hidden` 时对他人隐藏 |
+| `province` | TEXT | 可空 | 逆地理得到的省级行政区（省、自治区、直辖市；国外是州、都道府县），始终对所有人可见。`NULL` 表示还没查过或上次查询失败；`''` 表示查过，那里没有省份（海上、无数据），接口读作 `null` |
+| `city` | TEXT | 可空 | 逆地理得到的城市（中国为地级市、自治州、盟），始终对所有人可见 |
+| `district` | TEXT | 可空 | 区县（中国为区、县、旗或县级市）；`hidden` 时对他人隐藏 |
 
 ## 地点匹配
 
@@ -86,6 +87,13 @@ sources:
 - `photos_owner_taken`（`owner_id`, `taken_at`）：个人主页按时间排序。
 - `photos_visibility_taken`（`visibility`, `taken_at`）：首页公开照片按时间排序。
 - `photos_poi`（`poi_id`）：地点页取该地点的照片。
+- `photos_region_todo`（`id`）：仅 `province IS NULL` 的行，即每小时的补全任务还要查的照片；补上后离开索引。
+
+# 省、市、区县
+
+上传时，前端把 [地点匹配](/api/pois.md#post-apipoismatch-登录) 返回的 `province`、`city`、`district` 写进照片；没有坐标的照片用所选地点的城市和区县。[地图](/product/features/map.md) 据此把照片合成省、市、区县图集。
+
+之前上传的照片，以及上传时逆地理编码失败的照片，由每小时的定时任务补全（见 [Cloudflare 资源](/architecture/cloudflare.md#定时任务)）：每次随机取最多 8 张 `province IS NULL` 且有坐标（自己的，或所在地点的）的照片，按坐标逆地理编码，写入 `province`，`city`、`district` 只在为空时填写，不覆盖上传时的值。查不到省份的写 `''`，以后不再查；外部服务出错的保持 `NULL`，下次再试。
 
 # 关系
 
@@ -124,9 +132,15 @@ sources:
 # Examples
 
 ```sql
--- 地图和地点列表的计数：对访客可见、位置未隐藏、已匹配地点
+-- 地点列表的计数：对访客可见、位置未隐藏、已匹配地点
 SELECT poi_id, COUNT(*) AS n
 FROM photos
 WHERE visibility = 'public' AND geo_privacy <> 'hidden' AND poi_id IS NOT NULL
 GROUP BY poi_id;
+
+-- 补全任务每次取的照片：还没有省份，有自己的坐标或所在地点
+SELECT p.id, p.lat, p.lng, po.lat AS poi_lat, po.lng AS poi_lng
+FROM photos p LEFT JOIN pois po ON po.id = p.poi_id
+WHERE p.province IS NULL AND ((p.lat IS NOT NULL AND p.lng IS NOT NULL) OR po.id IS NOT NULL)
+ORDER BY random() LIMIT 8;
 ```

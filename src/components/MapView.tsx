@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Map as MLMap, Marker, GeoJSONSource, LngLatBoundsLike } from 'maplibre-gl';
 import type { Feature, FeatureCollection } from 'geojson';
 import { circleRing, coneRing } from '../../shared/geo';
-import { createClusterLayer, type ClusterLayer } from './mapCluster';
+import { createAlbumLayer, type AlbumLayer, type AlbumSource } from './mapAlbums';
 import { pointElement, pointMarkerOptions, type MapPoint } from './mapPoints';
 
-export type { MapPoint };
+export type { AlbumSource, MapPoint };
 
 // MapLibre wrapper with the atlas look: OpenFreeMap vector tiles restyled to paper land, pale
 // water, quiet roads. MapLibre (~250 kB gz) is loaded only when a map mounts.
@@ -34,11 +34,11 @@ interface Props {
   /** require Ctrl/⌘ + scroll or two fingers to move the map, so an embedded map does not trap page scrolling */
   cooperativeGestures?: boolean;
   /**
-   * Merge nearby points into numbered cluster markers that zoom in when clicked (default off). Like `interactive`, it is read
-   * when the map is created. A cluster shows the sum of its points' `count`s (1 for a point without one), is drawn selected when
-   * it holds a selected point and muted when all of its points are muted; `fit` still fits every point.
+   * Album markers (小图册, see mapAlbums.ts), asked for the albums of each whole-number zoom; drawn besides any `points`.
+   * Whether a map has albums is read when it is created (like `interactive`); a new source replaces the old one. `fit`
+   * does not look at albums.
    */
-  cluster?: boolean;
+  albums?: AlbumSource;
   className?: string;
   style?: CSSProperties;
 }
@@ -92,14 +92,17 @@ export default function MapView({
   maxZoom = 16,
   interactive = true,
   cooperativeGestures = false,
-  cluster = false,
+  albums,
   className,
   style
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markers = useRef<Marker[]>([]);
-  const clusters = useRef<ClusterLayer | null>(null);
+  const albumLayer = useRef<AlbumLayer | null>(null);
+  // the source as of the latest render, for the layer made when the map loads
+  const albumSource = useRef(albums);
+  albumSource.current = albums;
   const libRef = useRef<typeof import('maplibre-gl') | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -160,7 +163,7 @@ export default function MapView({
             filter: ['get', 'dashed'],
             paint: { 'line-color': '#1C201E', 'line-width': 1.2, 'line-dasharray': [2, 2] }
           });
-          if (cluster) clusters.current = createClusterLayer(m, map);
+          if (albumSource.current) albumLayer.current = createAlbumLayer(m, map, albumSource.current);
           setReady(true);
         });
         map.on('error', () => {});
@@ -168,8 +171,8 @@ export default function MapView({
       .catch(() => setFailed(true));
     return () => {
       cancelled = true;
-      clusters.current?.destroy();
-      clusters.current = null;
+      albumLayer.current?.destroy();
+      albumLayer.current = null;
       markers.current.forEach((mk) => mk.remove());
       mapRef.current?.remove();
       mapRef.current = null;
@@ -198,13 +201,11 @@ export default function MapView({
       )
     );
 
-    if (clusters.current) clusters.current.update(points);
-    else {
-      markers.current.forEach((mk) => mk.remove());
-      markers.current = points.map((p) =>
-        new m.Marker({ element: pointElement(p), ...pointMarkerOptions(p) }).setLngLat([p.lng, p.lat]).addTo(map)
-      );
-    }
+    markers.current.forEach((mk) => mk.remove());
+    markers.current = points.map((p) =>
+      new m.Marker({ element: pointElement(p), ...pointMarkerOptions(p) }).setLngLat([p.lng, p.lat]).addTo(map)
+    );
+    if (albums) albumLayer.current?.update(albums);
 
     if (!fit) return;
     if (fitKey !== undefined) {
@@ -227,7 +228,7 @@ export default function MapView({
       ];
       map.fitBounds(bounds, { padding: 48, maxZoom, duration: 0 });
     }
-  }, [ready, points, shapes, fit, fitKey, maxZoom]);
+  }, [ready, points, shapes, fit, fitKey, maxZoom, albums]);
 
   return (
     <div className={`map-frame${className ? ` ${className}` : ''}`} style={style} role="region" aria-label={ariaLabel}>

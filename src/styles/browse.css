@@ -200,21 +200,23 @@ a.pho-strip-all:hover { color: var(--ink); }
 .swapmap-layer { position: absolute; inset: 0; transition: opacity 0.26s ease; }
 .swapmap-layer[data-pending='true'] { opacity: 0; pointer-events: none; }
 .swapmap-layer .swapmap-frame { position: absolute; inset: 0; border: 0; }
-.mpg-map .map-pt { min-height: 44px; }
 .mpg-map > .loading { padding: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
 .mpg-none { position: absolute; left: 0; right: 0; bottom: 24px; margin: 0; text-align: center; pointer-events: none; font: 500 16px var(--serif); letter-spacing: 0.12em; color: var(--ink-2); }
 .mpg-panel { flex: 1 1 300px; min-width: 0; max-width: 400px; display: flex; flex-direction: column; gap: 22px; }
 .mpg-kind { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); }
 .mpg-kind svg { color: var(--ink); }
 .mpg-name { margin: 12px 0 0; font: 600 clamp(32px, 3vw, 44px) / 1.15 var(--serif); letter-spacing: 0.4em; overflow-wrap: anywhere; }
+.mpg-name-coord { font: 500 clamp(20px, 2vw, 24px) / 1.3 var(--mono); letter-spacing: 0; }
 .mpg-coord { margin: 12px 0 0; font-size: 13px; }
 .mpg-count { padding-top: 16px; border-top: 1px solid var(--rule); }
 .mpg-count-n { font-size: 36px; }
+.mpg-span { margin-left: auto; align-self: center; font-size: 12px; color: var(--ink-2); }
 .mpg-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .mpg-grid .img { width: 100%; }
 .mpg-grid a:hover .img { opacity: 0.88; }
 .mpg-open { justify-content: space-between; min-height: 48px; padding: 0 16px; font-size: 15px; }
 .mpg-living { justify-content: flex-start; min-height: 48px; margin-top: -12px; padding: 0 16px; }
+.mpg-living-solo { margin-top: 0; }
 .mpg-hint { margin: 0; font: 500 16px var(--serif); letter-spacing: 0.12em; color: var(--ink-2); }
 .mpg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .mpg-list button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }

@@ -231,9 +231,9 @@ photos.post('/', async (c) => {
         `INSERT INTO photos (id, owner_id, title, note, taken_at, tz, lat, lng, alt, heading, geo_privacy, city, district,
            poi_id, poi_distance, poi_method, camera, lens, focal, focal35, aperture, shutter, iso, width, height,
            file_key, file_type, file_size, variants, thumbhash, palette, focus_x, focus_y, visibility, in_living, favorite,
-           sha256, uploaded_at)
+           sha256, uploaded_at, province)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23,
-           ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38)`,
+           ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39)`,
         photoId,
         user.id,
         meta.title,
@@ -271,7 +271,8 @@ photos.post('/', async (c) => {
         meta.inLiving,
         meta.favorite,
         meta.sha256,
-        now
+        now,
+        meta.province
       )
     ];
     if (manualTags.length) {

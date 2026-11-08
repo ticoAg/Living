@@ -1,11 +1,12 @@
-// Living — one Worker: JSON API (/api), media from R2 (/media), and the SPA via static assets.
+// Living — one Worker: JSON API (/api), media from R2 (/media), and the SPA via static assets; plus the hourly region job.
 // Contract: /docs/api/
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import type { AppEnv } from './env';
+import type { AppEnv, Env } from './env';
 import { forbidden, HttpError } from './lib/http';
+import { fillRegions } from './lib/regions';
 import { admin } from './routes/admin';
 import { auth } from './routes/auth';
 import { me } from './routes/me';
@@ -18,7 +19,7 @@ import { tags } from './routes/tags';
 import { themes } from './routes/themes';
 import { users } from './routes/users';
 
-const app = new Hono<AppEnv>({ strict: false });
+export const app = new Hono<AppEnv>({ strict: false });
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const isLoopback = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
@@ -113,4 +114,14 @@ app.onError((err, c) => {
   return c.json({ error: 'internal', message: '服务器出错了，请稍后再试' }, 500, { 'Cache-Control': 'no-store' });
 });
 
-export default app;
+/** The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts). */
+async function scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  ctx.waitUntil(
+    fillRegions(env).then(
+      (run) => console.log('regions', JSON.stringify(run)),
+      (e: unknown) => console.error('regions: run failed', e instanceof Error ? (e.stack ?? e.message) : e)
+    )
+  );
+}
+
+export default { fetch: app.fetch, scheduled } satisfies ExportedHandler<Env>;

@@ -14,3 +14,8 @@ export interface Geocode {
   city: string | null;
   district: string | null;
 }
+
+/** A reverse geocode: city and district, plus the province-level division (省、自治区、直辖市, a state elsewhere). */
+export interface Region extends Geocode {
+  province: string | null;
+}

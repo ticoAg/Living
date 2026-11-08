@@ -241,6 +241,7 @@ export function buildMeta(it: Item, all: Item[]): CreatePhotoMeta {
     alt: x.alt,
     heading: x.heading,
     geoPrivacy: it.geoPrivacy,
+    province: res?.province ?? null,
     city: res?.city ?? place?.city ?? null,
     district: res?.district ?? place?.district ?? null,
     poiId: pf.poiId,
