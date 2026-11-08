@@ -62,9 +62,10 @@
 .up-variants { margin: 0; }
 
 .up-figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.up-preview { width: 100%; max-height: 420px; background: var(--mat); display: grid; place-items: center; overflow: hidden; }
-.up-preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.up-figure .up-preview { aspect-ratio: auto; }
+/* The box takes the photo's ratio (inline style) and is capped in height; a portrait then sits on the mat at its own ratio.
+   The image is taken out of flow so its natural height can't stretch the box and crop it. */
+.up-preview { position: relative; width: 100%; max-height: min(560px, 70vh); background: var(--mat); overflow: hidden; }
+.up-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 .up-palette { display: flex; height: 8px; }
 .up-palette span { flex: 1; }
 
