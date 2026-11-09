@@ -326,8 +326,6 @@ textarea.pf-input { min-height: 0; padding: 8px 12px; line-height: 1.6; }
 .pe-focus::before { left: 50%; top: -9px; bottom: -9px; width: 1px; }
 .pe-focus::after { top: 50%; left: -9px; right: -9px; height: 1px; }
 .pe-focus-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.pe-crops { display: flex; align-items: flex-end; gap: 12px; }
-.pe-crop { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; }
 .pe-section { display: flex; flex-direction: column; gap: 14px; padding-top: 24px; border-top: 1px solid var(--rule); }
 .pe-actions { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: -4px; padding: 14px 0; border-top: 1px solid var(--rule); background: var(--paper); }
 .pe-state { min-height: 20px; }

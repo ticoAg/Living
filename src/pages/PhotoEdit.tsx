@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
 import { Link, useLocation, useParams } from 'wouter';
 import type { PhotoDetail, Poi } from '../../shared/types';
 import { Icon } from '../components/icons';
-import Img from '../components/Img';
 import { ApiError, api, mediaUrl } from '../lib/api';
 import { invalidate, useApi } from '../lib/useApi';
 import ExifList from '../studio/ExifList';
@@ -271,21 +270,6 @@ function Editor({ id }: { id: string }) {
               清除焦点
             </button>
           </div>
-          <div className="pe-crops" aria-label="裁切预览">
-            {(
-              [
-                ['1 / 1', '方形'],
-                ['16 / 9', '横幅'],
-                ['3 / 4', '竖幅']
-              ] as const
-            ).map(([ratio, label]) => (
-              <figure key={ratio} className="pe-crop" style={{ flexBasis: ratio === '16 / 9' ? '38%' : ratio === '1 / 1' ? '26%' : '22%' }}>
-                <Img photo={{ ...base, focus: draft.focus }} ratio={ratio} sizes="240px" alt="" />
-                <figcaption className="small muted">{label}</figcaption>
-              </figure>
-            ))}
-          </div>
-
           <ExifList x={base} />
           {base.themes.length > 0 && (
             <p className="small" style={{ margin: 0 }}>
