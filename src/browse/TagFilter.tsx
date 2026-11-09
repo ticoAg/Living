@@ -65,7 +65,10 @@ export default function TagFilter({ tree, selected, counts, onToggle }: Props) {
       </Fragment>
     ));
 
-  const rows = tree.roots.map((root) => {
+  // the colour-tone row (a root whose children are all swatches) is left out of the filter
+  const isToneRow = (root: TagNode) => root.children.length > 0 && root.children.every(isSwatch);
+
+  const rows = tree.roots.filter((root) => !isToneRow(root)).map((root) => {
     const clusters: ReactNode[][] = [];
     let loose: ReactNode[] = [];
     const flush = () => {
