@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
+import { startScroll } from '../lib/scroll';
 
 /** Set the tab title while the page is mounted. */
 export function useDocTitle(title: string | null | undefined): void {
@@ -12,10 +13,10 @@ export function useDocTitle(title: string | null | undefined): void {
   }, [title]);
 }
 
-/** Jump to the top when `dep` changes (route changes keep the previous scroll offset otherwise). */
-export function useScrollTop(dep: unknown): void {
+/** Start at the top when `dep` changes, or where the page was left when it is reached with Back/Forward. */
+export function useScrollTop(dep?: unknown): void {
   useEffect(() => {
-    window.scrollTo(0, 0);
+    startScroll();
   }, [dep]);
 }
 

@@ -1,32 +1,34 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { Suspense } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 import Header from './components/Header';
 import { SessionProvider } from './lib/session';
+import {
+  Explore,
+  IndexPage,
+  Living,
+  Login,
+  MapPage,
+  NotFound,
+  Photo,
+  PhotoEdit,
+  Place,
+  PlaceEdit,
+  Profile,
+  Register,
+  Settings,
+  TagsManager,
+  ThemeEditor,
+  ThemeReader,
+  Themes,
+  Upload
+} from './routes';
 
 // Route table. Each page module is owned by one area (see /docs/architecture/frontend.md):
 // browse — Explore, Profile, Photo, Place, MapPage, IndexPage
 // living — Living
 // studio — Upload, PhotoEdit, PlaceEdit, TagsManager, Login, Register, Settings
 // themes — Themes, ThemeReader, ThemeEditor
-const page = (load: () => Promise<{ default: ComponentType }>) => lazy(load);
-const Explore = page(() => import('./pages/Explore'));
-const Profile = page(() => import('./pages/Profile'));
-const Photo = page(() => import('./pages/Photo'));
-const Place = page(() => import('./pages/Place'));
-const MapPage = page(() => import('./pages/MapPage'));
-const IndexPage = page(() => import('./pages/IndexPage'));
-const Living = page(() => import('./pages/Living'));
-const Upload = page(() => import('./pages/Upload'));
-const PhotoEdit = page(() => import('./pages/PhotoEdit'));
-const PlaceEdit = page(() => import('./pages/PlaceEdit'));
-const TagsManager = page(() => import('./pages/TagsManager'));
-const Login = page(() => import('./pages/Login'));
-const Register = page(() => import('./pages/Register'));
-const Settings = page(() => import('./pages/Settings'));
-const Themes = page(() => import('./pages/Themes'));
-const ThemeReader = page(() => import('./pages/ThemeReader'));
-const ThemeEditor = page(() => import('./pages/ThemeEditor'));
-const NotFound = page(() => import('./pages/NotFound'));
+// The lazy page modules and their prefetching live in ./routes.
 
 function Routes() {
   return (
@@ -62,7 +64,8 @@ export default function App() {
   return (
     <SessionProvider>
       {!immersive && <Header />}
-      <Suspense fallback={<p className="loading">加载中</p>}>
+      {/* the fallback fades in late: a chunk that arrives quickly never flashes it */}
+      <Suspense fallback={<p className="loading loading-late">加载中</p>}>
         <Routes />
       </Suspense>
     </SessionProvider>
