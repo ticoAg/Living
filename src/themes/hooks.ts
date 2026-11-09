@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { startScroll } from '../lib/scroll';
 
 /** `<title>` for the page while it is mounted. */
 export function useDocumentTitle(title: string | null | undefined) {
@@ -12,10 +13,10 @@ export function useDocumentTitle(title: string | null | undefined) {
   }, [title]);
 }
 
-/** Pages replace each other without a reload, so start each one at the top. */
-export function useScrollTop(dep?: unknown) {
+/** Start at the top when `dep` changes, or where the page was left when it is reached with Back/Forward. */
+export function useScrollTop(dep?: unknown): void {
   useEffect(() => {
-    window.scrollTo(0, 0);
+    startScroll();
   }, [dep]);
 }
 

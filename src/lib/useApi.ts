@@ -45,6 +45,13 @@ export function invalidate(prefix: string) {
   }
 }
 
+/** Start loading `path` into the cache ahead of the component that will read it; no-op if cached or in flight. */
+export function prefetch(path: string) {
+  const entry = cache.get(path);
+  if (entry && ('data' in entry || entry.promise)) return;
+  void load(path);
+}
+
 /** Seed or replace a cached value without a request (e.g. after a mutation returns the new object). */
 export function setCached<T>(path: string, data: T) {
   cache.set(path, { data });

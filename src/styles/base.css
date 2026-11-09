@@ -175,3 +175,5 @@ h1, h2, h3 { text-wrap: balance; }
 .map-album:focus-visible .map-album-disc { outline: 2px solid var(--hydro); outline-offset: 3px; }
 
 .loading { padding: 80px 0; text-align: center; color: var(--ink-2); }
+.loading-late { min-height: 100vh; animation: loading-late 0s 400ms both; }
+@keyframes loading-late { from { visibility: hidden; } }
