@@ -65,37 +65,42 @@ export default function TagFilter({ tree, selected, counts, onToggle }: Props) {
       </Fragment>
     ));
 
-  const rows = tree.roots.map((root) => {
-    const clusters: ReactNode[][] = [];
-    let loose: ReactNode[] = [];
-    const flush = () => {
-      if (loose.length) clusters.push(loose);
-      loose = [];
-    };
-    if (!root.children.length) {
-      loose.push(chip(root));
-    } else {
-      for (const g of root.children) {
-        if (!g.children.length) {
-          loose.push(chip(g));
-        } else {
-          flush();
-          clusters.push([chip(g, true), <Fragment key={`${g.id}/below`}>{below(g)}</Fragment>]);
+  // the colour-tone row (a root whose children are all swatches) is left out of the filter
+  const isToneRow = (root: TagNode) => root.children.length > 0 && root.children.every(isSwatch);
+
+  const rows = tree.roots
+    .filter((root) => !isToneRow(root))
+    .map((root) => {
+      const clusters: ReactNode[][] = [];
+      let loose: ReactNode[] = [];
+      const flush = () => {
+        if (loose.length) clusters.push(loose);
+        loose = [];
+      };
+      if (!root.children.length) {
+        loose.push(chip(root));
+      } else {
+        for (const g of root.children) {
+          if (!g.children.length) {
+            loose.push(chip(g));
+          } else {
+            flush();
+            clusters.push([chip(g, true), <Fragment key={`${g.id}/below`}>{below(g)}</Fragment>]);
+          }
         }
       }
-    }
-    flush();
-    return (
-      <div key={root.id} className="tagf-row" role="group" aria-label={root.name}>
-        {clusters.map((cluster, i) => (
-          <Fragment key={i}>
-            {i > 0 && <span className="tagf-sep" aria-hidden="true" />}
-            {cluster}
-          </Fragment>
-        ))}
-      </div>
-    );
-  });
+      flush();
+      return (
+        <div key={root.id} className="tagf-row" role="group" aria-label={root.name}>
+          {clusters.map((cluster, i) => (
+            <Fragment key={i}>
+              {i > 0 && <span className="tagf-sep" aria-hidden="true" />}
+              {cluster}
+            </Fragment>
+          ))}
+        </div>
+      );
+    });
 
   return <div className="tagf">{rows}</div>;
 }
