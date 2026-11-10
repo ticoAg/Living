@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AppEnv, Env } from './env';
-import { forbidden, HttpError } from './lib/http';
+import { forbidden, HttpError, REFERRER_POLICY } from './lib/http';
 import { fillRegions } from './lib/regions';
 import { admin } from './routes/admin';
 import { auth } from './routes/auth';
@@ -60,10 +60,12 @@ app.use('/api/*', async (c, next) => {
 });
 
 // API responses are never cached unless a handler opts in (public lists, media).
+// The security headers match public/_headers, which covers the pages and static files the Worker never sees.
 app.use('/api/*', async (c, next) => {
   await next();
   if (!c.res.headers.has('Cache-Control')) c.res.headers.set('Cache-Control', 'no-store');
   c.res.headers.set('X-Content-Type-Options', 'nosniff');
+  c.res.headers.set('Referrer-Policy', REFERRER_POLICY);
 });
 
 app.route('/api/site', site);

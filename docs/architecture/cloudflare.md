@@ -57,6 +57,18 @@ sources:
 
 静态资源请求不调用 Worker，不占请求额度。构建缓存另见 [构建与发布](/architecture/ci-cd.md)。
 
+# 安全响应头
+
+| 响应头 | 值 | 页面与静态文件 | `/api` | `/media` |
+|---|---|---|---|---|
+| `X-Content-Type-Options` | `nosniff` | ✓ | ✓ | ✓ |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | ✓ | ✓ | ✓ |
+| `Content-Security-Policy` | `frame-ancestors 'none'`（不允许被其他网站用 iframe 嵌入） | ✓ | — | — |
+
+- 页面与静态文件的响应头写在 `public/_headers` 的 `/*` 规则里，和 `/assets/*` 的缓存规则叠加生效。
+- `/api` 由 `worker/index.ts` 的中间件统一加；`/media` 在 `worker/routes/media.ts` 里加，包括从 R2 读出的响应、Cache API 命中的副本和命中后的 304（缓存里的旧副本没有这些头，返回前补上）。
+- 不设完整的内容安全策略：地图的 Worker、内联样式和 `data:` 占位图都要放行，配错会让站点打不开。
+
 # 费用
 
 全部在免费额度内可运行：Workers 免费版每天 10 万次请求；D1 5 GB；R2 10 GB 存储且无出站流量费；KV 每天 10 万次读。照片多了以后主要成本是 R2 存储。

@@ -25,6 +25,9 @@ export const tooLarge = (message: string) => new HttpError(413, 'too_large', mes
 export const rateLimited = (message: string) => new HttpError(429, 'rate_limited', message);
 export const upstream = (message: string) => new HttpError(502, 'upstream_failed', message);
 
+/** Same value as public/_headers: other sites learn only the origin a link or image request came from. */
+export const REFERRER_POLICY = 'strict-origin-when-cross-origin';
+
 const MAX_JSON_BYTES = 256 * 1024;
 
 /** Reads a JSON object body, with a size cap and Chinese error messages. */

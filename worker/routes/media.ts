@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Variants, Visibility } from '../../shared/types';
 import type { AppEnv } from '../env';
-import { etagMatches, notFound, ID_RE, type Ctx } from '../lib/http';
+import { etagMatches, notFound, ID_RE, REFERRER_POLICY, type Ctx } from '../lib/http';
 import { mediaCacheKey } from '../lib/mediaCache';
 import { viewerId } from '../lib/session';
 import { parseJson } from '../lib/sql';
@@ -12,6 +12,8 @@ const VARIANT_FILE = /^[sml]\.(webp|jpg)$/;
 const ORIGINAL_FILE = /^[A-Za-z0-9_-]{1,64}\.[a-z0-9]{1,5}$/;
 const PUBLIC_CACHE = 'public, max-age=31536000, immutable';
 const PRIVATE_CACHE = 'private, no-store';
+/** On every media response, including edge-cache hits stored before these headers existed. */
+const SECURITY = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': REFERRER_POLICY };
 
 /** Serves an R2 object with ETag/304 support. `onlyIf` lets R2 evaluate If-None-Match without reading the body. */
 async function serve(
@@ -26,7 +28,7 @@ async function serve(
     'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
     ETag: obj.httpEtag,
     'Cache-Control': cacheControl,
-    'X-Content-Type-Options': 'nosniff',
+    ...SECURITY,
     ...extra
   });
   if (!('body' in obj) || !obj.body) return { res: new Response(null, { status: 304, headers }), full: false };
@@ -48,9 +50,12 @@ media.get('/v/:photoId/:file', async (c) => {
   if (hit) {
     const etag = hit.headers.get('ETag');
     if (etag && etagMatches(c.req.header('if-none-match'), etag)) {
-      return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': PUBLIC_CACHE } });
+      return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': PUBLIC_CACHE, ...SECURITY } });
     }
-    return hit;
+    // a cached response's headers are immutable: copy it to add the security headers
+    const res = new Response(hit.body, hit);
+    for (const [k, v] of Object.entries(SECURITY)) res.headers.set(k, v);
+    return res;
   }
 
   const row = await c.env.DB.prepare('SELECT owner_id, visibility, variants FROM photos WHERE id = ?1')
