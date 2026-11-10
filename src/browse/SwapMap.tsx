@@ -67,7 +67,14 @@ export default function SwapMap({ viewKey, viewport, ...props }: MapProps & { vi
             data-pending={pending ? 'true' : undefined}
             inert={!top || pending ? true : undefined}
           >
-            <MapView {...props} className="swapmap-frame" fit={false} center={l.viewport?.center} zoom={l.viewport?.zoom ?? 11} />
+            <MapView
+              {...props}
+              className="swapmap-frame"
+              fit={false}
+              foldAttribution={false}
+              center={l.viewport?.center}
+              zoom={l.viewport?.zoom ?? 11}
+            />
           </div>
         );
       })}

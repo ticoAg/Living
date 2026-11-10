@@ -55,7 +55,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/lib/tags.ts` | 标签树、子孙展开、按标签筛选、包含计数 |
 | `src/lib/format.ts` | 日期、时段、距今、距离、度分秒 |
 | `src/components/Img.tsx` | 响应式图片 + ThumbHash 占位 |
-| `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放 |
+| `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放；署名在地图加载后收成 ⓘ（地图页 `/map` 保持 MapLibre 默认） |
 | `src/components/icons.tsx` | 地点类别符号 `CategoryIcon`、界面图标 `Icon` |
 | `src/components/Header.tsx` | 站点页眉与导航 |
 | `src/components/ErrorBoundary.tsx` | 路由外的错误边界：分块失效时重新加载，其他错误显示「出错了」 |
@@ -63,7 +63,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 
 # 设计令牌
 
-纸面 `#F1F2EE`、卡纸 `#E6E8E2`、墨 `#1C201E`、次级墨 `#5A605C`、细线 `#D3D6D0`、湖蓝 `#2B5F86`（链接、水体注记）、赭 `#8F5530`（等高线、匹配半径、朝向）。字体：宋体 Noto Serif SC 用于地名与标题（加宽字距 0.24–0.5em），Noto Sans SC 用于界面，DM Mono 用于坐标与数字，Spectral 用于 LIVING 字标。Living 模式使用深色（`--night*` 令牌）。
+纸面 `#F1F2EE`、卡纸 `#E6E8E2`、墨 `#1C201E`、次级墨 `#5A605C`、三级墨 `#686E6A`（11–13px 的小字，在纸面和卡纸 `#FAFAF8` 上都不低于 4.5:1）、细线 `#D3D6D0`、湖蓝 `#2B5F86`（链接、水体注记）、赭 `#8F5530`（等高线、匹配半径、朝向）。字体：宋体 Noto Serif SC 用于地名与标题（加宽字距 0.24–0.5em），Noto Sans SC 用于界面，DM Mono 用于坐标与数字，Spectral 用于 LIVING 字标。Living 模式使用深色（`--night*` 令牌）。
 
 # 约定
 

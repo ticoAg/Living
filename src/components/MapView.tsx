@@ -39,6 +39,11 @@ interface Props {
    * does not look at albums.
    */
   albums?: AlbumSource;
+  /**
+   * Fold the compact attribution to its ⓘ once the map has loaded (default true). MapLibre shows it unfolded until the
+   * first drag, which on a small embedded map covers a good part of it; a full-page map can keep the default.
+   */
+  foldAttribution?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -93,6 +98,7 @@ export default function MapView({
   interactive = true,
   cooperativeGestures = false,
   albums,
+  foldAttribution = true,
   className,
   style
 }: Props) {
@@ -125,6 +131,19 @@ export default function MapView({
           localIdeographFontFamily: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif"
         });
         mapRef.current = map;
+        if (foldAttribution) {
+          // Do what MapLibre does on the first drag: drop the "show" state, leaving the ⓘ to unfold it again. The text
+          // arrives with the style or a source, so try on each until it has been folded once.
+          const fold = () => {
+            const attrib = box.current?.querySelector('.maplibregl-ctrl-attrib.maplibregl-compact-show');
+            if (!attrib) return;
+            attrib.classList.remove('maplibregl-compact-show');
+            map.off('styledata', fold);
+            map.off('sourcedata', fold);
+          };
+          map.on('styledata', fold);
+          map.on('sourcedata', fold);
+        }
         if (interactive) map.addControl(new m.NavigationControl({ showCompass: false }), 'top-right');
         map.on('load', () => {
           restyle(map);
