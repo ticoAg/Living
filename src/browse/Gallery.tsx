@@ -1,12 +1,14 @@
-import { useDeferredValue, useEffect, useMemo, type ReactNode } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, type ReactNode } from 'react';
 import { Link } from 'wouter';
+import type { PhotoSummary } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { useSession } from '../lib/session';
 import { buildTagTree, filterByTags, inclusiveCounts } from '../lib/tags';
 import { enc, usePhotoList, usePoiList, useTagTree } from './api';
 import { setBrowseList } from './context';
-import GalleryTile from './GalleryTile';
+import GalleryTile, { galleryTileSize } from './GalleryTile';
 import { livingForFilter } from './links';
+import Masonry from './Masonry';
 import { byTakenDesc } from './sort';
 import TagFilter from './TagFilter';
 import { EmptyState, LoadError } from './ui';
@@ -17,6 +19,8 @@ import { replaceQuery, splitIds, useQuery } from './url';
 // toggling a chip is instant. State lives in the address bar: ?tags=a,b&city=杭州
 
 const EMPTY_TREE = buildTagTree([]);
+
+const photoId = (p: PhotoSummary) => p.id;
 
 const SKELETON_RATIOS = ['4 / 5', '3 / 2', '2 / 3', '1 / 1', '3 / 4', '3 / 2', '4 / 5', '2 / 3', '3 / 2', '1 / 1', '3 / 4', '4 / 3'];
 
@@ -45,9 +49,14 @@ export default function Gallery({ owner }: { owner?: string }) {
   // chips answer at once; the (large) tile list catches up right behind them
   const listed = useDeferredValue(shown);
 
+  // the photo page steps through the whole filtered list, not just the tiles rendered so far
   useEffect(() => {
     setBrowseList(shown.map((p) => p.id));
   }, [shown]);
+
+  const poiOf = useCallback((p: PhotoSummary) => (p.poiId ? poiById.get(p.poiId) : undefined), [poiById]);
+  const tileSize = useCallback((p: PhotoSummary) => galleryTileSize(p, poiOf(p)), [poiOf]);
+  const tile = useCallback((p: PhotoSummary) => <GalleryTile photo={p} poi={poiOf(p)} />, [poiOf]);
 
   const toggleTag = (id: string) =>
     replaceQuery({ tags: (selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]).join(',') });
@@ -90,13 +99,7 @@ export default function Gallery({ owner }: { owner?: string }) {
       </EmptyState>
     );
   } else {
-    body = (
-      <div className="gal-masonry">
-        {listed.map((p) => (
-          <GalleryTile key={p.id} photo={p} poi={p.poiId ? poiById.get(p.poiId) : undefined} />
-        ))}
-      </div>
-    );
+    body = <Masonry className="gal-masonry" items={listed} keyOf={photoId} measure={tileSize} render={tile} />;
   }
 
   return (

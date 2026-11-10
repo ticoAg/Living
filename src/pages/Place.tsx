@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, type CSSProperties } from 'react';
 import { Link, useParams } from 'wouter';
 import type { PhotoSummary, Poi, PoiDetail } from '../../shared/types';
 import { circleRing, dms } from '../../shared/geo';
@@ -9,7 +9,8 @@ import { DAY_PARTS, partOf, seasonOf, SEASONS } from '../browse/facets';
 import { useBoxSize, useDocTitle, useScrollTop } from '../browse/hooks';
 import { livingPlace } from '../browse/links';
 import { fitViewport } from '../browse/mapfit';
-import PlaceTile from '../browse/PlaceTile';
+import Masonry from '../browse/Masonry';
+import PlaceTile, { placeTileSize } from '../browse/PlaceTile';
 import { byTakenDesc } from '../browse/sort';
 import { EmptyState, LoadError, Loading, spanText } from '../browse/ui';
 import { replaceQuery, useQuery } from '../browse/url';
@@ -22,6 +23,8 @@ import { useApi } from '../lib/useApi';
 import '../styles/browse.css';
 
 type Nearby = Poi & { distance: number };
+
+const photoId = (p: PhotoSummary) => p.id;
 
 /** /place/:id — one place: map with its matching radius and every shot position, filters, photos, neighbours. */
 export default function Place() {
@@ -60,6 +63,9 @@ export default function Place() {
   }, [visible]);
 
   const visibleIds = useMemo(() => new Set(visible.map((r) => r.p.id)), [visible]);
+  const shownPhotos = useMemo(() => visible.map((r) => r.p), [visible]);
+  const tileSize = useCallback((p: PhotoSummary) => placeTileSize(p, showOwner), [showOwner]);
+  const tile = useCallback((p: PhotoSummary) => <PlaceTile photo={p} showOwner={showOwner} />, [showOwner]);
   const myId = user?.id;
   const shot = useMemo(
     () => rows.map((r) => r.p).filter((p) => p.lat != null && p.lng != null && (p.geoPrivacy === 'exact' || p.ownerId === myId)),
@@ -242,11 +248,7 @@ export default function Place() {
           </button>
         </EmptyState>
       ) : (
-        <div className="gal-masonry plc-masonry">
-          {visible.map((r) => (
-            <PlaceTile key={r.p.id} photo={r.p} showOwner={showOwner} />
-          ))}
-        </div>
+        <Masonry className="gal-masonry plc-masonry" items={shownPhotos} keyOf={photoId} measure={tileSize} render={tile} />
       )}
 
       {nearby && nearby.length > 0 && (
