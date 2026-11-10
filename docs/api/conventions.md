@@ -49,11 +49,13 @@ sources:
 
 # 位置精度（对非所有者）
 
-| `geoPrivacy` | `lat` `lng` | `heading` `alt` | `poiId` `poi` `poiDistance` | `district` |
-|---|---|---|---|---|
-| `exact` | 原值 | 原值 | 原值 | 原值 |
-| `fuzzy` | `shared/geo.ts` 的 `fuzz()` 取整 | null | 原值 | 原值 |
-| `hidden` | null | null | null | null |
+| `geoPrivacy` | `lat` `lng` | `heading` `alt` | `poiId` `poi` | `poiDistance` | `district` |
+|---|---|---|---|---|---|
+| `exact` | 原值 | 原值 | 原值 | 原值 | 原值 |
+| `fuzzy` | `shared/geo.ts` 的 `fuzz()` 取整 | null | 原值 | null | 原值 |
+| `hidden` | null | null | null | null | null |
+
+`fuzzy` 的 `poiDistance` 为 null：`poi` 带着地点的精确坐标，再给出到它的距离，取整后的位置就被缩回到几十米内。`poiMethod` 只在 `hidden` 时为 null。
 
 `province` 和 `city` 始终返回。列表（`PhotoSummary`）和详情（`PhotoDetail`）都带 `district`，按上表处理。
 

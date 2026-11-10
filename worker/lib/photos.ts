@@ -123,7 +123,8 @@ export async function toDetail(db: D1Database, r: PhotoRow, viewer: string | nul
     tz: r.tz ?? null,
     alt: g.level === 'exact' ? (r.alt ?? null) : null,
     poi: poiRow ? toPoi(poiRow) : null,
-    poiDistance: hidden ? null : (r.poi_distance ?? null),
+    // The place's centre is exact, so its distance to a fuzzy photo would give the rounding back.
+    poiDistance: g.level === 'exact' ? (r.poi_distance ?? null) : null,
     poiMethod: hidden ? null : (r.poi_method ?? null),
     camera: r.camera ?? null,
     lens: r.lens ?? null,

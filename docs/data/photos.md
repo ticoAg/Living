@@ -118,14 +118,15 @@ sources:
 
 位置精度对他人的效果：
 
-| `geo_privacy` | `lat` `lng` | `heading` `alt` | `poi_id` `poi_distance` | `district` |
-|---|---|---|---|---|
-| `exact` | 原值 | 原值 | 原值 | 原值 |
-| `fuzzy` | 取整到约 500 米 | 隐藏 | 原值 | 原值 |
-| `hidden` | 隐藏 | 隐藏 | 隐藏 | 隐藏 |
+| `geo_privacy` | `lat` `lng` | `heading` `alt` | `poi_id` | `poi_distance` | `district` |
+|---|---|---|---|---|---|
+| `exact` | 原值 | 原值 | 原值 | 原值 | 原值 |
+| `fuzzy` | 取整到约 500 米 | 隐藏 | 原值 | 隐藏 | 原值 |
+| `hidden` | 隐藏 | 隐藏 | 隐藏 | 隐藏 | 隐藏 |
 
 - 表里始终存原始坐标；精度处理发生在 Worker 组装响应时。任何新增的查询只要返回照片，都必须走同一套处理。
-- 创建照片时，坐标落在本人任一 [隐私区域](/data/privacy-zones.md) 内，`geo_privacy` 强制为 `hidden`。已发布的照片不会因为新增区域而被改写。
+- `fuzzy` 不返回 `poi_distance`：地点中心是精确坐标，再加上到它的距离，就能把取整后的位置缩回到几十米内。
+- 创建照片时，坐标落在本人任一 [隐私区域](/data/privacy-zones.md) 内，`geo_privacy` 强制为 `hidden`。新增区域时，本人坐标落在区域内的已有照片也改为 `hidden`；删除区域不会恢复。
 - `file_key` 不出现在接口响应里；原图只能由所有者经 `/media/o/…` 读取。
 - 地图、地点页只统计位置未隐藏的照片。
 

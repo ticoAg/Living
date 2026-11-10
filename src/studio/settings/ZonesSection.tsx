@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import type { PhotoSummary, PrivacyZone } from '../../../shared/types';
+import type { CreatePrivacyZoneResponse, PhotoSummary, PrivacyZone } from '../../../shared/types';
 import { fmtLat, fmtLng } from '../../../shared/geo';
 import { Icon } from '../../components/icons';
 import Img from '../../components/Img';
@@ -17,7 +17,7 @@ function parseNum(s: string, min: number, max: number): number | null {
   return Number.isFinite(n) && n >= min && n <= max ? n : null;
 }
 
-/** Privacy zones: photos taken inside one are uploaded with their location hidden. */
+/** Privacy zones: photos taken inside one get their location hidden, those already uploaded and those to come. */
 export default function ZonesSection() {
   const zonesReq = useApi<{ zones: PrivacyZone[] }>('/api/privacy-zones');
   const zones = useKeep(zonesReq.data)?.zones;
@@ -70,14 +70,27 @@ export default function ZonesSection() {
     setBusy(true);
     setMsg(null);
     try {
-      await api<{ zone: PrivacyZone }>('/api/privacy-zones', { json: { name: name.trim(), lat: la, lng: ln, radius: Math.round(r) } });
+      const { hiddenPhotos } = await api<CreatePrivacyZoneResponse>('/api/privacy-zones', {
+        json: { name: name.trim(), lat: la, lng: ln, radius: Math.round(r) }
+      });
       invalidate('/api/privacy-zones');
+      if (hiddenPhotos > 0) {
+        // those photos now show no location to others: lists, place counts and the map change
+        invalidate('/api/photos');
+        invalidate('/api/pois');
+      }
       setName('');
       setLat('');
       setLng('');
       setRadius('300');
       setFrom(null);
-      setMsg({ ok: true, text: `已添加「${name.trim()}」` });
+      setMsg({
+        ok: true,
+        text:
+          hiddenPhotos > 0
+            ? `已添加「${name.trim()}」，隐藏了 ${hiddenPhotos} 张照片的位置`
+            : `已添加「${name.trim()}」，区域内没有要隐藏的照片`
+      });
     } catch (err) {
       setMsg({ ok: false, text: errMsg(err, '添加失败') });
     } finally {
@@ -106,7 +119,7 @@ export default function ZonesSection() {
         隐私区域
       </h2>
       <p className="muted se-lede">
-        之后上传的照片，只要落在区域里，位置就会自动设为隐藏，上传页也会提示。已经发布的照片不受影响，需要的话到编辑页把位置精度改成隐藏。
+        落在区域里的照片，位置会设为隐藏：添加区域时已有的照片一并隐藏，之后上传的自动隐藏，上传页也会提示。删除区域不会恢复。
       </p>
 
       {!zones && !zonesReq.error && <p className="small muted">加载中…</p>}
@@ -143,7 +156,7 @@ export default function ZonesSection() {
               </div>
               {removing === z.id && (
                 <ConfirmBar
-                  prompt={`删除「${z.name}」？之后上传的照片不再因为它而自动隐藏位置。`}
+                  prompt={`删除「${z.name}」？之后上传的照片不再因为它而自动隐藏位置，已隐藏的不会恢复。`}
                   confirmLabel="确认删除"
                   busy={removeBusy}
                   onConfirm={() => void remove(z)}

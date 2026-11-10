@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
-import type { PrivacyZone } from '../../shared/types';
+import type { CreatePrivacyZoneResponse, PrivacyZone } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { invalid, notFound, paramId, readJson } from '../lib/http';
 import { newId } from '../lib/ids';
+import { photosToHide } from '../lib/privacy';
 import { requireUser } from '../lib/session';
 import { nowIso, prep } from '../lib/sql';
 import { optNum, reqNum, reqStr } from '../lib/validate';
@@ -39,19 +40,33 @@ privacyZones.post('/', async (c) => {
   const count = await db.prepare('SELECT COUNT(*) AS n FROM privacy_zones WHERE owner_id = ?1').bind(user.id).first<{ n: number }>();
   if ((count?.n ?? 0) >= MAX_ZONES) throw invalid(`隐私区域最多 ${MAX_ZONES} 个`);
 
+  // A zone protects the photos already taken inside it too, not only later uploads: hide their position now, in the
+  // same batch as the zone itself. Deleting the zone later does not bring the positions back.
   const id = newId.zone();
-  await prep(
-    db,
-    'INSERT INTO privacy_zones (id, owner_id, name, lat, lng, radius, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
-    id,
-    user.id,
-    name,
-    lat,
-    lng,
-    radius,
-    nowIso()
-  ).run();
-  return c.json({ zone: toZone({ id, name, lat, lng, radius }) }, 201);
+  const now = nowIso();
+  const hide = await photosToHide(db, user.id, { lat, lng, radius });
+  await db.batch([
+    prep(
+      db,
+      'INSERT INTO privacy_zones (id, owner_id, name, lat, lng, radius, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)',
+      id,
+      user.id,
+      name,
+      lat,
+      lng,
+      radius,
+      now
+    ),
+    prep(
+      db,
+      `UPDATE photos SET geo_privacy = 'hidden', updated_at = ?1 WHERE owner_id = ?2 AND id IN (SELECT value FROM json_each(?3))`,
+      now,
+      user.id,
+      JSON.stringify(hide)
+    )
+  ]);
+  const created: CreatePrivacyZoneResponse = { zone: toZone({ id, name, lat, lng, radius }), hiddenPhotos: hide.length };
+  return c.json(created, 201);
 });
 
 privacyZones.delete('/:id', async (c) => {

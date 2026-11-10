@@ -95,7 +95,9 @@ export interface PhotoDetail extends PhotoSummary {
   note: string | null;
   tz: string | null;
   alt: number | null;
+  /** The place; null for others when `geoPrivacy` is `hidden`. */
   poi: Poi | null;
+  /** Metres from the photo to the place; for others only with `geoPrivacy: 'exact'` (with fuzzy it would undo the rounding). */
   poiDistance: number | null;
   poiMethod: PoiMethod | null;
   camera: string | null;
@@ -338,6 +340,13 @@ export interface PrivacyZone {
   lat: number;
   lng: number;
   radius: number;
+}
+
+/** `POST /api/privacy-zones`. */
+export interface CreatePrivacyZoneResponse {
+  zone: PrivacyZone;
+  /** How many of the creator's photos inside the new zone just had their position set to `hidden`. */
+  hiddenPhotos: number;
 }
 
 export interface Invite {

@@ -172,9 +172,10 @@ function expectDetailGeo(p: PhotoDetail, v: Viewer) {
   expect(p.alt, at).toBe(level === 'exact' ? ALT : null);
   expect(p.poi?.id ?? null, at).toBe(level === 'hidden' ? null : poiIds[f.place]);
   expect(p.poiMethod, at).toBe(level === 'hidden' ? null : 'confirmed');
-  // conventions.md: hidden → null; otherwise the stored distance (a few hundred metres here).
-  if (level === 'hidden') expect(p.poiDistance, at).toBeNull();
-  else expect(p.poiDistance, at).toBeGreaterThan(100);
+  // conventions.md: only exact gives the stored distance (a few hundred metres here); with fuzzy, the distance to the
+  // place's exact centre would undo the rounding, so it is null like with hidden.
+  if (level === 'exact') expect(p.poiDistance, at).toBeGreaterThan(100);
+  else expect(p.poiDistance, at).toBeNull();
 }
 
 // ---- photos -------------------------------------------------------------------------------------------------------

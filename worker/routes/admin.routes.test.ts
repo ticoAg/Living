@@ -1,8 +1,9 @@
 // Privacy zones, invites and the registration setting against real D1: docs/api/users-admin.md.
 
 import { beforeEach, describe, expect, it } from 'vite-plus/test';
-import type { Invite } from '../../shared/types';
-import { Client, expectStatus, newUser, PASSWORD, usePlatform } from '../test-platform';
+import { destination } from '../../shared/geo';
+import type { Invite, PhotoDetail } from '../../shared/types';
+import { Client, expectStatus, newUser, PASSWORD, upload, usePlatform } from '../test-platform';
 
 const platform = usePlatform();
 
@@ -32,6 +33,50 @@ describe('privacy zones', () => {
     expect(expectStatus(await alice.del(`/api/privacy-zones/${home.id}`), 200)).toEqual({ ok: true });
     expect(expectStatus(await alice.get('/api/privacy-zones'), 200).zones).toEqual([work]);
     expect((await alice.del(`/api/privacy-zones/${home.id}`)).status).toBe(404);
+  });
+
+  it('hide the position of the creator’s photos already inside the new zone', async () => {
+    const HOME = { lat: 30.25, lng: 120.15 };
+    const near = (bearing: number, meters: number) => {
+      const [lat, lng] = destination(HOME.lat, HOME.lng, bearing, meters);
+      return { lat, lng };
+    };
+    const place = expectStatus(await alice.post('/api/pois', { name: '楼下', category: '景', ...near(0, 40) }), 201).poi;
+    const inside = await upload(alice, { ...near(90, 120), poiId: place.id, visibility: 'public', geoPrivacy: 'exact', heading: 45 });
+    const fuzzy = await upload(alice, { ...near(200, 250), visibility: 'public', geoPrivacy: 'fuzzy' });
+    const outside = await upload(alice, { ...near(45, 320), visibility: 'public', geoPrivacy: 'exact' });
+    const bobs = await upload(bob, { ...near(0, 10), visibility: 'public', geoPrivacy: 'exact' });
+    // placed inside only through its place: no coordinates of its own to hide
+    const viaPlace = await upload(alice, { poiId: place.id, visibility: 'public', geoPrivacy: 'exact' });
+
+    const visitor = new Client(platform);
+    const seen = async (id: string) => expectStatus(await visitor.get<PhotoDetail>(`/api/photos/${id}`), 200);
+    expect((await seen(inside.id)).lat).not.toBeNull();
+
+    const res = expectStatus(await alice.post('/api/privacy-zones', { name: '家', ...HOME, radius: 300 }), 201);
+    expect(res.hiddenPhotos).toBe(2);
+
+    for (const id of [inside.id, fuzzy.id]) {
+      const p = await seen(id);
+      expect(p, id).toMatchObject({ geoPrivacy: 'hidden', lat: null, lng: null, heading: null, poiId: null, poi: null, district: null });
+    }
+    // the gallery agrees
+    const gallery = expectStatus(await visitor.get<{ photos: PhotoDetail[] }>('/api/photos'), 200).photos;
+    expect(gallery.find((p) => p.id === inside.id)).toMatchObject({ geoPrivacy: 'hidden', lat: null, poiId: null });
+    // the owner still sees everything, and the photo says it is hidden now
+    expect(expectStatus(await alice.get<PhotoDetail>(`/api/photos/${inside.id}`), 200)).toMatchObject({
+      geoPrivacy: 'hidden',
+      lat: inside.lat,
+      poiId: place.id
+    });
+    for (const id of [outside.id, bobs.id, viaPlace.id]) expect((await seen(id)).geoPrivacy, id).toBe('exact');
+
+    // a wider zone over the same spot hides only what is not hidden yet; deleting the zones restores nothing
+    const again = expectStatus(await alice.post('/api/privacy-zones', { name: '还是家', ...HOME, radius: 500 }), 201);
+    expect(again.hiddenPhotos).toBe(1);
+    for (const z of expectStatus(await alice.get('/api/privacy-zones'), 200).zones) await alice.del(`/api/privacy-zones/${z.id}`);
+    expect((await seen(inside.id)).geoPrivacy).toBe('hidden');
+    expect((await seen(outside.id)).geoPrivacy).toBe('hidden');
   });
 
   it('check name, coordinates and radius (50 to 5000 m), and need a session', async () => {
