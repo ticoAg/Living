@@ -1,5 +1,10 @@
 # Directory Update Log
 
+## 2026-11-10
+* **Update**: 页面、静态资源、`/api`、`/media` 响应加上 nosniff、Referrer-Policy，页面禁止被 iframe 嵌入，见 [Cloudflare 资源](/architecture/cloudflare.md)。
+* **Update**: 发布后旧页面取不到分块时整页重新加载一次，仍失败则显示可刷新的错误状态，不再白屏，见 [前端分区](/architecture/frontend.md)。
+* **Update**: 会话过期时就地弹出重新登录，填写的内容不丢；共享 GET 缓存 5 分钟后在挂载或回到标签页时后台刷新，见 [账号](/product/features/accounts.md)。
+
 ## 2026-11-08
 * **Update**: 域名改为 Worker 路由 `living.ticoag.fun/*`，DNS 记录手动维护，不再使用自定义域名，见 [Cloudflare 资源](/architecture/cloudflare.md#资源)。
 * **Update**: 上传页"全部发布（N）"取代"发布全部已匹配"：一键照原样发布队列里所有没发的照片，待确认和无位置的不关联地点；刚拖进来就能点，处理和匹配完的照片依次发出，结束后报告发了几张、几张已存在、几张失败，见 [全部发布](/product/features/upload.md#全部发布)。
