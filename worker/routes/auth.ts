@@ -7,9 +7,9 @@ import { forbidden, invalid, readJson, rateLimited, conflict, unauthenticated } 
 import { newId } from '../lib/ids';
 import { clear, clientIp, hit } from '../lib/ratelimit';
 import { currentUser, endSession, startSession, toSessionUser, USER_COLS } from '../lib/session';
+import { getRegistration } from '../lib/settings';
 import { isUniqueViolation, nowIso, prep } from '../lib/sql';
 import { reqStr } from '../lib/validate';
-import { getRegistration } from './site';
 
 export const auth = new Hono<AppEnv>({ strict: false });
 

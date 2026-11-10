@@ -5,9 +5,9 @@ import type { AppEnv } from '../env';
 import { conflict, forbidden, invalid, notFound, readJson } from '../lib/http';
 import { inviteCode } from '../lib/ids';
 import { requireRole, requireUser } from '../lib/session';
+import { REGISTRATION_MODES, getRegistration, type Registration } from '../lib/settings';
 import { addDaysIso, isUniqueViolation, nowIso, prep } from '../lib/sql';
 import { has, optEnum, optNum, optText } from '../lib/validate';
-import { REGISTRATION_MODES, getRegistration, type Registration } from './site';
 
 export const admin = new Hono<AppEnv>({ strict: false });
 
