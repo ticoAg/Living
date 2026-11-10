@@ -229,3 +229,18 @@ export function useAutoHide(hold: boolean, delay = 3000): AutoHide {
 
   return useMemo(() => ({ visible, poke, toggle }), [visible, poke, toggle]);
 }
+
+/** Page chrome while Living is open: the dark page (`html.lv-active`) and a dark browser UI colour. */
+export function useDarkChrome(): void {
+  useEffect(() => {
+    const html = document.documentElement;
+    html.classList.add('lv-active');
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const prev = meta?.getAttribute('content') ?? null;
+    meta?.setAttribute('content', '#0E0F0E');
+    return () => {
+      html.classList.remove('lv-active');
+      if (meta && prev !== null) meta.setAttribute('content', prev);
+    };
+  }, []);
+}
