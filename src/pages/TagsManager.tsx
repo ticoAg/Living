@@ -22,6 +22,7 @@ const SWATCHES: { color: string; label: string }[] = [
 
 function IconBtn({
   label,
+  text,
   icon,
   onClick,
   disabled,
@@ -30,6 +31,8 @@ function IconBtn({
   flip
 }: {
   label: string;
+  /** short name shown beside the icon in the phone's action menu; part of `label`, so speech matches what is seen */
+  text: string;
   icon: IconName;
   onClick: () => void;
   disabled?: boolean;
@@ -49,6 +52,9 @@ function IconBtn({
       onClick={onClick}
     >
       <Icon name={icon} size={17} style={flip ? { transform: 'rotate(180deg)' } : undefined} />
+      <span className="tm-icon-text" aria-hidden="true">
+        {text}
+      </span>
     </button>
   );
 }
@@ -278,6 +284,8 @@ export default function TagsManager() {
   const seeded = useRef(false);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  // phones: the row whose actions are unfolded behind its "more" button (wider screens always show them)
+  const [menu, setMenu] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -334,6 +342,12 @@ export default function TagsManager() {
     return ok;
   }
 
+  /** Open (or with null close) a tag's panel; the phone's action menu folds away, the panel takes its place. */
+  const openPanel = (id: string, kind: Panel['kind'] | null) => {
+    setMenu(null);
+    setPanel(kind ? { id, kind } : null);
+  };
+
   const siblingsOf = (n: TagNode): TagNode[] => (n.parentId ? tree.byId.get(n.parentId)?.children : undefined) ?? tree.roots;
 
   /** Swap places with the neighbour by trading `sort` values; hop over a preset the user may not touch. */
@@ -373,7 +387,12 @@ export default function TagsManager() {
           const working = busy === n.id;
           return (
             <li key={n.id} className="tm-item">
-              <div className="tm-row" data-preset={n.ownerId === null || undefined} data-busy={working || undefined}>
+              <div
+                className="tm-row"
+                data-preset={n.ownerId === null || undefined}
+                data-busy={working || undefined}
+                data-menu={menu === n.id || undefined}
+              >
                 {n.children.length ? (
                   <button
                     type="button"
@@ -413,10 +432,22 @@ export default function TagsManager() {
                   {countOf(n)}
                 </span>
 
-                <span className="tm-actions">
+                <button
+                  type="button"
+                  className="tm-icon tm-more"
+                  aria-label={`「${n.name}」的更多操作`}
+                  aria-expanded={menu === n.id}
+                  aria-controls={`tm-act-${n.id}`}
+                  onClick={() => setMenu(menu === n.id ? null : n.id)}
+                >
+                  <Icon name="more" size={18} />
+                </button>
+
+                <span className="tm-actions" id={`tm-act-${n.id}`}>
                   {mine && (
                     <IconBtn
                       label={`「${n.name}」上移`}
+                      text="上移"
                       icon="down"
                       flip
                       onClick={() => void reorder(n, -1)}
@@ -426,40 +457,48 @@ export default function TagsManager() {
                   {mine && (
                     <IconBtn
                       label={`「${n.name}」下移`}
+                      text="下移"
                       icon="down"
                       onClick={() => void reorder(n, 1)}
                       disabled={at < 0 || at >= sibs.length - 1 || !!busy}
                     />
                   )}
                   <IconBtn
-                    label={`在「${n.name}」下新建子标签`}
+                    label={`在「${n.name}」下添加子标签`}
+                    text="添加"
                     icon="plus"
-                    onClick={() => setPanel(here === 'add' ? null : { id: n.id, kind: 'add' })}
+                    onClick={() => openPanel(n.id, here === 'add' ? null : 'add')}
                     pressed={here === 'add'}
                   />
                   {mine && (
                     <IconBtn
-                      label={`重命名「${n.name}」`}
+                      label={`给「${n.name}」改名`}
+                      text="改名"
                       icon="edit"
-                      onClick={() => setRenaming(renaming === n.id ? null : n.id)}
+                      onClick={() => {
+                        setMenu(null);
+                        setRenaming(renaming === n.id ? null : n.id);
+                      }}
                       pressed={renaming === n.id}
                       disabled={!!busy}
                     />
                   )}
                   {mine && (
                     <IconBtn
-                      label={`移动或设置颜色：「${n.name}」`}
+                      label={`设置「${n.name}」：移动或颜色`}
+                      text="设置"
                       icon="sliders"
-                      onClick={() => setPanel(here === 'more' ? null : { id: n.id, kind: 'more' })}
+                      onClick={() => openPanel(n.id, here === 'more' ? null : 'more')}
                       pressed={here === 'more'}
                     />
                   )}
                   {mine && (
                     <IconBtn
                       label={`删除「${n.name}」`}
+                      text="删除"
                       icon="trash"
                       danger
-                      onClick={() => setPanel(here === 'delete' ? null : { id: n.id, kind: 'delete' })}
+                      onClick={() => openPanel(n.id, here === 'delete' ? null : 'delete')}
                       pressed={here === 'delete'}
                     />
                   )}

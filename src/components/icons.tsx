@@ -68,7 +68,8 @@ const UI = {
   star: { d: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z' },
   expand: { d: 'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7' },
   user: { d: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0' },
-  grip: { d: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01' }
+  grip: { d: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01' },
+  more: { d: 'M5 12h.01M12 12h.01M19 12h.01' }
 } as const;
 export type IconName = keyof typeof UI;
 
@@ -82,7 +83,7 @@ export function Icon({ name, size = 20, ...rest }: { name: IconName; size?: numb
       viewBox="0 0 24 24"
       fill={filled ? 'currentColor' : 'none'}
       stroke={filled ? 'none' : 'currentColor'}
-      strokeWidth={name === 'grip' ? 3 : 1.75}
+      strokeWidth={name === 'grip' || name === 'more' ? 3 : 1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"

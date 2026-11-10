@@ -18,15 +18,18 @@ export default function Header() {
         <Link href="/" className="wordmark">
           LIVING
         </Link>
-        <nav aria-label="主导航" className="site-nav">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="nav-link" aria-current={n.match(path) ? 'page' : undefined}>
-              {n.label}
-            </Link>
-          ))}
+        {/* on phones the nav becomes a bar fixed to the foot of the screen; the account actions stay up here */}
+        <div className="site-bar">
+          <nav aria-label="主导航" className="site-nav">
+            {NAV.map((n) => (
+              <Link key={n.href} href={n.href} className="nav-link" aria-current={n.match(path) ? 'page' : undefined}>
+                {n.label}
+              </Link>
+            ))}
+          </nav>
           {user && !expired ? (
             <>
-              <Link href="/upload" className="btn btn-quiet btn-icon" aria-label="上传" style={{ marginLeft: 8 }}>
+              <Link href="/upload" className="btn btn-quiet btn-icon site-upload" aria-label="上传">
                 <Icon name="upload" size={18} />
               </Link>
               <details className="user-menu">
@@ -68,7 +71,7 @@ export default function Header() {
               登录
             </Link>
           )}
-        </nav>
+        </div>
       </div>
     </header>
   );

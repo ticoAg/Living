@@ -12,6 +12,10 @@
 .bw-state-title { margin: 0; font: 500 18px var(--serif); letter-spacing: 0.12em; color: var(--ink-2); }
 .bw-state-hint { margin: 0; font-size: 14px; color: var(--ink-2); }
 .bw-chips { display: flex; flex-wrap: wrap; gap: 2px; }
+/* the phone-only button that unfolds a page's filters (browse/ui.tsx FilterToggle) */
+.btn.bw-filter { display: none; }
+.bw-filter[aria-expanded='true'] { background: var(--mat); }
+.bw-filter-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--ink); color: var(--paper); font-size: 12px; }
 .bw .mono { font-variant-numeric: tabular-nums; }
 /* the base .chip loses its pressed look to data-included when a selected chip sits inside a selected subtree */
 .chip[aria-pressed='true'][data-included='true'] { background: var(--ink); color: var(--paper); }
@@ -272,10 +276,15 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .gal { padding-top: 28px; }
   .gal-count-n, .prof-num, .plc-stat-n { font-size: 32px; }
   .prof-head { padding-top: 28px; }
+  .btn.bw-filter { display: inline-flex; }
+  /* filter button and Living share a row; the tag rows unfold below them, pushing the photos down */
+  .gal-head { flex-wrap: wrap; align-items: center; gap: 12px; padding-bottom: 12px; }
+  .gal-head-tags { order: 3; flex-basis: 100%; }
+  .gal-head-tags[data-open='false'] { display: none; }
+  .gal-head .tagf { padding-bottom: 0; }
+  .gal-head > .btn-living { order: 2; margin-left: auto; }
+  .gal-masonry { padding-top: 24px; }
   /* tag rows scroll sideways instead of stacking into a wall of chips */
-  .gal-head { flex-direction: column-reverse; align-items: stretch; border-bottom: 0; }
-  .gal-head .tagf { border-bottom: 1px solid var(--rule); }
-  .gal-head > .btn-living { align-self: flex-end; }
   .tagf { margin-inline: calc(var(--gutter) * -1); }
   .tagf-row { flex-wrap: nowrap; overflow-x: auto; margin-left: 0; padding: 2px var(--gutter) 2px calc(var(--gutter) - 10px); scrollbar-width: none; }
   .tagf-row::-webkit-scrollbar { display: none; }
@@ -284,7 +293,19 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .pho-side { max-width: none; }
   .pho-main { gap: 28px; }
   .plc-top { margin-top: -16px; }
-  .mpg-map { flex-basis: 100%; height: 58vh; min-height: 360px; }
+  /* title and filter button on one row, the cities scrolling sideways below, the season and light chips folded:
+     the map takes the rest of the screen (136px: the rows above it and their gaps) */
+  .mpg { gap: 12px; }
+  .mpg-top { align-items: center; gap: 8px 12px; padding-top: 12px; }
+  .mpg-title { display: contents; }
+  .mpg-h1 { order: 1; flex: 1 1 auto; }
+  .mpg-top > .bw-filter { order: 2; }
+  .mpg-cities { order: 3; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) 0 calc(var(--gutter) - 10px); scrollbar-width: none; }
+  .mpg-cities::-webkit-scrollbar { display: none; }
+  .mpg-cities > * { flex: none; }
+  .mpg-filters { order: 4; flex: 1 1 100%; }
+  .mpg-filters[data-open='false'] { display: none; }
+  .mpg-map { flex-basis: 100%; height: calc(100svh - var(--header-h) - var(--nav-foot, 0px) - 136px); min-height: 320px; }
   .mpg-panel { flex-basis: 100%; max-width: none; }
   .idx { gap: 40px; }
   .idx-head { padding-top: 28px; }

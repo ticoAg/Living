@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import type { PhotoSummary } from '../../shared/types';
 import { dms } from '../../shared/geo';
@@ -27,7 +27,7 @@ import { fitViewport } from '../browse/mapfit';
 import { shortCity, shortProvince } from '../browse/regions';
 import SwapMap from '../browse/SwapMap';
 import { byTakenDesc } from '../browse/sort';
-import { LoadError, Loading, spanText } from '../browse/ui';
+import { FilterToggle, LoadError, Loading, spanText } from '../browse/ui';
 import { replaceQuery, splitIds, useQuery } from '../browse/url';
 import Img from '../components/Img';
 import { CategoryIcon, Icon } from '../components/icons';
@@ -259,6 +259,9 @@ export default function MapPage() {
 
   const setTags = (season: string, ls: readonly string[]) => replaceQuery({ tags: [season, ...ls].filter(Boolean).join(',') });
   const filtering = !!selSeason || selLights.length > 0;
+  // phones fold the season and light chips behind a button, so the map gets the screen
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterId = useId();
 
   if (error) {
     return (
@@ -297,7 +300,15 @@ export default function MapPage() {
             </div>
           )}
         </div>
-        <div className="mpg-filters">
+        {(seasons.length > 0 || lights.length > 0) && (
+          <FilterToggle
+            open={filterOpen}
+            onToggle={() => setFilterOpen((o) => !o)}
+            count={(selSeason ? 1 : 0) + selLights.length}
+            controls={filterId}
+          />
+        )}
+        <div className="mpg-filters" id={filterId} data-open={filterOpen}>
           <ChipGroup
             label="季节"
             chips={seasons.map((s) => ({ id: s.id, label: s.label, disabled: !avail.seasonOk.has(s.id) }))}

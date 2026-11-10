@@ -81,15 +81,28 @@ h1, h2, h3 { text-wrap: balance; }
 .site-header { position: sticky; top: 0; z-index: 20; background: var(--paper); border-bottom: 1px solid var(--rule); }
 .site-header-inner { max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 20px; }
 .wordmark { display: flex; align-items: center; min-height: var(--header-h); font: 500 17px var(--latin); letter-spacing: 0.42em; color: var(--ink); text-decoration: none; }
-.site-nav { display: flex; align-items: center; gap: 2px; }
-.site-nav a.nav-link { display: flex; align-items: center; min-height: var(--header-h); padding: 0 12px; color: var(--ink-2); text-decoration: none; font-size: 15px; }
-.site-nav a.nav-link[aria-current='page'] { color: var(--ink); font-weight: 500; box-shadow: inset 0 -2px 0 var(--ink); }
+.site-bar, .site-nav { display: flex; align-items: center; gap: 2px; }
+.site-bar a.nav-link { display: flex; align-items: center; min-height: var(--header-h); padding: 0 12px; color: var(--ink-2); text-decoration: none; font-size: 15px; }
+.site-bar a.nav-link[aria-current='page'] { color: var(--ink); font-weight: 500; box-shadow: inset 0 -2px 0 var(--ink); }
+.site-upload { margin-left: 8px; }
 .user-menu { position: relative; }
 .user-menu > summary { list-style: none; cursor: pointer; }
 .user-menu > summary::-webkit-details-marker { display: none; }
 .user-menu-panel { position: absolute; right: 0; top: calc(100% + 6px); min-width: 180px; padding: 6px; background: var(--sheet); border: 1px solid var(--rule-2); border-radius: 3px; box-shadow: 0 12px 32px -12px rgba(28, 32, 30, 0.35); display: flex; flex-direction: column; }
 .user-menu-panel a, .user-menu-panel button { display: flex; align-items: center; min-height: 44px; padding: 0 12px; border: 0; background: none; text-align: left; color: var(--ink); text-decoration: none; cursor: pointer; border-radius: 2px; }
 .user-menu-panel a:hover, .user-menu-panel button:hover { background: var(--mat); }
+/* Phones: one header row (wordmark, upload, account); the four sections move to a bar fixed at the foot of the screen,
+   always one tap away. --nav-foot is that bar's height; the page, scrolling into view and sticky bottom bars keep clear
+   of it. Pages without the header (Living) have no bar and no padding. */
+@media (max-width: 640px) {
+  :root { --header-h: 52px; }
+  :root:has(.site-nav) { --nav-foot: calc(52px + env(safe-area-inset-bottom, 0px)); scroll-padding-bottom: var(--nav-foot); }
+  body { padding-bottom: var(--nav-foot, 0px); }
+  .site-header-inner { flex-wrap: nowrap; }
+  .site-nav { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--paper); border-top: 1px solid var(--rule); }
+  .site-nav a.nav-link { justify-content: center; min-height: 52px; padding: 0; }
+  .site-nav a.nav-link[aria-current='page'] { box-shadow: inset 0 2px 0 var(--ink); }
+}
 
 /* Controls */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 1px solid var(--ink); border-radius: 3px; background: transparent; color: var(--ink); font-size: 14px; font-weight: 500; text-decoration: none; cursor: pointer; white-space: nowrap; }

@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, type ReactNode } from 'react';
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import type { PhotoSummary } from '../../shared/types';
 import { Icon } from '../components/icons';
@@ -11,7 +11,7 @@ import { livingForFilter } from './links';
 import Masonry from './Masonry';
 import { byTakenDesc } from './sort';
 import TagFilter from './TagFilter';
-import { EmptyState, LoadError } from './ui';
+import { EmptyState, FilterToggle, LoadError } from './ui';
 import { replaceQuery, splitIds, useQuery } from './url';
 
 // The masonry gallery shared by the home page (everyone's public photos) and a profile (`owner`).
@@ -62,6 +62,10 @@ export default function Gallery({ owner }: { owner?: string }) {
     replaceQuery({ tags: (selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]).join(',') });
   const clear = () => replaceQuery({ tags: null, city: null });
 
+  // phones fold the tag rows behind a button (browse.css); wider screens always show them
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterId = useId();
+
   const filtered = selected.length > 0 || !!city;
   const total = shown.length;
   const livingHref = livingForFilter({ tags: selected, city, user: owner });
@@ -102,11 +106,16 @@ export default function Gallery({ owner }: { owner?: string }) {
     body = <Masonry className="gal-masonry" items={listed} keyOf={photoId} measure={tileSize} render={tile} />;
   }
 
+  const hasFilter = !!photos && !!tree && tree.roots.length > 0;
+
   return (
     <div className="gal">
       <div className="gal-head">
-        <div className="gal-head-tags">
-          {photos && tree && tree.roots.length > 0 && <TagFilter tree={tree} selected={selected} counts={counts} onToggle={toggleTag} />}
+        {hasFilter && (
+          <FilterToggle open={filterOpen} onToggle={() => setFilterOpen((o) => !o)} count={selected.length} controls={filterId} />
+        )}
+        <div className="gal-head-tags" id={filterId} data-open={filterOpen}>
+          {hasFilter && <TagFilter tree={tree} selected={selected} counts={counts} onToggle={toggleTag} />}
         </div>
         {total > 0 ? (
           <Link href={livingHref} className="btn btn-primary btn-living" aria-label={livingLabel}>

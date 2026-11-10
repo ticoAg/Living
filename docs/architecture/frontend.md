@@ -57,7 +57,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/components/Img.tsx` | 响应式图片 + ThumbHash 占位 |
 | `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放；署名在地图加载后收成 ⓘ（地图页 `/map` 保持 MapLibre 默认） |
 | `src/components/icons.tsx` | 地点类别符号 `CategoryIcon`、界面图标 `Icon` |
-| `src/components/Header.tsx` | 站点页眉与导航 |
+| `src/components/Header.tsx` | 站点页眉与导航；手机上（≤640px）页眉一行（字标、上传、账户），四个分区移到底部固定栏 |
 | `src/components/ErrorBoundary.tsx` | 路由外的错误边界：分块失效时重新加载，其他错误显示「出错了」 |
 | `src/styles/base.css` | 设计令牌与通用控件（按钮、标签片、色块、分段、输入框） |
 
@@ -70,3 +70,4 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 - 文案用中文，简短；能用版面说明的不加说明文字。
 - 交互控件用真实的 `button`、`a`、`input`，触控目标不小于 44px，图标按钮带 `aria-label`。
 - 地址栏承载可分享的状态（筛选、选中地点、Living 参数）。
+- 手机（≤640px）：`--header-h` 是 52px；底部导航栏的高度是 `--nav-foot`（含安全区，没有页眉的页面为 0），页面底部留白、滚动定位和吸底的操作栏都让开它。筛选收进「筛选」按钮（`FilterToggle`），按钮上显示已选个数。

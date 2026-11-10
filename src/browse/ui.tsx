@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'wouter';
+import { Icon } from '../components/icons';
 import { ApiError } from '../lib/api';
 
 // Small shared pieces for loading, failure and empty states.
@@ -55,6 +56,37 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The button that unfolds a page's filters on a phone (hidden on wider screens, where the filters always show; see
+ * .bw-filter in browse.css). The number of chosen filters sits on it, so a folded filter still shows it is on.
+ */
+export function FilterToggle({
+  open,
+  onToggle,
+  count,
+  controls
+}: {
+  open: boolean;
+  onToggle: () => void;
+  count: number;
+  controls: string;
+}) {
+  return (
+    <button type="button" className="btn btn-quiet bw-filter" aria-expanded={open} aria-controls={controls} onClick={onToggle}>
+      <Icon name="sliders" size={18} />
+      筛选
+      {count > 0 && (
+        <>
+          <span className="bw-filter-n mono" aria-hidden="true">
+            {count}
+          </span>
+          <span className="visually-hidden">，已选 {count} 个</span>
+        </>
+      )}
+    </button>
   );
 }
 
