@@ -17,7 +17,8 @@ sources:
 |---|---|
 | 安装 | `npm ci` |
 | 格式、lint、类型检查 | `npx vp check` |
-| 测试 | `npx vp test` |
+| 单元测试 | `npx vp test` |
+| 路由测试 | `npm run test:routes`（本地 D1、R2、KV 上的接口测试，见 [路由测试](/runbooks/local-dev.md#路由测试)） |
 | 构建 | `npx vp build` |
 
 # 部署触发
@@ -32,7 +33,7 @@ sources:
 | Node | `.node-version`（24） |
 | 构建缓存 | 开启（缓存依赖与构建产物） |
 
-Workers Builds 会在构建前按 `package-lock.json` 自动安装依赖。部署前的构建不检查格式：格式问题在 PR 检查里拦下，不阻塞已经合并的修复上线。
+Workers Builds 会在构建前按 `package-lock.json` 自动安装依赖。部署前的构建不检查格式：格式问题在 PR 检查里拦下，不阻塞已经合并的修复上线。路由测试也只在 PR 检查里跑：它要启动 workerd，在 Workers Builds 里能否启动没有验证过，不能让部署被它卡住。
 
 # 流程
 

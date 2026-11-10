@@ -1,12 +1,17 @@
 import { cloudflare } from '@cloudflare/vite-plugin';
 import react from '@vitejs/plugin-react';
-import { defineConfig, lazyPlugins } from 'vite-plus';
+import { defaultExclude, defineConfig, lazyPlugins } from 'vite-plus';
+
+// Route tests run the API against local D1, R2 and KV in workerd (worker/test-platform.ts). They have their own command,
+// `npm run test:routes` (mode 'routes'), and stay out of `vp test` and `npm run build`: the deploy build must not
+// depend on starting workerd.
+const ROUTE_TESTS = 'worker/**/*.routes.test.ts';
 
 export default defineConfig(({ mode }) => ({
   // The Cloudflare plugin runs worker/index.ts in workerd next to the SPA, with the bindings from wrangler.jsonc.
   // `vp build` writes dist/client and dist/living; `wrangler deploy` picks them up through .wrangler/deploy.
-  // Vitest (mode 'test') runs plain Node tests; the Cloudflare plugin's dev server would clash with Vitest's.
-  plugins: lazyPlugins(() => (mode === 'test' ? [react()] : [react(), cloudflare()])),
+  // Vitest (modes 'test' and 'routes') runs in Node; the Cloudflare plugin's dev server would clash with Vitest's.
+  plugins: lazyPlugins(() => (mode === 'test' || mode === 'routes' ? [react()] : [react(), cloudflare()])),
   build: { chunkSizeWarningLimit: 1400 },
   fmt: {
     singleQuote: true,
@@ -25,8 +30,8 @@ export default defineConfig(({ mode }) => ({
     },
     options: { typeAware: true, typeCheck: true }
   },
-  test: {
-    include: ['{src,worker,shared}/**/*.test.ts'],
-    environment: 'node'
-  }
+  test:
+    mode === 'routes'
+      ? { include: [ROUTE_TESTS], environment: 'node', hookTimeout: 60_000, testTimeout: 20_000 }
+      : { include: ['{src,worker,shared}/**/*.test.ts'], exclude: [...defaultExclude, ROUTE_TESTS], environment: 'node' }
 }));

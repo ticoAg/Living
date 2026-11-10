@@ -24,4 +24,5 @@ jobs:
       - run: npm ci
       - run: npx vp check
       - run: npx vp test
+      - run: npm run test:routes
       - run: npx vp build

@@ -45,6 +45,7 @@ npm run dev                # http://localhost:5173：页面、/api、/media 和�
 | -------------------------- | ------------------------------------ |
 | `npm run check`            | 格式、lint 和类型检查（`vp check`）  |
 | `npm test`                 | 单元测试（`vp test`）                |
+| `npm run test:routes`      | 接口在本地 D1、R2、KV 上的路由测试   |
 | `npm run build`            | 检查、测试加构建，与线上构建命令相同 |
 | `npm run db:migrate:local` | 对本地 D1 应用迁移                   |
 

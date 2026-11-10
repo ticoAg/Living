@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: 本地开发
-description: 安装依赖、建本地 D1、写入站长邀请码，用 Vite+ 一条命令在本机跑起前端、Worker 和本地 D1、R2、KV。
+description: 安装依赖、建本地 D1、写入站长邀请码，用 Vite+ 一条命令在本机跑起前端、Worker 和本地 D1、R2、KV；单元测试与路由测试怎么跑。
 tags: [runbook, dev]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/package.json
@@ -53,6 +53,7 @@ sources:
 | 检查 | `npm run check`，即 `vp check`：格式、Oxlint（含类型感知规则）和类型检查一起跑 |
 | 自动修复 | `npx vp check --fix`，格式化并应用能自动修复的 lint 规则 |
 | 测试 | `npm test`，即 `vp test`（Vitest）；监听模式用 `npx vp test watch` |
+| 路由测试 | `npm run test:routes`：接口在本地 D1、R2、KV 上跑，见 [路由测试](#路由测试) |
 | 完整构建 | `npm run build`，即 `vp check --no-fmt`、`vp test`、`vp build`，与线上构建命令相同 |
 | 预览构建产物 | `npm run build` 后 `npx vp preview`，在 workerd 里运行构建出的 Worker |
 | 新增迁移 | `npx wrangler d1 migrations create living <描述>`，写好后 `npm run db:migrate:local`，规则见 [部署](/runbooks/deploy.md) |
@@ -74,6 +75,23 @@ npx vp test shared/geo   # 只跑路径里含 shared/geo 的测试文件
 - 不碰真实的 D1、R2、KV 和外部服务。`worker/test-utils.ts` 提供内存里的 D1、KV 替身，`fetch` 在测试里用 `vi.stubGlobal` 替换。
 - 涉及日期的测试用本地日期字段构造（如 `new Date(2026, 10, 8)`），结果不随机器时区变化。
 - `npm run build` 会先跑检查和测试，有一项失败就不会构建。
+
+# 路由测试
+
+接口的集成测试：`worker/routes/*.routes.test.ts` 通过 `app.request()` 调用真实的路由，SQL 在本地 D1 上执行，文件写进本地 R2，会话和限流计数在本地 KV，`/media` 用本地的 Cache API。覆盖可见性与位置精度矩阵、账号、上传、照片、主题、标签、地点、隐私区域、邀请码和注册设置。
+
+```bash
+npm run test:routes                          # 跑一遍，即 vp test --mode routes
+npm run test:routes -- worker/routes/tags    # 只跑一个文件
+```
+
+- 底座在 `worker/test-platform.ts`：每个测试文件用 Miniflare 启动一个 workerd，D1、R2、KV 都在内存里，不落盘；建库时按文件名顺序应用 `migrations/` 的全部迁移。每个测试开始前恢复到刚迁移完的状态（预置标签和设置还在，其余清空），只读的夹具文件（`visibility.routes.test.ts`）例外。
+- 路由在 Node 里运行。D1 的语句由 workerd 里的一个小 Worker 在真实的 D1 绑定上执行，每次执行一个来回；KV、R2 和 Cache API 用 Miniflare 的绑定代理。
+- 请求由 `Client` 发出：手动带上会话 Cookie（它是 `Secure` 的），写请求带站点的 `Origin`，并带固定的 `CF-Connecting-IP`（登录限流按它计数）；每个请求等 `waitUntil` 里的工作做完再返回。`ASSETS` 是返回一个空页面的替身。
+- 不访问网络：对 Photon、Nominatim、Overpass、高德的请求由 `platform.external.respond` 应答（默认都返回 503，即外部服务不可用），访问其他外部主机会让测试失败；底座与 workerd 之间的本机通信不受影响。
+- `newUser()` 直接在 D1 和 KV 里建用户和会话，`upload()` 走真实的上传接口，尺寸图只是魔数正确的几个字节。注册流程本身在 `auth.routes.test.ts` 里测。
+- 期望按 `docs/api/` 写。暴露出、但还没有修的与文档不一致之处写成 `it.fails`，修好后改回 `it`。
+- 不在 `npm test` 和 `npm run build` 里：线上构建在 Workers Builds 里执行 `npm run build`，那里能否启动 workerd 没有验证过。PR 检查单独跑它，见 [构建与发布](/architecture/ci-cd.md#pr-检查)。
 
 # 重置本地数据
 
