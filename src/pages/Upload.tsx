@@ -6,6 +6,9 @@ import { ensureSaved, nearbyGroup, planPlace } from '../studio/batch-place';
 import type { ApplyResult } from '../studio/BatchPlace';
 import { DEFAULT_RADIUS, createPoi, initialMatch, matchPois, type PlaceChoice } from '../studio/match';
 import { processFile } from '../studio/process';
+import { deviceHints, nextToProcess, processLimit } from '../studio/process-queue';
+import { fileKey } from '../studio/upload-drafts';
+import { useUploadDrafts } from '../studio/useUploadDrafts';
 import { uploadPhoto } from '../studio/publish';
 import { PageHead } from '../studio/ui';
 import UploadBatch from '../studio/UploadBatch';
@@ -36,7 +39,6 @@ import '../styles/studio.css';
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|avif|heic|heif|gif|bmp|tiff?)$/i;
 const isImage = (f: File) => f.type.startsWith('image/') || IMAGE_EXT.test(f.name);
-const fileKey = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
 
 const SUMMARY: { key: StatusKey; label: string }[] = [
   { key: 'matched', label: '已匹配' },
@@ -63,7 +65,7 @@ function runSummary(t: { done: number; duplicate: number; failed: number }, stop
 
 export default function Upload() {
   useTitle('上传');
-  const { ready } = useRequireLogin();
+  const { user, ready } = useRequireLogin();
 
   const [items, setItems] = useState<Item[]>([]);
   const itemsRef = useRef<Item[]>([]);
@@ -75,9 +77,12 @@ export default function Upload() {
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [kick, setKick] = useState(0);
+  const drafts = useUploadDrafts(user?.id ?? null, items);
 
   const alive = useRef(true);
-  const busy = useRef(false);
+  /** photos being read and resized right now */
+  const running = useRef(new Set<string>());
+  const limit = useMemo(() => processLimit(deviceHints()), []);
   const dragDepth = useRef(0);
   const stopBulk = useRef(false);
   const bulkOn = useRef(false);
@@ -138,13 +143,20 @@ export default function Upload() {
       const parts: string[] = [];
       if (files.length - images.length > 0) parts.push(`已忽略 ${files.length - images.length} 个不是图片的文件`);
       if (images.length - fresh.length > 0) parts.push(`${images.length - fresh.length} 张已在队列里`);
+      // what was filled in for these files before (a reload, a crashed tab) comes back with them
+      let restored = 0;
+      const added = fresh.map((f) => {
+        const kept = drafts.take(f);
+        if (kept) restored++;
+        return kept ? { ...newItem(f), ...kept } : newItem(f);
+      });
+      if (restored) parts.push(`已恢复 ${restored} 张之前填的内容`);
       setNotice(parts.length ? `${parts.join('，')}。` : null);
-      if (!fresh.length) return;
-      const added = fresh.map(newItem);
+      if (!added.length) return;
       update((prev) => [...prev, ...added]);
       setSelectedId((cur) => (cur && itemsRef.current.some((i) => i.id === cur) ? cur : added[0].id));
     },
-    [update]
+    [update, drafts]
   );
 
   const onPick = (e: ChangeEvent<HTMLInputElement>) => {
@@ -227,15 +239,12 @@ export default function Upload() {
     [runMatch]
   );
 
-  /* ------------------------------------------------------------ processing (one file at a time) */
+  /* ------------------------------------------------------------ processing (a few files at a time) */
 
-  useEffect(() => {
-    if (!ready || busy.current) return;
-    const next = items.find((i) => i.stage === 'queued');
-    if (!next) return;
-    busy.current = true;
-    patch(next.id, { stage: 'processing', error: null });
-    void (async () => {
+  const processOne = useCallback(
+    async (next: Item) => {
+      running.current.add(next.id);
+      patch(next.id, { stage: 'processing', error: null });
       try {
         const p = await processFile(next.file, (phase) => {
           if (alive.current) patch(next.id, { phase });
@@ -253,11 +262,17 @@ export default function Upload() {
       } catch (e) {
         if (alive.current) patch(next.id, { stage: 'error', phase: null, error: errMsg(e, '处理失败') });
       } finally {
-        busy.current = false;
+        running.current.delete(next.id);
         if (alive.current) setKick((k) => k + 1);
       }
-    })();
-  }, [items, ready, kick, patch, enqueueMatch]);
+    },
+    [patch, enqueueMatch]
+  );
+
+  useEffect(() => {
+    if (!ready) return;
+    for (const next of nextToProcess(items, running.current, limit)) void processOne(next);
+  }, [items, ready, kick, limit, processOne]);
 
   /* ------------------------------------------------------------ publishing */
 
@@ -383,13 +398,14 @@ export default function Upload() {
       if (it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
       clearTimeout(radiusTimers.current.get(id));
       update((prev) => prev.filter((i) => i.id !== id));
+      drafts.forget([it.file]);
       setSelectedId((cur) => {
         if (cur !== id) return cur;
         const rest = itemsRef.current;
         return (rest[at] ?? rest[at - 1] ?? null)?.id ?? null;
       });
     },
-    [update]
+    [update, drafts]
   );
 
   const clearPublished = useCallback(() => {
@@ -512,9 +528,9 @@ export default function Upload() {
     return () => window.removeEventListener('keydown', onKey);
   }, [selecting]);
 
-  // Unpublished photos live only in this tab.
+  // Unpublished photos live only in this tab; what was typed for them is kept as a draft (useUploadDrafts).
   const unsaved = items.some((i) => i.stage !== 'error' && i.publish.state !== 'done' && i.publish.state !== 'duplicate');
-  useLeaveGuard(unsaved, '还有没发布的照片，离开这个页面会丢掉它们。确定离开吗？');
+  useLeaveGuard(unsaved, '还有没发布的照片。离开后要重新加入，已填的内容会恢复。确定离开吗？');
 
   if (!ready) return <p className="loading">加载中</p>;
 

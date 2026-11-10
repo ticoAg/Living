@@ -1,13 +1,15 @@
 ---
 type: Feature
 title: 上传与整理
-description: 批量选择或拖入照片，浏览器读取 EXIF、生成三种尺寸和占位图，匹配地点；逐张或多选一起选地点、打标签，逐张、所选或一键全部发布；有照片时整个工作区放进一屏。iPhone 的 HEIC 在所有浏览器里都能上传。
+description: 批量选择或拖入照片，浏览器读取 EXIF、生成三种尺寸和占位图，匹配地点；逐张或多选一起选地点、打标签，逐张、所选或一键全部发布；有照片时整个工作区放进一屏。已填的内容留作草稿，刷新后再加入同样的文件会恢复。iPhone 的 HEIC 在所有浏览器里都能上传。
 tags: [record, mvp]
 route: "/upload, /studio/photo/:id"
 area: studio
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/src/studio/process.ts
     title: 浏览器端处理管线
+  - resource: https://github.com/ticoAg/Living/blob/main/src/studio/process-queue.ts
+    title: 同时处理几张、下一张处理哪张
   - resource: https://github.com/ticoAg/Living/blob/main/src/studio/heic.ts
     title: HEIC 后备解码（WebAssembly，在 Worker 里运行）
   - resource: https://github.com/ticoAg/Living/blob/main/src/studio/heif.ts
@@ -16,13 +18,15 @@ sources:
     title: 上传校验
   - resource: https://github.com/ticoAg/Living/blob/main/src/studio/upload-model.ts
     title: 队列状态、多选和全部发布的规则
+  - resource: https://github.com/ticoAg/Living/blob/main/src/studio/upload-drafts.ts
+    title: 草稿的存取、过期和上限
   - resource: https://github.com/ticoAg/Living/blob/main/src/studio/batch-place.ts
     title: 多选时一起选地点、同处的一组
 ---
 # 流程
 
 1. 拖入或选择多张照片（JPEG、PNG、WebP、AVIF、HEIC；单张不超过 50 MB）。iPhone 默认拍出的 HEIC 在所有浏览器里都能上传，见 [HEIC 与 HEIF](#heic-与-heif)。
-2. 浏览器端逐张处理：读取 EXIF（时间、时区、GPS、海拔、朝向、相机、镜头、焦距、光圈、快门、ISO）；按方向旋正；生成长边 480 / 1600 / 2560 的 WebP（不支持时用 JPEG）；生成 ThumbHash；提取 5 个主色；计算 SHA-256 用于去重。生成的图不含 EXIF。
+2. 浏览器端处理，一般同时两张（见 [处理](#处理)）：读取 EXIF（时间、时区、GPS、海拔、朝向、相机、镜头、焦距、光圈、快门、ISO）；按方向旋正；生成长边 480 / 1600 / 2560 的 WebP（不支持时用 JPEG）；生成 ThumbHash；提取 5 个主色；计算 SHA-256 用于去重。生成的图不含 EXIF。
 3. 有 GPS 的照片请求 [地点匹配](/product/features/poi-matching.md)，自动选中第一名；拿不准时标记"待确认"。
 4. 没有 GPS 的照片，按拍摄时间找同批里前后 2 小时内最近的一张有地点的照片，给出"按时间推断"；也可以搜索地点或新建自定义地点。有 GPS 的照片可以在附近地点列表里选，或搜索附近的地点。搜索结果按 A、B、C 编号，同时标在地图上（有 GPS 时与候选一起，没有时单独出一张地图），点地图上的字母或列表都能选中，见 [地点匹配](/product/features/poi-matching.md#界面)。
 5. 每张照片可填标题、[笔记](/product/features/photo-notes.md)、[标签](/product/features/hierarchical-tags.md#打标签)、公开范围、位置精度、加入哪些 [主题](/product/features/themes.md)。照片还在处理时就能填，只有发布要等处理完。标签不自动建议，全部由人选。是否进入 Living 和收藏不在上传时选：默认进入 Living、不收藏，发布后在照片编辑页修改。几张照片要同样的标签或设置时，在队列里多选，见 [一起整理](#一起整理)。
@@ -81,6 +85,22 @@ iPhone 默认拍出 HEIC。Safari 能直接解码它，Chrome、Edge、Firefox �
 - **原图原样保存**：HEIC 不转码，存成 `.heic` 或 `.heif`（取决于浏览器报告的类型），只有所有者能读，见 [R2 媒体文件](/data/media.md)。查看者只会拿到 WebP/JPEG 尺寸图，任何浏览器都不需要解码 HEIC。
 - **失败只影响那一张**：队列里其他照片照常处理，这一张标为"失败"，面板里用中文说明原因，可以重试。会失败的情形有：解码器加载失败（离线或被拦截）、文件被截断或已损坏（libheif 对残缺的文件不报错，只会补灰，所以解码前先检查文件结构是否完整）、像素超过 1 亿（解码时每个像素约占 20 字节，内存不够会让整个标签页崩溃，未发布的队列随之丢失）、内存不足、解码超过 3 分钟。
 
+# 处理
+
+- **同时几张**：2 张。浏览器报告内存不超过 2 GB 或不超过 2 个核心的设备（Chromium 报告 `deviceMemory`，Safari 和 Firefox 不报告）仍一次 1 张。解码（`createImageBitmap`）、编码（`toBlob`）和 SHA-256 都不在主线程上，两张同时处理时解码器、编码器和主线程各忙各的；主线程上主要只剩把解码后的整张图画进最大尺寸这一步。
+- **大文件一张一张来**：HEIC（浏览器解不开时由 libheif 解码，每像素约 20 字节）和超过 30 MB 的文件一次只处理一张，期间其他照片照常处理。
+- **内存**：解码出的位图（每像素 4 字节，2400 万像素约 100 MB）在画出最大尺寸后立即释放，各尺寸的画布在这张处理完时释放。
+- **实测**：Chromium，4 核，20 张 2400 万像素、约 5 MB 的 JPEG，不含地点匹配：一次一张 20–21 秒，两张 12 秒，三张 9–10 秒。单张约 1.1 秒，其中编码 2560 的 WebP 约 0.5 秒、编码 1600 约 0.2 秒、解码约 0.16 秒、主线程上缩放约 0.13 秒，EXIF、480 尺寸、ThumbHash、主色和 SHA-256 合计不到 0.1 秒。在上传页里边处理边在标题框打字（地点匹配换成立即返回）：从加入到处理完，一次一张 26–30 秒，两张 16–20 秒，三张 13–15 秒；按键到画面更新最长分别是 0.06–0.16 秒、0.11–0.22 秒、0.44–0.73 秒。两张时打字和一次一张相近，三张时明显卡，所以不用三张。
+
+# 草稿
+
+标签页崩溃、手机切到后台被回收或误刷新后，照片要重新加入，但已经填的内容不会丢：
+
+- **存什么**：每张照片的标题、笔记、标签、公开范围、自己改过的位置精度、主题，以及自己选的地点（或"清除"了地点）。自动匹配的地点不存。图片本身不存。
+- **存在哪**：这个浏览器的本地存储（localStorage），按登录的用户分开，按文件名、大小和修改时间认文件。停止输入约 0.4 秒后保存，切到后台或关闭页面时立即保存。换设备、换浏览器或清除网站数据后就没有了。
+- **恢复**：再次加入同样的文件时自动填回，顶部提示"已恢复 N 张之前填的内容"。自己选的地点优先于重新匹配的结果；没存地点的照片照常自动匹配；没改过位置精度的照片在隐私区域内仍自动隐藏。
+- **删除**：发布成功、发布时发现已经传过（已存在），或手动从队列移除，这张的草稿就删掉；之后再加入同一个文件不会恢复旧内容，发布时提示已经上传过。超过 30 天的草稿自动删除；最多留 300 张、约 512 KB，超出时先删最旧的。存储满了或被浏览器禁用时不保存，上传照常进行。
+
 # 队列状态
 
 已匹配 / 待确认 / 无位置 / 位置不公开（在隐私区域内）/ 已发布 / 已存在 / 失败（可重试）。处理中的照片显示"处理中"。已匹配的照片在队列行里直接显示地点名。
@@ -89,7 +109,7 @@ iPhone 默认拍出 HEIC。Safari 能直接解码它，Chrome、Edge、Firefox �
 
 - 单张原图上限 50 MB；同一用户重复上传同一文件（SHA-256 相同）时提示已存在并跳过。
 - 原图原样保存（HEIC 也是），只有本人能下载；公开展示只用生成的尺寸。
-- 上传中途关闭页面，未发布的照片不会入库。
+- 上传中途关闭页面，未发布的照片不会入库；已填的内容留作 [草稿](#草稿)。
 
 # 编辑
 
