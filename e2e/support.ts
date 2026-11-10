@@ -63,8 +63,8 @@ export function watch(page: Page) {
 
 /**
  * Follow an in-app link the way a person with a mouse does: point at it, then click. Pointing fetches the page's chunk
- * and data (src/routes.ts), so the click finds them in the cache. A bare `click()` presses the instant the pointer
- * arrives, while that data is still on its way, and the app can then stay on the next page's loading state.
+ * and data (src/routes.ts), so the click finds them in the cache. The bare press, with that data still on its way, has
+ * its own test in regressions.spec.ts (it used to leave the next page on its loading state).
  */
 export async function follow(link: Locator) {
   await link.hover();

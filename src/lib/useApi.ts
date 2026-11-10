@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { api } from './api';
 
 // Minimal shared GET cache: components asking for the same path share one request and one result.
@@ -97,23 +97,26 @@ if (typeof document !== 'undefined') {
   });
 }
 
+function subscribe(path: string, fn: () => void): () => void {
+  let set = listeners.get(path);
+  if (!set) listeners.set(path, (set = new Set()));
+  set.add(fn);
+  return () => void set.delete(fn);
+}
+const noSubscription = () => () => {};
+
 export function useApi<T>(path: string | null): { data: T | undefined; error: unknown; loading: boolean; reload: () => void } {
-  const [, force] = useState(0);
+  // useSyncExternalStore reads the entry again right after it subscribes. A result that lands between the render and
+  // the subscription is therefore not missed: a link's prefetch often finishes while its lazy page still waits in
+  // Suspense, and a plain effect subscription then left the page on its loading state for good.
+  const sub = useCallback((fn: () => void) => (path ? subscribe(path, fn) : noSubscription()), [path]);
+  const entry = useSyncExternalStore(sub, () => (path ? cache.get(path) : undefined));
   useEffect(() => {
-    if (!path) return;
-    const fn = () => force((n) => n + 1);
-    let set = listeners.get(path);
-    if (!set) listeners.set(path, (set = new Set()));
-    set.add(fn);
-    revalidate(path);
-    return () => {
-      set!.delete(fn);
-    };
+    if (path) revalidate(path);
   }, [path]);
   const reload = useCallback(() => {
     if (path) invalidate(path);
   }, [path]);
-  const entry = path ? cache.get(path) : undefined;
   return {
     data: entry?.data as T | undefined,
     error: entry?.error,

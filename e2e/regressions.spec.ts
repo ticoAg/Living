@@ -139,6 +139,20 @@ test.describe('the gallery shows the newest photos first', () => {
   }
 });
 
+test.describe('a link pressed the moment the page is up', () => {
+  // No hover first, as on a touch screen, and before the idle prefetch has fetched the next page's chunk: the link's
+  // prefetched data then arrives while the lazy page waits in Suspense. The page used to miss it and stay on its
+  // skeleton (src/lib/useApi.ts). Several rounds, because the outcome depended on timing.
+  test('the gallery still shows its photos', async ({ page }) => {
+    for (let round = 0; round < 5; round++) {
+      await page.goto('/themes', { waitUntil: 'domcontentloaded' });
+      await page.locator('main').first().waitFor();
+      await page.locator('header.site-header').getByRole('link', { name: '图库' }).click();
+      await expect(page.locator('a.gal-tile').first(), `round ${round + 1}`).toBeVisible();
+    }
+  });
+});
+
 test.describe('phone width', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
