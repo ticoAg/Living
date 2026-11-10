@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { distance } from '../../shared/geo';
+import { POI_SEARCH_LIMITS } from '../../shared/limits';
 import { POI_CATEGORIES, POI_LIMITS, type MatchCandidate, type PoiDetail } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { forbidden, invalid, listCache, notFound, paramId, readJson } from '../lib/http';
@@ -47,7 +48,7 @@ pois.get('/search', async (c) => {
   const user = await requireUser(c);
   const q = (c.req.query('q') ?? '').trim();
   if (!q) return c.json({ results: [] as MatchCandidate[] });
-  if ([...q].length > 60) throw invalid('搜索词最多 60 个字符');
+  if ([...q].length > POI_SEARCH_LIMITS.queryMax) throw invalid(`搜索词最多 ${POI_SEARCH_LIMITS.queryMax} 个字符`);
   const lat = c.req.query('lat') !== undefined ? Number(c.req.query('lat')) : null;
   const lng = c.req.query('lng') !== undefined ? Number(c.req.query('lng')) : null;
   const at =

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { ACCOUNT_LIMITS } from '../../shared/limits';
 import type { AppEnv } from '../env';
 import { hashPassword, verifyPassword } from '../lib/crypto';
 import { invalid, readJson } from '../lib/http';
@@ -18,8 +19,8 @@ me.patch('/', async (c) => {
     sets.push(`${col} = ?${params.length}`);
   };
 
-  if (has(body, 'displayName')) set('display_name', reqStr(body, 'displayName', '显示名', 1, 40));
-  if (has(body, 'bio')) set('bio', optText(body.bio, '简介', 500));
+  if (has(body, 'displayName')) set('display_name', reqStr(body, 'displayName', '显示名', 1, ACCOUNT_LIMITS.displayNameMax));
+  if (has(body, 'bio')) set('bio', optText(body.bio, '简介', ACCOUNT_LIMITS.bioMax));
   if (has(body, 'avatarPhotoId')) {
     const id = body.avatarPhotoId;
     if (id === null) set('avatar_photo_id', null);
@@ -46,8 +47,9 @@ me.post('/password', async (c) => {
   const body = await readJson(c);
   const current = typeof body.current === 'string' ? body.current : '';
   const next = body.next;
-  if (typeof next !== 'string' || next.length < 8) throw invalid('新密码至少需要 8 个字符');
-  if (next.length > 256) throw invalid('新密码最多 256 个字符');
+  const { passwordMin, passwordMax } = ACCOUNT_LIMITS;
+  if (typeof next !== 'string' || next.length < passwordMin) throw invalid(`新密码至少需要 ${passwordMin} 个字符`);
+  if (next.length > passwordMax) throw invalid(`新密码最多 ${passwordMax} 个字符`);
   const row = await c.env.DB.prepare('SELECT password_hash FROM users WHERE id = ?1').bind(user.id).first<{ password_hash: string }>();
   if (!row || !(await verifyPassword(current, row.password_hash))) throw invalid('当前密码不对');
   await c.env.DB.prepare('UPDATE users SET password_hash = ?1 WHERE id = ?2')

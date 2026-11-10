@@ -1,5 +1,6 @@
 // Validation of the JSON `meta` part of POST /api/photos (CreatePhotoMeta).
 
+import { PHOTO_LIMITS, REGION_LIMITS } from '../../shared/limits';
 import type { GeoPrivacy, NewPoi, PoiMethod, Visibility } from '../../shared/types';
 import { invalid } from './http';
 import { parseNewPoi } from './poi';
@@ -94,8 +95,8 @@ export function parseCreateMeta(raw: unknown): ParsedMeta {
   const newPoi = m.newPoi === undefined || m.newPoi === null ? null : parseNewPoi(m.newPoi);
 
   return {
-    title: optText(m.title, '标题', 200),
-    note: optText(m.note, '笔记', 5000),
+    title: optText(m.title, '标题', PHOTO_LIMITS.titleMax),
+    note: optText(m.note, '笔记', PHOTO_LIMITS.noteMax),
     takenAt: optTakenAt(m.takenAt),
     tz: optTz(m.tz, true),
     lat,
@@ -103,19 +104,19 @@ export function parseCreateMeta(raw: unknown): ParsedMeta {
     alt: optNum(m.alt, '海拔', { min: -1000, max: 100000 }),
     heading: optHeading(m.heading),
     geoPrivacy: optEnum<GeoPrivacy>(m.geoPrivacy, '位置精度', GEO_PRIVACIES) ?? 'exact',
-    province: optText(m.province, '省份', 60),
-    city: optText(m.city, '城市', 60),
-    district: optText(m.district, '区县', 60),
+    province: optText(m.province, '省份', REGION_LIMITS.nameMax),
+    city: optText(m.city, '城市', REGION_LIMITS.nameMax),
+    district: optText(m.district, '区县', REGION_LIMITS.nameMax),
     poiId,
     newPoi,
     poiDistance: optNum(m.poiDistance, '地点距离', { min: 0, max: 1_000_000 }),
     poiMethod: optEnum<PoiMethod>(m.poiMethod === null ? undefined : m.poiMethod, '地点匹配方式', POI_METHODS) ?? null,
-    camera: optText(m.camera, '相机', 120),
-    lens: optText(m.lens, '镜头', 120),
+    camera: optText(m.camera, '相机', PHOTO_LIMITS.cameraMax),
+    lens: optText(m.lens, '镜头', PHOTO_LIMITS.lensMax),
     focal: optNum(m.focal, '焦距', { min: 0, max: 5000 }),
     focal35: optNum(m.focal35, '等效焦距', { min: 0, max: 5000 }),
     aperture: optNum(m.aperture, '光圈', { min: 0, max: 100 }),
-    shutter: optText(m.shutter, '快门', 30),
+    shutter: optText(m.shutter, '快门', PHOTO_LIMITS.shutterMax),
     iso: optNum(m.iso, 'ISO', { min: 0, max: 10_000_000, int: true }),
     width,
     height,
@@ -127,9 +128,9 @@ export function parseCreateMeta(raw: unknown): ParsedMeta {
     inLiving: optBool(m.inLiving, 'inLiving') ?? true,
     favorite: optBool(m.favorite, 'favorite') ?? false,
     sha256: sha === null ? null : (sha as string).toLowerCase(),
-    tagIds: strArray(m.tagIds, '标签', 200),
-    suggestedTagIds: strArray(m.suggestedTagIds, '建议标签', 200),
-    themeIds: strArray(m.themeIds, '主题', 50)
+    tagIds: strArray(m.tagIds, '标签', PHOTO_LIMITS.tagCount),
+    suggestedTagIds: strArray(m.suggestedTagIds, '建议标签', PHOTO_LIMITS.tagCount),
+    themeIds: strArray(m.themeIds, '主题', PHOTO_LIMITS.themeCount)
   };
 }
 

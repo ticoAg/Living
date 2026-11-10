@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
+import { ACCOUNT_LIMITS, HANDLE_RE } from '../../shared/limits';
 import type { SessionUser } from '../../shared/types';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
@@ -9,7 +10,7 @@ import '../styles/studio.css';
 // /register — invite code (when the site wants one), handle, display name, password.
 // Docs: /docs/api/auth.md, /docs/product/features/accounts.md
 
-const HANDLE_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}$/;
+const { handleMin, handleMax, displayNameMax, passwordMin, passwordMax } = ACCOUNT_LIMITS;
 
 export default function Register() {
   useTitle('注册');
@@ -37,9 +38,10 @@ export default function Register() {
 
   function problem(): string | null {
     if (needInvite && !invite.trim()) return setup ? '请输入站长邀请码' : '注册需要邀请码，请向站长或管理员索取';
-    if (!HANDLE_RE.test(handle.trim())) return '用户名需要 3 到 24 个字符，只能包含字母、数字、下划线和连字符，并以字母或数字开头';
-    if (!displayName.trim() || [...displayName.trim()].length > 40) return '显示名需要 1 到 40 个字符';
-    if (password.length < 8) return '密码至少需要 8 个字符';
+    if (!HANDLE_RE.test(handle.trim()))
+      return `用户名需要 ${handleMin} 到 ${handleMax} 个字符，只能包含字母、数字、下划线和连字符，并以字母或数字开头`;
+    if (!displayName.trim() || [...displayName.trim()].length > displayNameMax) return `显示名需要 1 到 ${displayNameMax} 个字符`;
+    if (password.length < passwordMin) return `密码至少需要 ${passwordMin} 个字符`;
     return null;
   }
 
@@ -120,12 +122,12 @@ export default function Register() {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              maxLength={24}
+              maxLength={handleMax}
               disabled={closed}
               aria-describedby="au-handle-hint"
             />
             <span id="au-handle-hint" className="small muted">
-              3–24 位，字母、数字、下划线、连字符。你的主页是 /@{handle.trim() || '用户名'}
+              {handleMin}–{handleMax} 位，字母、数字、下划线、连字符。你的主页是 /@{handle.trim() || '用户名'}
             </span>
           </div>
           <div className="field">
@@ -138,7 +140,7 @@ export default function Register() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               autoComplete="nickname"
-              maxLength={40}
+              maxLength={displayNameMax}
               disabled={closed}
             />
           </div>
@@ -154,7 +156,7 @@ export default function Register() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
-                maxLength={256}
+                maxLength={passwordMax}
                 disabled={closed}
                 aria-describedby="au-pw-hint"
               />
@@ -163,7 +165,7 @@ export default function Register() {
               </button>
             </div>
             <span id="au-pw-hint" className="small muted">
-              至少 8 位。
+              至少 {passwordMin} 位。
             </span>
           </div>
           <div className="au-status" role="alert" aria-live="assertive">

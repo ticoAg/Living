@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { ACCOUNT_LIMITS, HANDLE_RE } from '../../shared/limits';
 import type { Role } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { DUMMY_HASH, hashPassword, verifyPassword } from '../lib/crypto';
@@ -12,7 +13,6 @@ import { getRegistration } from './site';
 
 export const auth = new Hono<AppEnv>({ strict: false });
 
-const HANDLE_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}$/;
 const RESERVED = new Set(
   'admin api media living login register settings studio themes upload map index place t p www root owner'.split(' ')
 );
@@ -43,13 +43,15 @@ auth.post('/register', async (c) => {
   const needsSetup = userCount === 0;
   if (!needsSetup && registration === 'closed') throw forbidden('站点暂不开放注册');
 
-  const handle = reqStr(body, 'handle', '用户名', 3, 24);
-  if (!HANDLE_RE.test(handle)) throw invalid('用户名需要 3 到 24 个字符，只能包含字母、数字、下划线和连字符，并以字母或数字开头');
+  const { handleMin, handleMax, passwordMin, passwordMax } = ACCOUNT_LIMITS;
+  const handle = reqStr(body, 'handle', '用户名', handleMin, handleMax);
+  if (!HANDLE_RE.test(handle))
+    throw invalid(`用户名需要 ${handleMin} 到 ${handleMax} 个字符，只能包含字母、数字、下划线和连字符，并以字母或数字开头`);
   if (RESERVED.has(handle.toLowerCase())) throw invalid('这个用户名已被站点保留，请换一个');
-  const displayName = reqStr(body, 'displayName', '显示名', 1, 40);
+  const displayName = reqStr(body, 'displayName', '显示名', 1, ACCOUNT_LIMITS.displayNameMax);
   const password = body.password;
-  if (typeof password !== 'string' || password.length < 8) throw invalid('密码至少需要 8 个字符');
-  if (password.length > 256) throw invalid('密码最多 256 个字符');
+  if (typeof password !== 'string' || password.length < passwordMin) throw invalid(`密码至少需要 ${passwordMin} 个字符`);
+  if (password.length > passwordMax) throw invalid(`密码最多 ${passwordMax} 个字符`);
 
   const rawInvite = typeof body.invite === 'string' ? body.invite.trim() : '';
   let invite: InviteRow | null = null;
@@ -121,7 +123,7 @@ auth.post('/login', async (c) => {
   const handle = typeof body.handle === 'string' ? body.handle.trim() : '';
   const password = typeof body.password === 'string' ? body.password : '';
   if (!handle || !password) throw invalid('请输入用户名和密码');
-  if (handle.length > 64 || password.length > 256) throw unauthenticated('用户名或密码不对');
+  if (handle.length > 64 || password.length > ACCOUNT_LIMITS.passwordMax) throw unauthenticated('用户名或密码不对');
 
   const rlKey = `rl:login:${clientIp(c)}:${handle.toLowerCase()}`;
   const limit = await hit(c.env.KV, rlKey, 5, 60);

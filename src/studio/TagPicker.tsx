@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link } from 'wouter';
+import { TAG_LIMITS } from '../../shared/limits';
 import type { Tag } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { api } from '../lib/api';
@@ -114,8 +115,8 @@ export default function TagPicker({ value, mixed = [], onEdit, disabled }: Props
     if (!creating) return;
     const name = creating.name.trim();
     if (!name) return;
-    if ([...name].length > 24) {
-      setProblem('名称最多 24 个字符');
+    if ([...name].length > TAG_LIMITS.nameMax) {
+      setProblem(`名称最多 ${TAG_LIMITS.nameMax} 个字符`);
       return;
     }
     setBusy(true);
@@ -186,7 +187,7 @@ export default function TagPicker({ value, mixed = [], onEdit, disabled }: Props
             placeholder={tokens.length ? '' : '搜索或新建标签'}
             autoComplete="off"
             enterKeyHint="done"
-            maxLength={24}
+            maxLength={TAG_LIMITS.nameMax}
             disabled={disabled}
             aria-describedby={term ? `${id}-hint` : undefined}
           />
@@ -270,7 +271,7 @@ export default function TagPicker({ value, mixed = [], onEdit, disabled }: Props
             className="input tp-name"
             value={creating.name}
             onChange={(e) => setCreating({ ...creating, name: e.target.value })}
-            maxLength={24}
+            maxLength={TAG_LIMITS.nameMax}
             disabled={busy}
             required
           />

@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
+import { ACCOUNT_LIMITS } from '../../shared/limits';
 import type { SessionUser } from '../../shared/types';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
@@ -57,7 +58,7 @@ export default function LoginForm({ initialHandle = '', autoFocus, onSignedIn }:
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          maxLength={24}
+          maxLength={ACCOUNT_LIMITS.handleMax}
           required
           autoFocus={autoFocus && !initialHandle}
         />
@@ -75,7 +76,7 @@ export default function LoginForm({ initialHandle = '', autoFocus, onSignedIn }:
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
-            maxLength={256}
+            maxLength={ACCOUNT_LIMITS.passwordMax}
             required
             autoFocus={autoFocus && !!initialHandle}
           />

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { PHOTO_LIMITS } from '../../shared/limits';
 import { distance } from '../../shared/geo';
 import {
   PHOTO_LIST_LIMIT,
@@ -356,8 +357,8 @@ photos.patch('/:id', async (c) => {
   const sets: string[] = [];
   const set = (col: string, v: unknown) => sets.push(`${col} = ${q.p(v)}`);
 
-  if (has(body, 'title')) set('title', optText(body.title, '标题', 200));
-  if (has(body, 'note')) set('note', optText(body.note, '笔记', 5000));
+  if (has(body, 'title')) set('title', optText(body.title, '标题', PHOTO_LIMITS.titleMax));
+  if (has(body, 'note')) set('note', optText(body.note, '笔记', PHOTO_LIMITS.noteMax));
   if (has(body, 'takenAt')) set('taken_at', optTakenAt(body.takenAt));
   const geoPrivacy = optEnum<GeoPrivacy>(body.geoPrivacy, '位置精度', GEO_PRIVACIES);
   if (geoPrivacy) set('geo_privacy', geoPrivacy);
@@ -402,7 +403,7 @@ photos.patch('/:id', async (c) => {
   let tagIds: string[] | undefined;
   if (has(body, 'tagIds')) {
     if (!Array.isArray(body.tagIds)) throw invalid('标签需要是数组');
-    tagIds = await usableTagIds(db, user.id, strArray(body.tagIds, '标签', 200));
+    tagIds = await usableTagIds(db, user.id, strArray(body.tagIds, '标签', PHOTO_LIMITS.tagCount));
   }
 
   const statements: D1PreparedStatement[] = [];

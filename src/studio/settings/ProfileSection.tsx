@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { ACCOUNT_LIMITS } from '../../../shared/limits';
 import type { PhotoSummary, SessionUser } from '../../../shared/types';
 import { Icon } from '../../components/icons';
 import Img from '../../components/Img';
@@ -122,7 +123,7 @@ export default function ProfileSection({ user }: { user: SessionUser }) {
             className="input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={40}
+            maxLength={ACCOUNT_LIMITS.displayNameMax}
             autoComplete="nickname"
             required
           />
@@ -136,13 +137,13 @@ export default function ProfileSection({ user }: { user: SessionUser }) {
             className="textarea"
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            maxLength={500}
+            maxLength={ACCOUNT_LIMITS.bioMax}
             rows={3}
             placeholder="一两句话介绍自己"
           />
-          {bio.length > 400 && (
+          {bio.length > ACCOUNT_LIMITS.bioMax - 100 && (
             <span className="small muted mono" style={{ textAlign: 'right' }}>
-              {bio.length} / 500
+              {bio.length} / {ACCOUNT_LIMITS.bioMax}
             </span>
           )}
         </div>

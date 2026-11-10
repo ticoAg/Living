@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { TAG_LIMITS } from '../../shared/limits';
 import type { PhotoSummary, Tag } from '../../shared/types';
 import { Icon, type IconName } from '../components/icons';
 import { api } from '../lib/api';
@@ -91,7 +92,7 @@ function RenameForm({
         className="input"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        maxLength={24}
+        maxLength={TAG_LIMITS.nameMax}
         autoFocus
         required
       />
@@ -134,7 +135,7 @@ function AddForm({
           className="input"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          maxLength={24}
+          maxLength={TAG_LIMITS.nameMax}
           placeholder="标签名称"
           autoFocus
           required
@@ -595,7 +596,7 @@ export default function TagsManager() {
             className="input"
             value={rootName}
             onChange={(e) => setRootName(e.target.value)}
-            maxLength={24}
+            maxLength={TAG_LIMITS.nameMax}
             placeholder="如 人物、家人、项目"
           />
           <button type="submit" className="btn btn-primary" disabled={!rootName.trim() || busy === '__root'}>

@@ -6,6 +6,8 @@ tags: [api]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/shared/types.ts
     title: 接口类型
+  - resource: https://github.com/ticoAg/Living/blob/main/shared/limits.ts
+    title: 输入上限
 ---
 # 格式
 
@@ -38,6 +40,8 @@ sources:
 | 502 | `upstream_failed` | 高德 / OSM 不可用（地点匹配仍返回站内候选） |
 
 `message` 用中文，直接说明原因和解决办法。
+
+文字长度和条数的上限（标题、笔记、导语、标签名、显示名、简介、密码等）定义在 `shared/limits.ts`，Worker 校验和前端表单用同一份。长度按 Unicode 码点计，中文和 emoji 都算一个字符；密码按 UTF-16 码元计。
 
 # 可见性
 

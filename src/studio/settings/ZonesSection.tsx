@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { PRIVACY_ZONE_LIMITS } from '../../../shared/limits';
 import type { CreatePrivacyZoneResponse, PhotoSummary, PrivacyZone } from '../../../shared/types';
 import { fmtLat, fmtLng } from '../../../shared/geo';
 import { Icon } from '../../components/icons';
@@ -63,10 +64,11 @@ export default function ZonesSection() {
     if (busy) return;
     const la = parseNum(lat, -90, 90);
     const ln = parseNum(lng, -180, 180);
-    const r = parseNum(radius, 50, 5000);
+    const r = parseNum(radius, PRIVACY_ZONE_LIMITS.radiusMin, PRIVACY_ZONE_LIMITS.radiusMax);
     if (!name.trim()) return setMsg({ ok: false, text: '请给这个区域起个名字，例如「家」' });
     if (la == null || ln == null) return setMsg({ ok: false, text: '纬度要在 -90 到 90 之间，经度要在 -180 到 180 之间' });
-    if (r == null) return setMsg({ ok: false, text: '半径需要在 50 到 5000 米之间' });
+    if (r == null)
+      return setMsg({ ok: false, text: `半径需要在 ${PRIVACY_ZONE_LIMITS.radiusMin} 到 ${PRIVACY_ZONE_LIMITS.radiusMax} 米之间` });
     setBusy(true);
     setMsg(null);
     try {
@@ -179,7 +181,7 @@ export default function ZonesSection() {
             className="input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={40}
+            maxLength={PRIVACY_ZONE_LIMITS.nameMax}
             placeholder="如 家、公司"
           />
         </div>
@@ -233,7 +235,7 @@ export default function ZonesSection() {
           </div>
         </div>
         <p id="se-z-r-hint" className="small muted se-hint">
-          半径 50–5000 米。坐标是 WGS-84，可以把「纬度, 经度」整段粘贴到纬度栏。
+          半径 {PRIVACY_ZONE_LIMITS.radiusMin}–{PRIVACY_ZONE_LIMITS.radiusMax} 米。坐标是 WGS-84，可以把「纬度, 经度」整段粘贴到纬度栏。
           {from && <> 当前坐标取自照片「{from}」。</>}
         </p>
 

@@ -1,3 +1,4 @@
+import { THEME_LIMITS } from '../../shared/limits';
 import type { PhotoSummary, PutThemeItemsBody, ThemeDetail, ThemeKind, UpdateThemeBody, Visibility } from '../../shared/types';
 import { dayOf } from './util';
 
@@ -26,7 +27,7 @@ export interface Draft {
 }
 
 /** What the API accepts in one theme (PUT /api/themes/:id/items). */
-export const MAX_ITEMS = 1000;
+export const MAX_ITEMS = THEME_LIMITS.itemCount;
 
 let seq = 0;
 export const nextKey = () => `k${++seq}`;

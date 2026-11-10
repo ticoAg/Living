@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { INVITE_LIMITS } from '../../shared/limits';
 import type { Invite, Role } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { conflict, forbidden, invalid, notFound, readJson } from '../lib/http';
@@ -47,8 +48,12 @@ admin.post('/invites', async (c) => {
   const body = await readJson(c);
   const role = optEnum<'member' | 'admin'>(body.role, '角色', ['member', 'admin']) ?? 'member';
   if (role === 'admin' && user.role !== 'owner') throw forbidden('只有站长可以生成管理员邀请码');
-  const note = optText(body.note, '备注', 200);
-  const days = optNum(body.expiresInDays, '有效天数', { min: 1, max: 365, int: true });
+  const note = optText(body.note, '备注', INVITE_LIMITS.noteMax);
+  const days = optNum(body.expiresInDays, '有效天数', {
+    min: INVITE_LIMITS.expiresInDaysMin,
+    max: INVITE_LIMITS.expiresInDaysMax,
+    int: true
+  });
   const expiresAt = days === null ? null : addDaysIso(days);
   const db = c.env.DB;
 

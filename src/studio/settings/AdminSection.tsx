@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { INVITE_LIMITS } from '../../../shared/limits';
 import type { Invite, Role, SessionUser, SiteInfo } from '../../../shared/types';
 import { api } from '../../lib/api';
 import { useSession } from '../../lib/session';
@@ -170,7 +171,7 @@ export default function AdminSection({ user }: { user: SessionUser }) {
               className="input"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              maxLength={200}
+              maxLength={INVITE_LIMITS.noteMax}
               placeholder="给谁的，如 小林"
             />
           </div>

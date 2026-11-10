@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Redirect, useLocation, useParams } from 'wouter';
+import { THEME_LIMITS } from '../../shared/limits';
 import type { CreateThemeBody, PhotoSummary, Poi, SessionUser, ThemeDetail, ThemeKind, Visibility } from '../../shared/types';
 import Img from '../components/Img';
 import { Icon } from '../components/icons';
@@ -413,7 +414,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
                   id="th-title"
                   className="input ed-title-input"
                   value={draft.title}
-                  maxLength={100}
+                  maxLength={THEME_LIMITS.titleMax}
                   autoFocus={!themeId}
                   placeholder={trip ? '例：2026 秋 · 杭州三日' : '例：西湖四季'}
                   onChange={(e) => set('title', e.target.value)}
@@ -428,7 +429,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
                   id="th-subtitle"
                   className="input"
                   value={draft.subtitle}
-                  maxLength={200}
+                  maxLength={THEME_LIMITS.subtitleMax}
                   onChange={(e) => set('subtitle', e.target.value)}
                 />
               </div>
@@ -441,7 +442,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
                   id="th-intro"
                   className="textarea"
                   rows={5}
-                  maxLength={20000}
+                  maxLength={THEME_LIMITS.introMax}
                   value={draft.intro}
                   placeholder="几句话说明这次旅程或这个专题。空一行分段。"
                   onChange={(e) => set('intro', e.target.value)}

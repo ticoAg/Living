@@ -1,6 +1,7 @@
 import { useCallback, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { POI_CATEGORIES, type MatchCandidate, type Poi } from '../../shared/types';
 import { distance as geoDistance, fmtDistance } from '../../shared/geo';
+import { POI_SEARCH_LIMITS } from '../../shared/limits';
 import { CategoryIcon, Icon } from '../components/icons';
 import { invalidate } from '../lib/useApi';
 import MatchMap, { resultMark } from './MatchMap';
@@ -213,7 +214,7 @@ export function SearchForm({
         onChange={(e) => setQ(e.target.value)}
         placeholder={at ? '搜索附近的地点，如 断桥、咖啡' : '搜索地点，如 断桥残雪'}
         disabled={disabled}
-        maxLength={60}
+        maxLength={POI_SEARCH_LIMITS.queryMax}
         enterKeyHint="search"
       />
       <button type="submit" className="btn" disabled={disabled || loading || !q.trim()}>
