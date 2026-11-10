@@ -1,6 +1,7 @@
 # Directory Update Log
 
 ## 2026-11-10
+* **Update**: 输入长度上限集中定义在 `shared/limits.ts`，后端校验和前端的 maxLength、提示文案都引用它，数值不变，见 [接口约定](/api/conventions.md)。
 * **Update**: 地点与逆地理缓存从 KV 移到 D1 的 place_cache 表，每小时清理过期行；KV 每天 1000 次写入只留给会话和登录限流，批量上传不再导致当天无法登录，见 [place_cache](/data/place-cache.md)。
 * **Update**: 新增隐私区域时，本人坐标落在区域内的已有照片一并改为隐藏位置，设置页显示改了几张；位置精度 fuzzy 的照片对他人不再返回到地点的距离，见 [隐私](/product/features/privacy.md)。
 * **Update**: 照片列表超过 5000 张时响应带 truncated，图库、地图、索引显示「只显示最近的 5000 张」，见 [照片接口](/api/photos.md)。
