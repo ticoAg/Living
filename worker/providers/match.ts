@@ -1,12 +1,13 @@
 // POI matching: local places + AMap (with a key, inside China) or OpenStreetMap, scored by distance and heading.
 // docs/api/pois.md#post-apipoismatch-登录
+// Name search for the place picker (`searchPlaces`) combines the same sources. docs/api/pois.md#get-apipoissearchqlatlng登录
 
 import { angleDiff, bearing, distance, outOfChina } from '../../shared/geo';
 import type { MatchCandidate, MatchResponse } from '../../shared/types';
 import type { Env } from '../env';
-import { POI_COLS, type PoiRow } from '../lib/poi';
+import { POI_COLS, poiCols, type PoiRow } from '../lib/poi';
 import { zoneAt } from '../lib/privacy';
-import { prepQ, Sql } from '../lib/sql';
+import { likeContains, prepQ, Sql } from '../lib/sql';
 import { poiOffered } from '../lib/visibility';
 import { amapAround, amapRegeo, amapText } from './amap';
 import { isAreaCategory, radiusOf } from './category';
@@ -245,4 +246,77 @@ export async function searchExternal(env: Env, q: string, at: { lat: number; lng
   ]);
   if (!named.ok && !around?.ok) throw named.error;
   return [...(named.ok ? named.value : []), ...(around?.ok ? around.value.filter((p) => nameMatches(p.name, q)) : [])];
+}
+
+const SEARCH_LIMIT = 30;
+
+/** A search result without a reference point: no distance or bearing to speak of. */
+function unscored(p: RawPlace): MatchCandidate {
+  return {
+    key: p.key,
+    poiId: p.poiId,
+    name: p.name,
+    category: p.category,
+    lat: p.lat,
+    lng: p.lng,
+    distance: 0,
+    bearing: 0,
+    inView: false,
+    score: 0,
+    source: p.source,
+    sourceId: p.sourceId,
+    area: false,
+    city: p.city,
+    district: p.district
+  };
+}
+
+/** Stored places offered to the user whose name or an alias contains `q`. */
+async function localByName(db: D1Database, userId: string, q: string): Promise<PoiRow[]> {
+  const like = likeContains(q);
+  const sql = new Sql();
+  const res = await prepQ(
+    db,
+    `SELECT ${poiCols('po')} FROM pois po
+     WHERE (po.name LIKE ${sql.p(like)} ESCAPE '\\' OR po.aliases LIKE ${sql.p(like)} ESCAPE '\\') AND ${poiOffered(sql, userId)}
+     LIMIT 50`,
+    sql
+  ).all<PoiRow>();
+  return res.results;
+}
+
+/**
+ * Places named like `q`, at most 30: stored ones, then provider results that do not duplicate them. With a point every
+ * result gets its distance and the list is sorted by it (local first on a tie); without one, local places come first,
+ * then provider order. A provider failure just leaves the local results.
+ */
+export async function searchPlaces(
+  env: Env,
+  userId: string,
+  q: string,
+  at: { lat: number; lng: number } | null
+): Promise<MatchCandidate[]> {
+  const local = (await localByName(env.DB, userId, q)).map(fromPoiRow);
+
+  // AMap with a key in China; otherwise OpenStreetMap (Photon, Nominatim). With a point, only places around it.
+  const external = await settle(searchExternal(env, q, at));
+  let remote: RawPlace[] = [];
+  if (external.ok) {
+    // Provider results carry their own city/district; no reference-point fallback (they may be anywhere).
+    remote = dedupe(
+      local,
+      external.value.map((e) => fromExternal(e, { city: null, district: null })),
+      at ?? undefined
+    );
+  } else {
+    console.warn('search: provider failed', external.error instanceof Error ? external.error.message : external.error);
+  }
+
+  const places = [...local, ...remote];
+  if (!at) return places.slice(0, SEARCH_LIMIT).map(unscored);
+  const from = { lat: at.lat, lng: at.lng, heading: null };
+  return places
+    .map((p) => score(p, from))
+    .sort((a, b) => a.distance - b.distance || Number(b.source === 'local') - Number(a.source === 'local'))
+    .slice(0, SEARCH_LIMIT);
 }

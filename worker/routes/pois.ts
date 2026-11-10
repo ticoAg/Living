@@ -6,17 +6,15 @@ import type { AppEnv } from '../env';
 import { forbidden, invalid, listCache, notFound, paramId, readJson } from '../lib/http';
 import { canEditPoi, getPoiRow, parseNewPoi, findOrCreatePoi, poiCols, toPoi, toPoiDetail, type PoiRow } from '../lib/poi';
 import { currentUser, requireUser, viewerId } from '../lib/session';
-import { likeContains, prepQ, Sql } from '../lib/sql';
+import { prepQ, Sql } from '../lib/sql';
 import { has, optNum, optText, reqStr, strArray } from '../lib/validate';
-import { photoList, photoLocation, poiOffered } from '../lib/visibility';
-import { dedupe, fromExternal, fromPoiRow, matchPlaces, score, searchExternal, type RawPlace } from '../providers/match';
-import { settle } from '../providers/http';
+import { photoList, photoLocation } from '../lib/visibility';
+import { matchPlaces, searchPlaces } from '../providers/match';
 
 export const pois = new Hono<AppEnv>({ strict: false });
 
 const NEARBY_METERS = 5000;
 const NEARBY_LIMIT = 8;
-const SEARCH_LIMIT = 30;
 
 /** Visible-photo POIs: the viewer's own photos, or public photos whose location is not hidden. */
 function visiblePhotos(q: Sql, viewer: string | null): string {
@@ -53,63 +51,9 @@ pois.get('/search', async (c) => {
   const lng = c.req.query('lng') !== undefined ? Number(c.req.query('lng')) : null;
   const at =
     lat !== null && lng !== null && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
-      ? { lat, lng, heading: null }
+      ? { lat, lng }
       : null;
-
-  const like = likeContains(q);
-  const q1 = new Sql();
-  const localRows = await prepQ(
-    c.env.DB,
-    `SELECT ${poiCols('po')} FROM pois po
-     WHERE (po.name LIKE ${q1.p(like)} ESCAPE '\\' OR po.aliases LIKE ${q1.p(like)} ESCAPE '\\') AND ${poiOffered(q1, user.id)}
-     LIMIT 50`,
-    q1
-  ).all<PoiRow>();
-  const local = localRows.results.map(fromPoiRow);
-
-  // AMap with a key in China; otherwise OpenStreetMap (Photon, Nominatim). With a point, only places around it.
-  // A provider failure just leaves the local results.
-  const external = await settle(searchExternal(c.env, q, at));
-  let remote: RawPlace[] = [];
-  if (external.ok) {
-    // Provider results carry their own city/district; no reference-point fallback (they may be anywhere).
-    remote = dedupe(
-      local,
-      external.value.map((e) => fromExternal(e, { city: null, district: null })),
-      at ?? undefined
-    );
-  } else {
-    console.warn('search: provider failed', external.error instanceof Error ? external.error.message : external.error);
-  }
-
-  const places = [...local, ...remote];
-  let results: MatchCandidate[];
-  if (at) {
-    results = places
-      .map((p) => score(p, at))
-      .sort((a, b) => a.distance - b.distance || Number(b.source === 'local') - Number(a.source === 'local'))
-      .slice(0, SEARCH_LIMIT);
-  } else {
-    // No reference point: no distance to speak of. Local places first, then provider order.
-    results = places.slice(0, SEARCH_LIMIT).map((p) => ({
-      key: p.key,
-      poiId: p.poiId,
-      name: p.name,
-      category: p.category,
-      lat: p.lat,
-      lng: p.lng,
-      distance: 0,
-      bearing: 0,
-      inView: false,
-      score: 0,
-      source: p.source,
-      sourceId: p.sourceId,
-      area: false,
-      city: p.city,
-      district: p.district
-    }));
-  }
-  return c.json({ results });
+  return c.json({ results: await searchPlaces(c.env, user.id, q, at) });
 });
 
 pois.post('/match', async (c) => {
