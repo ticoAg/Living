@@ -41,17 +41,18 @@ npm run dev                # http://localhost:5173：页面、/api、/media 和�
 
 其他常用命令：
 
-| 命令                       | 作用                                 |
-| -------------------------- | ------------------------------------ |
-| `npm run check`            | 格式、lint 和类型检查（`vp check`）  |
-| `npm test`                 | 单元测试（`vp test`）                |
-| `npm run test:routes`      | 接口在本地 D1、R2、KV 上的路由测试   |
-| `npm run build`            | 检查、测试加构建，与线上构建命令相同 |
-| `npm run db:migrate:local` | 对本地 D1 应用迁移                   |
+| 命令                       | 作用                                     |
+| -------------------------- | ---------------------------------------- |
+| `npm run check`            | 格式、lint 和类型检查（`vp check`）      |
+| `npm test`                 | 单元测试（`vp test`）                    |
+| `npm run test:routes`      | 接口在本地 D1、R2、KV 上的路由测试       |
+| `npm run test:e2e`         | 构建后在浏览器里跑冒烟测试（Playwright） |
+| `npm run build`            | 检查、测试加构建，与线上构建命令相同     |
+| `npm run db:migrate:local` | 对本地 D1 应用迁移                       |
 
 ## 部署
 
-PR 上由 GitHub Actions 跑检查、测试和构建；合并到 `main` 即由 Workers Builds 构建并部署，部署命令会先对线上 D1 应用新迁移。流程见 [构建与发布](docs/architecture/ci-cd.md)；日志、手动部署、回滚见 [部署](docs/runbooks/deploy.md)；高德 Key 和站长邀请码见 [密钥与初始化](docs/runbooks/secrets.md)。
+PR 上由 GitHub Actions 跑检查、测试和构建，另一个 job 在浏览器里跑冒烟测试；合并到 `main` 即由 Workers Builds 构建并部署，部署命令会先对线上 D1 应用新迁移。流程见 [构建与发布](docs/architecture/ci-cd.md)；日志、手动部署、回滚见 [部署](docs/runbooks/deploy.md)；高德 Key 和站长邀请码见 [密钥与初始化](docs/runbooks/secrets.md)。
 
 ## 文档
 

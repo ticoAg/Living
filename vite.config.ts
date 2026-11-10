@@ -79,11 +79,15 @@ function fonts(): Plugin {
   };
 }
 
+// Where `vp dev` and `vp preview` keep the local D1, R2 and KV. LIVING_STATE_DIR moves them out of .wrangler/state,
+// so the smoke tests (e2e/) run on a throwaway copy and never touch the developer's local data.
+const persistState = process.env.LIVING_STATE_DIR ? { path: process.env.LIVING_STATE_DIR } : true;
+
 export default defineConfig(({ mode }) => ({
   // The Cloudflare plugin runs worker/index.ts in workerd next to the SPA, with the bindings from wrangler.jsonc.
   // `vp build` writes dist/client and dist/living; `wrangler deploy` picks them up through .wrangler/deploy.
   // Vitest (modes 'test' and 'routes') runs in Node; the Cloudflare plugin's dev server would clash with Vitest's.
-  plugins: lazyPlugins(() => (mode === 'test' || mode === 'routes' ? [react()] : [react(), fonts(), cloudflare()])),
+  plugins: lazyPlugins(() => (mode === 'test' || mode === 'routes' ? [react()] : [react(), fonts(), cloudflare({ persistState })])),
   build: {
     chunkSizeWarningLimit: 1400,
     // A font slice inlined as base64 would weigh on the font stylesheet of every page, used or not.

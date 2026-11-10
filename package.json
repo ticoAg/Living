@@ -17,6 +17,7 @@
     "check": "vp check",
     "test": "vp test",
     "test:routes": "vp test --mode routes",
+    "test:e2e": "vp build && playwright test --config e2e",
     "prepare": "node scripts/install-hooks.mjs",
     "build": "vp check --no-fmt && vp test && vp build",
     "db:migrate:local": "wrangler d1 migrations apply living --local",
@@ -39,6 +40,8 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.67.0",
     "@cloudflare/workers-types": "^5.20261108.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.2.1",
