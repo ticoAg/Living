@@ -41,7 +41,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 - 其他渲染错误显示「出错了」和「刷新」按钮。
 - `React.lazy` 一旦失败会一直抛同一个错误，所以恢复靠整页跳转，不在页面内重试；预取失败不会让 `lazy` 失败，渲染时会重新请求。
 
-分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。
+分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；主题编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`。
 
 # 共享模块（改动需要协调）
 
