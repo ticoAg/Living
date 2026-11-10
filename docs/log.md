@@ -1,6 +1,7 @@
 # Directory Update Log
 
 ## 2026-11-10
+* **Update**: 照片上传在服务端拆成读表单、查询、写 R2、落库四步（`worker/lib/upload.ts`），注册设置移到 `worker/lib/settings.ts`，地点名称搜索移到 `searchPlaces`，路由之间不再互相引用，见 [照片接口](/api/photos.md)。
 * **Update**: Lint 开启 React Hooks 与无障碍规则，`vp check` 保持零告警，见 [工具链采用 Vite+](/architecture/decisions/0006-vite-plus.md)。
 * **Update**: 地图页切换城市时，新地图在图集画出后立即淡入，不再等满 6 秒，见 [地图](/product/features/map.md)。
 * **Update**: 输入长度上限集中定义在 `shared/limits.ts`，后端校验和前端的 maxLength、提示文案都引用它，数值不变，见 [接口约定](/api/conventions.md)。
