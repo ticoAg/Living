@@ -1,4 +1,5 @@
-// Living — one Worker: JSON API (/api), media from R2 (/media), and the SPA via static assets; plus the hourly region job.
+// Living — one Worker: JSON API (/api), media from R2 (/media), and the SPA via static assets; plus the hourly job
+// (provinces, place cache cleanup).
 // Contract: /docs/api/
 
 import { Hono } from 'hono';
@@ -7,6 +8,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AppEnv, Env } from './env';
 import { forbidden, HttpError, REFERRER_POLICY } from './lib/http';
 import { fillRegions } from './lib/regions';
+import { purgePlaceCache } from './providers/cache';
 import { admin } from './routes/admin';
 import { auth } from './routes/auth';
 import { me } from './routes/me';
@@ -121,14 +123,14 @@ app.onError((err, c) => {
   return c.json({ error: 'internal', message: '服务器出错了，请稍后再试' }, 500, { 'Cache-Control': 'no-store' });
 });
 
-/** The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts). */
+/**
+ * The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts), and expired rows of the
+ * place cache (providers/cache.ts). The two are independent: one failing does not stop the other.
+ */
 async function scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-  ctx.waitUntil(
-    fillRegions(env).then(
-      (run) => console.log('regions', JSON.stringify(run)),
-      (e: unknown) => console.error('regions: run failed', e instanceof Error ? (e.stack ?? e.message) : e)
-    )
-  );
+  const failed = (job: string) => (e: unknown) => console.error(`${job}: run failed`, e instanceof Error ? (e.stack ?? e.message) : e);
+  ctx.waitUntil(fillRegions(env).then((run) => console.log('regions', JSON.stringify(run)), failed('regions')));
+  ctx.waitUntil(purgePlaceCache(env.DB).then((purged) => console.log('place cache', JSON.stringify({ purged })), failed('place cache')));
 }
 
 export default { fetch: app.fetch, scheduled } satisfies ExportedHandler<Env>;

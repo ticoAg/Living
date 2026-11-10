@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import type { Env } from '../env';
-import { fakeD1, fakeKv, type DbCall } from '../test-utils';
+import { fakeD1, fakeKv, fakePlaceCache, type DbCall } from '../test-utils';
 import { fillRegions, REGION_BATCH, REGION_SPACING_MS } from './regions';
 
 // The hourly region job (docs/architecture/cloudflare.md#定时任务), with D1, KV and the network replaced by stand-ins.
@@ -18,9 +18,12 @@ interface Todo {
 }
 
 function makeEnv(todo: Todo[], extra: Partial<Env> = {}) {
-  const d1 = fakeD1((call: DbCall) => (call.method === 'all' ? todo.map((t) => ({ poi_lat: null, poi_lng: null, ...t })) : null));
+  const cache = fakePlaceCache();
+  const d1 = fakeD1(
+    cache.wrap((call: DbCall) => (call.method === 'all' ? todo.map((t) => ({ poi_lat: null, poi_lng: null, ...t })) : null))
+  );
   const kv = fakeKv();
-  return { env: { DB: d1.db, KV: kv.kv, ...extra } as unknown as Env, d1, kv };
+  return { env: { DB: d1.db, KV: kv.kv, ...extra } as unknown as Env, d1, kv, cache };
 }
 
 /** Replaces `fetch`; every request is answered by `handler` and logged. */
@@ -37,7 +40,9 @@ function stubFetch(handler: (url: URL) => Response) {
   return calls;
 }
 
-const updates = (calls: DbCall[]) => calls.filter((c) => c.method === 'run').map((c) => c.params);
+/** The photo updates, leaving out the place cache's writes. */
+const photoUpdates = (calls: DbCall[]) => calls.filter((c) => c.method === 'run' && c.sql.includes('UPDATE photos'));
+const updates = (calls: DbCall[]) => photoUpdates(calls).map((c) => c.params);
 const noWait = { wait: async () => {} };
 
 let warn: ReturnType<typeof vi.spyOn>;
@@ -67,7 +72,7 @@ describe('fillRegions', () => {
     stubFetch(() => Response.json(YULIN_ADDRESS));
     const { env, d1 } = makeEnv([{ id: 'ph_1', ...YULIN }]);
     expect(await fillRegions(env, noWait)).toEqual({ filled: 1, empty: 0, failed: 0 });
-    const update = d1.calls.find((c) => c.method === 'run');
+    const [update] = photoUpdates(d1.calls);
     expect(update?.sql).toContain('city = COALESCE(city, ?3), district = COALESCE(district, ?4)');
     expect(update?.sql).toContain('WHERE id = ?1 AND province IS NULL');
     expect(update?.params).toEqual(['ph_1', '广西壮族自治区', '玉林市', '玉州区']);
@@ -114,13 +119,14 @@ describe('fillRegions', () => {
 
   it('shares the reverse geocode cache with the match flow', async () => {
     const calls = stubFetch(() => Response.json(YULIN_ADDRESS));
-    const { env, kv } = makeEnv([
+    const { env, kv, cache } = makeEnv([
       { id: 'ph_1', ...YULIN },
       { id: 'ph_2', lat: YULIN.lat + 0.00001, lng: YULIN.lng }
     ]);
     await fillRegions(env, noWait);
     expect(calls).toHaveLength(1);
-    expect([...kv.store.keys()]).toEqual(['geo:rev2:osm:22.601:110.144']);
+    expect([...cache.rows.keys()]).toEqual(['geo:rev2:osm:22.601:110.144']);
+    expect(kv.store.size).toBe(0);
   });
 
   it('uses AMap inside China when a key is configured', async () => {

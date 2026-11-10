@@ -34,6 +34,7 @@ describe('the platform', () => {
         'invites',
         'photo_tags',
         'photos',
+        'place_cache',
         'pois',
         'privacy_zones',
         'settings',

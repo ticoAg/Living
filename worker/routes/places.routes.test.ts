@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import type { MatchCandidate, MatchResponse, Poi } from '../../shared/types';
+import worker from '../index';
 import { Client, expectStatus, newUser, upload, usePlatform } from '../test-platform';
 
 const platform = usePlatform();
@@ -200,5 +201,111 @@ describe('GET /api/pois/search', () => {
     await createPoi(alice, { name: '西湖', category: '湖', lat: 30.24, lng: 120.14 });
     expect(expectStatus(await alice.get('/api/pois/search?q=%25'), 200).results).toEqual([]);
     expect(expectStatus(await alice.get('/api/pois/search?q=_'), 200).results).toEqual([]);
+  });
+});
+
+describe('the place cache', () => {
+  /** Photon and Nominatim answer: one landmark nearby, a district of 杭州 for the reverse geocode, nothing by name. */
+  const providersUp = (url: URL) => {
+    if (url.hostname === 'photon.komoot.io') {
+      if (url.pathname === '/api') return Response.json({ type: 'FeatureCollection', features: [] });
+      return Response.json({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [120.1514, 30.2589] },
+            properties: { osm_type: 'N', osm_id: 42, osm_key: 'tourism', osm_value: 'attraction', name: '断桥残雪' }
+          }
+        ]
+      });
+    }
+    if (url.hostname === 'nominatim.openstreetmap.org' && url.pathname === '/reverse') {
+      return Response.json({ address: { country_code: 'cn', city: '杭州市', suburb: '西湖区', state: '浙江省' } });
+    }
+    if (url.hostname === 'nominatim.openstreetmap.org') return Response.json([]);
+    return new Response('down', { status: 503 });
+  };
+  const match = async (client: Client, body: Record<string, unknown> = HERE) =>
+    expectStatus(await client.post<MatchResponse>('/api/pois/match', body), 200);
+  const cacheKeys = async () =>
+    (await platform.env.DB.prepare('SELECT key FROM place_cache ORDER BY key').all<{ key: string }>()).results.map((r) => r.key);
+  const kvKeys = async () => (await platform.env.KV.list()).keys.map((k) => k.name);
+  const nowSeconds = () => Math.floor(Date.now() / 1000);
+
+  /** Runs the cron handler the way the runtime does, and waits for its work. */
+  async function runHourly() {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const pending: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p), passThroughOnException: () => {}, props: {} };
+    const controller = { scheduledTime: Date.now(), cron: '23 * * * *', noRetry: () => {} };
+    await worker.scheduled(controller as unknown as ScheduledController, platform.env, ctx as unknown as ExecutionContext);
+    await Promise.all(pending);
+  }
+
+  it('answers a second match at the same spot without asking the providers again', async () => {
+    platform.external.respond = providersUp;
+    const first = await match(alice);
+    expect(first.provider).toBe('osm');
+    expect(first).toMatchObject({ province: '浙江省', city: '杭州市' });
+    const asked = platform.external.calls.length;
+    expect(asked).toBeGreaterThan(0);
+
+    // a few metres away, another user: same cache cells
+    const second = await match(bob, { lat: HERE.lat + 0.00002, lng: HERE.lng - 0.00002 });
+    expect(platform.external.calls).toHaveLength(asked);
+    expect(second.provider).toBe('osm');
+    expect(second.candidates.map((c) => c.name)).toEqual(first.candidates.map((c) => c.name));
+    expect(await cacheKeys()).toEqual(['geo:rev2:osm:30.259:120.151', 'poi:near:photon:30.2588:120.1512:300']);
+  });
+
+  it('does not cache a failed lookup', async () => {
+    expect((await match(alice)).provider).toBe('local');
+    expect(await cacheKeys()).toEqual([]);
+    platform.external.respond = providersUp;
+    expect((await match(alice)).provider).toBe('osm');
+  });
+
+  it('leaves KV to sessions and the login rate limit: matching and searching write no poi: or geo: keys', async () => {
+    platform.external.respond = providersUp;
+    await match(alice);
+    await match(alice, { ...HERE, radius: 500 });
+    expectStatus(await alice.get('/api/pois/search?q=断桥'), 200);
+    expectStatus(await alice.get(`/api/pois/search?q=断桥&lat=${HERE.lat}&lng=${HERE.lng}`), 200);
+    expect(await cacheKeys()).toEqual(
+      expect.arrayContaining(['poi:near:photon:30.2588:120.1512:500', 'poi:q:osm:断桥', 'poi:q:osm:断桥:30.26:120.15'])
+    );
+    expect((await kvKeys()).filter((k) => !k.startsWith('sess:') && !k.startsWith('rl:'))).toEqual([]);
+  });
+
+  it('treats an expired row as a miss', async () => {
+    const key = 'poi:near:photon:30.2588:120.1512:300';
+    await platform.env.DB.prepare('INSERT INTO place_cache (key, value, expires_at) VALUES (?1, ?2, ?3)')
+      .bind(key, JSON.stringify([]), nowSeconds() - 1)
+      .run();
+    platform.external.respond = providersUp;
+    const res = await match(alice);
+    expect(res.candidates.map((c) => c.name)).toContain('断桥残雪');
+    const row = await platform.env.DB.prepare('SELECT expires_at FROM place_cache WHERE key = ?1')
+      .bind(key)
+      .first<{ expires_at: number }>();
+    expect(row?.expires_at).toBeGreaterThan(nowSeconds() + 6 * 24 * 60 * 60);
+  });
+
+  it('has its expired rows deleted by the hourly job', async () => {
+    const now = nowSeconds();
+    await platform.env.DB.batch(
+      [
+        ['geo:rev2:osm:1.000:1.000', now - 3600],
+        ['poi:q:osm:old', now],
+        ['poi:near:photon:1.0000:1.0000:300', now + 3600]
+      ].map(([key, expires]) =>
+        platform.env.DB.prepare('INSERT INTO place_cache (key, value, expires_at) VALUES (?1, ?2, ?3)').bind(key, '[]', expires)
+      )
+    );
+    await runHourly();
+    expect(await cacheKeys()).toEqual(['poi:near:photon:1.0000:1.0000:300']);
+    // the job asked no provider: there were no photos waiting for a province
+    expect(platform.external.calls).toEqual([]);
   });
 });

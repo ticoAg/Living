@@ -26,12 +26,21 @@ sources:
 
 # 定时任务
 
-`wrangler.jsonc` 的 `triggers.crons` 设为 `23 * * * *`：每小时第 23 分钟，Worker 的 `scheduled` 处理函数（`worker/index.ts`）调用 `worker/lib/regions.ts` 补全照片的省份。
+`wrangler.jsonc` 的 `triggers.crons` 设为 `23 * * * *`：每小时第 23 分钟，Worker 的 `scheduled` 处理函数（`worker/index.ts`）做两件互不影响的事，一件失败不妨碍另一件。
+
+补全照片的省份（`worker/lib/regions.ts`）：
 
 - 每次随机取最多 8 张还没有省份、有坐标（自己的或所在地点的）的照片，逐张逆地理编码，两张之间停 2.2 秒（Nominatim 要求每秒最多一次请求，一次查询可能要两次请求）。
 - 写入 `province`，`city`、`district` 只在为空时填写；查不到省份的写 `''`；外部服务出错的留到下一小时。规则见 [photos](/data/photos.md#省市区县)。
-- 与地点匹配共用数据源和 KV 缓存 `geo:rev2:`，配置了 `AMAP_KEY` 时中国境内用高德。
-- 结果写进 Workers Logs：`regions {"filled":…,"empty":…,"failed":…}`。本地开发时用 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"` 触发一次。
+- 与地点匹配共用数据源和逆地理缓存 `geo:rev2:`（D1 的 [place_cache](/data/place-cache.md)），配置了 `AMAP_KEY` 时中国境内用高德。
+
+清理地点缓存（`worker/providers/cache.ts`）：
+
+- 删除 [place_cache](/data/place-cache.md) 里已过期的行，按 `expires_at` 的索引查找。读缓存时过期行本来就算未命中，清理只是不让表无限变大。
+
+其他：
+
+- 结果写进 Workers Logs：`regions {"filled":…,"empty":…,"failed":…}` 和 `place cache {"purged":…}`。本地开发时用 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"` 触发一次。
 - Cron 触发器在免费版里不另外计费，每次运行算一次请求。
 
 # 变量与密钥
@@ -71,4 +80,13 @@ sources:
 
 # 费用
 
-全部在免费额度内可运行：Workers 免费版每天 10 万次请求；D1 5 GB；R2 10 GB 存储且无出站流量费；KV 每天 10 万次读。照片多了以后主要成本是 R2 存储。
+全部在免费额度内可运行，照片多了以后主要成本是 R2 存储。各项免费额度每天 UTC 0 点重置，超出后对应的操作直接报错，不会自动计费：
+
+| 服务 | 免费额度 | 用在哪里 |
+|---|---|---|
+| Workers | 每天 10 万次请求 | 每次 `/api`、`/media` 请求和每次定时任务 |
+| D1 | 5 GB（单库 500 MB）；每天 500 万行读取、10 万行写入 | 全部表，包括地点缓存 [place_cache](/data/place-cache.md)：每写一条缓存约记 3 行（连同索引） |
+| R2 | 10 GB 存储，无出站流量费 | 原图与尺寸图 |
+| KV | 每天 10 万次读、1000 次写、1000 次删除 | 只有会话和登录限流，见 [KV](/data/kv.md) |
+
+KV 的写入额度最紧：会话写不进去时登录和注册返回 500，当天无法登录。所以 KV 只放会话和登录限流（每天约 500 次成功登录才会用完），地点与逆地理缓存放在 D1，批量上传再多照片也不占 KV 的写入。

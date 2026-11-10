@@ -10,7 +10,8 @@ import { prepQ, Sql } from '../lib/sql';
 import { poiOffered } from '../lib/visibility';
 import { amapAround, amapRegeo, amapText } from './amap';
 import { isAreaCategory, radiusOf } from './category';
-import { kvCached, settle } from './http';
+import { placeCached } from './cache';
+import { settle } from './http';
 import { nominatimReverse, osmNearby, osmSearch } from './osm';
 import type { ExternalPlace, Geocode, Region } from './types';
 
@@ -154,7 +155,7 @@ function nearby(env: Env, provider: 'amap' | 'osm', lat: number, lng: number, ra
   const qLng = Number(lng.toFixed(4));
   // OpenStreetMap places come from Photon now; the key names it so answers cached from Overpass are not reused.
   const key = `poi:near:${provider === 'osm' ? 'photon' : provider}:${qLat.toFixed(4)}:${qLng.toFixed(4)}:${Math.round(radius)}`;
-  return kvCached(env.KV, key, () =>
+  return placeCached(env.DB, key, () =>
     provider === 'amap' ? amapAround(env.AMAP_KEY as string, qLat, qLng, radius) : osmNearby(qLat, qLng, radius)
   );
 }
@@ -164,7 +165,9 @@ export function reverse(env: Env, provider: 'amap' | 'osm', lat: number, lng: nu
   const qLat = Number(lat.toFixed(3));
   const qLng = Number(lng.toFixed(3));
   const key = `geo:rev2:${provider}:${qLat.toFixed(3)}:${qLng.toFixed(3)}`;
-  return kvCached(env.KV, key, () => (provider === 'amap' ? amapRegeo(env.AMAP_KEY as string, qLat, qLng) : nominatimReverse(qLat, qLng)));
+  return placeCached(env.DB, key, () =>
+    provider === 'amap' ? amapRegeo(env.AMAP_KEY as string, qLat, qLng) : nominatimReverse(qLat, qLng)
+  );
 }
 
 /** AMap only covers mainland China; outside it (or without a key) OpenStreetMap is used. */
@@ -229,15 +232,15 @@ export async function searchExternal(env: Env, q: string, at: { lat: number; lng
   const grid = at ? `:${at.lat.toFixed(2)}:${at.lng.toFixed(2)}` : '';
   if (env.AMAP_KEY && (!at || !outOfChina(at.lat, at.lng))) {
     const key = env.AMAP_KEY;
-    return kvCached(
-      env.KV,
+    return placeCached(
+      env.DB,
       `poi:q:amap:${term}${grid}`,
       () => (at ? amapAround(key, at.lat, at.lng, NEAR_SEARCH_METERS, q) : amapText(key, q)),
       SEARCH_CACHE_TTL
     );
   }
   const [named, around] = await Promise.all([
-    settle(kvCached(env.KV, `poi:q:osm:${term}${grid}`, () => osmSearch(q, at), SEARCH_CACHE_TTL)),
+    settle(placeCached(env.DB, `poi:q:osm:${term}${grid}`, () => osmSearch(q, at), SEARCH_CACHE_TTL)),
     at ? settle(nearby(env, 'osm', at.lat, at.lng, NEARBY_FILTER_METERS)) : null
   ]);
   if (!named.ok && !around?.ok) throw named.error;

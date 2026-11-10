@@ -30,7 +30,7 @@ tags: [api, places]
    - Nominatim 的省份取 `state`（日本是 `province`），北京等直辖市按 ISO 代码命名；同一个名字给出简繁两种写法（`第七区;第七區`）时取第一个。
    - 中国大陆的地址字段不固定：区县可能在 `city`、`district` 或 `county`，乡镇、街道、苏木可能在 `city`，地级市在 `state_district`、`region` 或 `league`，也可能没有。区县取这些字段里第一个以区、县、旗结尾的，或已知地级市之下的县级市（义乌市、北流市）；城市取地级市；乡镇不会被当成城市。
    - 地址里没有直接写出地级市时（西湖区、义乌市都是这样），再以 zoom 7 请求一次 Nominatim，它返回的是地级市；比较两者分出县级市。第二次请求失败时整个逆地理算失败，不缓存只有一半的结果。
-7. KV 缓存 7 天：`poi:near:<amap|photon>:<lat 4 位>:<lng 4 位>:<radius>`、`geo:rev2:<provider>:<lat 3 位>:<lng 3 位>`（每小时的省份补全也用这个缓存）。外部请求超时 8 秒；失败时 `provider: "local"`，只返回站内候选。
+7. 缓存 7 天（D1 的 [place_cache](/data/place-cache.md)）：`poi:near:<amap|photon>:<lat 4 位>:<lng 4 位>:<radius>`、`geo:rev2:<provider>:<lat 3 位>:<lng 3 位>`（每小时的省份补全也用这个缓存）。外部请求超时 8 秒；失败时 `provider: "local"`，只返回站内候选。
 8. `privacyZone`：坐标落在请求者某个隐私区域内时返回区域名。
 
 # GET /api/pois/search?q=&lat=&lng=（登录）
@@ -46,7 +46,7 @@ tags: [api, places]
 | 其余，有坐标 | Photon 搜索和 Nominatim 搜索，都限定在照片周围约 6 千米的框内（`bbox`、`viewbox` + `bounded=1`）；再加上 1 千米内附近地点里名称包含 `q` 的（按词搜索会漏掉中文名称的一部分，例如"咖啡"之于"库迪咖啡"） |
 | 其余，没有坐标 | Photon 搜索和 Nominatim 搜索，不限范围 |
 
-KV 缓存 1 天：`poi:q:<amap|osm>:<q>[:<lat 2 位>:<lng 2 位>]`，有坐标时按约 1 千米的网格分开。所有来源都失败时只返回站内结果。
+缓存 1 天（[place_cache](/data/place-cache.md)）：`poi:q:<amap|osm>:<q>[:<lat 2 位>:<lng 2 位>]`，有坐标时按约 1 千米的网格分开。所有来源都失败时只返回站内结果。
 
 # POST /api/pois（登录）
 

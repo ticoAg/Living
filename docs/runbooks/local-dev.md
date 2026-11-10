@@ -57,7 +57,7 @@ sources:
 | 完整构建 | `npm run build`，即 `vp check --no-fmt`、`vp test`、`vp build`，与线上构建命令相同 |
 | 预览构建产物 | `npm run build` 后 `npx vp preview`，在 workerd 里运行构建出的 Worker |
 | 新增迁移 | `npx wrangler d1 migrations create living <描述>`，写好后 `npm run db:migrate:local`，规则见 [部署](/runbooks/deploy.md) |
-| 跑一次定时任务 | 开发服务器运行时 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"`，补全本地照片的省份，见 [定时任务](/architecture/cloudflare.md#定时任务) |
+| 跑一次定时任务 | 开发服务器运行时 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"`，补全本地照片的省份并清理过期的地点缓存，见 [定时任务](/architecture/cloudflare.md#定时任务) |
 
 格式与 lint 的设置都在 `vite.config.ts` 的 `fmt` 和 `lint` 里：单引号、不加尾随逗号、行宽 140；CSS 保持一条规则一行，`docs/` 不格式化。类型检查按就近的 `tsconfig.json` 进行：`worker/` 用 `worker/tsconfig.json`（Workers 类型），其余用根目录的 `tsconfig.json`。
 
@@ -72,7 +72,7 @@ npx vp test shared/geo   # 只跑路径里含 shared/geo 的测试文件
 ```
 
 - 测试在 Node 里运行，不需要先构建或启动开发服务器：`mode` 为 `test` 时 `vite.config.ts` 不加载 Cloudflare 插件。
-- 不碰真实的 D1、R2、KV 和外部服务。`worker/test-utils.ts` 提供内存里的 D1、KV 替身，`fetch` 在测试里用 `vi.stubGlobal` 替换。
+- 不碰真实的 D1、R2、KV 和外部服务。`worker/test-utils.ts` 提供内存里的 D1、KV 替身（`fakePlaceCache()` 替地点缓存表应答），`fetch` 在测试里用 `vi.stubGlobal` 替换。
 - 涉及日期的测试用本地日期字段构造（如 `new Date(2026, 10, 8)`），结果不随机器时区变化。
 - `npm run build` 会先跑检查和测试，有一项失败就不会构建。
 

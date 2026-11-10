@@ -11,7 +11,7 @@
 | 前端   | React 19、wouter；MapLibre（OpenFreeMap 瓦片）；`exifr`、`thumbhash`                            |
 | 工具链 | Vite+（Vite 8、Rolldown、Vitest、Oxlint、Oxfmt）；Cloudflare Vite 插件在开发服务器里运行 Worker |
 | 后端   | Cloudflare Worker + Hono；同一个 Worker 提供静态资源、`/api` 和 `/media`                        |
-| 数据   | D1（SQLite）、R2（原图与尺寸图）、KV（会话与缓存）                                              |
+| 数据   | D1（SQLite，含地点缓存）、R2（原图与尺寸图）、KV（会话与登录限流）                              |
 | 图片   | 浏览器端解码、缩放、生成 ThumbHash 与 SHA-256，Worker 只校验和存储                              |
 | 发布   | GitHub 推送 `main`，Cloudflare Workers Builds 自动构建、迁移、部署                              |
 

@@ -32,7 +32,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 /**
  * Looks up to `batch` photos up. A photo without coordinates of its own is placed at its place's centre. The rows come
- * in random order, so a few that keep failing cannot hold up the rest. Lookups share the match flow's KV cache.
+ * in random order, so a few that keep failing cannot hold up the rest. Lookups share the match flow's cache (providers/cache.ts).
  */
 export async function fillRegions(env: Env, { batch = REGION_BATCH, wait = sleep } = {}): Promise<RegionRun> {
   const run: RegionRun = { filled: 0, empty: 0, failed: 0 };
