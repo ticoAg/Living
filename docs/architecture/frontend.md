@@ -29,6 +29,16 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 
 页面模块按路由拆分，统一在 `src/routes.ts` 声明。首屏之后浏览器空闲时依次预取 browse、themes、living 的分块（省流量模式与 2G 下跳过）；鼠标停在站内链接上约 80ms、按下或键盘聚焦时，预取目标路由的分块和它挂载时要发的 GET 请求（进入共享缓存），所以切页通常不再出现「加载中」。分块确实没到时，「加载中」在 400ms 后才显示。`src/lib/scroll.ts` 按历史记录保存滚动位置：前进、后退回到离开时的位置，新跳转从顶部开始。
 
+## 分块失效与错误
+
+每次发布都会换掉 `/assets/` 下带哈希的文件。发布前打开的标签页再去取旧分块时，静态资源找不到文件，按单页应用的规则回一份 `index.html`，`import()` 因此失败。
+
+- `src/components/ErrorBoundary.tsx` 包在路由外面，页眉留在边界外；地址变化时清除错误状态，所以从页眉的链接就能离开。
+- 分块加载失败（`src/lib/chunks.ts` 的 `isChunkError`）时整页跳到当前地址一次，拿到新的 `index.html` 和新的分块名；跳转期间显示「加载中」。`sessionStorage` 记下跳转时间，一分钟内再次失败就不再跳转，显示「页面没能加载」和「刷新」按钮，不会循环刷新。
+- 后台预取的分块失败时（Vite 的 `vite:preloadError` 事件），不刷新眼前的页面（上面可能有没保存的内容），只记下「版本已过期」：之后点站内链接改为整页跳转到目标地址，页面自己的离开提醒仍然有效。
+- 其他渲染错误显示「出错了」和「刷新」按钮。
+- `React.lazy` 一旦失败会一直抛同一个错误，所以恢复靠整页跳转，不在页面内重试；预取失败不会让 `lazy` 失败，渲染时会重新请求。
+
 分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。
 
 # 共享模块（改动需要协调）
@@ -39,6 +49,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `shared/geo.ts` | 距离、方位角、坐标转换、扇形与圆、度分秒格式 |
 | `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()` |
 | `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)` |
+| `src/lib/chunks.ts` | 分块失效的识别与一次性整页重新加载，见 [分块失效与错误](#分块失效与错误) |
 | `src/lib/scroll.ts` | 按历史记录恢复滚动位置；页面经 `useScrollTop` 调用 |
 | `src/lib/session.tsx` | `useSession()`：当前用户、站点信息、退出 |
 | `src/lib/tags.ts` | 标签树、子孙展开、按标签筛选、包含计数 |
@@ -47,6 +58,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放 |
 | `src/components/icons.tsx` | 地点类别符号 `CategoryIcon`、界面图标 `Icon` |
 | `src/components/Header.tsx` | 站点页眉与导航 |
+| `src/components/ErrorBoundary.tsx` | 路由外的错误边界：分块失效时重新加载，其他错误显示「出错了」 |
 | `src/styles/base.css` | 设计令牌与通用控件（按钮、标签片、色块、分段、输入框） |
 
 # 设计令牌

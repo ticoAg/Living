@@ -10,11 +10,15 @@ import { prefetch } from './lib/useApi';
 type Loader = () => Promise<{ default: ComponentType }>;
 type Page = ReturnType<typeof lazy<ComponentType>> & { preload: () => void };
 
+// The preload and React.lazy share one request. A failed preload is forgotten, so rendering the page later asks
+// again. A failure while rendering is final for this tab: React.lazy keeps rethrowing the error it got, and the
+// chunk is usually gone for good (a deploy replaced it). ErrorBoundary and lib/chunks.ts recover from that with a
+// full page load, which fetches the new build.
 function page(load: Loader): Page {
   let pending: Promise<{ default: ComponentType }> | undefined;
   const get = () =>
     (pending ??= load().catch((e: unknown) => {
-      pending = undefined; // a failed chunk (offline, new deploy) is retried on the next attempt
+      pending = undefined;
       throw e;
     }));
   return Object.assign(lazy(get), { preload: () => void get().catch(() => {}) });

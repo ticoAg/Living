@@ -86,6 +86,11 @@ app.notFound((c) => {
   const path = new URL(c.req.url).pathname;
   if (path.startsWith('/api/') || path === '/api') return c.json(NOT_FOUND, 404, { 'Cache-Control': 'no-store' });
   if (path.startsWith('/media/')) return c.json({ error: 'not_found', message: '文件不存在' }, 404, { 'Cache-Control': 'no-store' });
+  // A missing hashed file is a chunk from an earlier deploy: answer 404 rather than the page HTML. Note that with
+  // run_worker_first as a list (wrangler.jsonc), the static assets answer a missing file with index.html themselves,
+  // navigation or not, so today this only runs when the Worker is reached some other way. The page recovers from
+  // either answer (src/lib/chunks.ts).
+  if (path.startsWith('/assets/')) return c.text('Not found', 404, { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   // Anything else belongs to the SPA (normally served before the Worker runs).
   return c.env.ASSETS.fetch(c.req.raw);
 });

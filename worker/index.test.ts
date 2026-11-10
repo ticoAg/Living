@@ -119,9 +119,23 @@ describe('unknown paths', () => {
   });
 
   it('hand everything else to the single-page app', async () => {
-    const res = await request('/map');
-    expect(res.status).toBe(200);
-    expect(await res.text()).toContain('<title>Living</title>');
+    for (const path of ['/map', '/@song', '/assets', '/assetsx/a.js']) {
+      const res = await request(path);
+      expect(res.status, path).toBe(200);
+      expect(await res.text(), path).toContain('<title>Living</title>');
+    }
+  });
+
+  it('answer a missing build file with 404, not the page, so a stale chunk import fails cleanly', async () => {
+    let asked = false;
+    const env = makeEnv({ ASSETS: { fetch: async () => ((asked = true), new Response('<!doctype html>')) } } as unknown as Partial<Env>);
+    for (const path of ['/assets/Upload-Bl8QK5JD.js', '/assets/studio-x.css', '/assets/']) {
+      const res = await request(path, {}, env);
+      expect(res.status, path).toBe(404);
+      expect(res.headers.get('Content-Type'), path).toContain('text/plain');
+      expect(res.headers.get('Cache-Control'), path).toBe('no-store');
+    }
+    expect(asked).toBe(false);
   });
 });
 
