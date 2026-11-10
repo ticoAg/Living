@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import type { Poi, Tag } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { invalidate, useApi } from '../lib/useApi';
-import { DEFAULT_RADIUS, initialMatch, matchPois, type PlaceChoice } from '../studio/match';
+import { ensureSaved, nearbyGroup, planPlace } from '../studio/batch-place';
+import type { ApplyResult } from '../studio/BatchPlace';
+import { DEFAULT_RADIUS, createPoi, initialMatch, matchPois, type PlaceChoice } from '../studio/match';
 import { processFile } from '../studio/process';
 import { uploadPhoto } from '../studio/publish';
 import { PageHead } from '../studio/ui';
@@ -425,6 +427,30 @@ export default function Upload() {
     [checked, update]
   );
 
+  /**
+   * One place for every selected photo that can take it. A custom place is created once first, so the photos share
+   * one row instead of the server making one per photo; photos clearly too far from it are left alone.
+   */
+  const placePicked = useCallback(
+    async (choice: PlaceChoice, fromCandidates: boolean): Promise<ApplyResult> => {
+      const { choice: saved, created } = await ensureSaved(choice, createPoi);
+      if (created) {
+        invalidate('/api/pois');
+        onCreated(created);
+      }
+      const ids = new Set(checked);
+      const plan = planPlace(
+        itemsRef.current.filter((i) => ids.has(i.id)),
+        saved,
+        fromCandidates
+      );
+      update((prev) => prev.map((it) => (plan.patches.has(it.id) ? { ...it, ...plan.patches.get(it.id) } : it)));
+      return { key: saved.key, done: plan.patches.size, far: plan.far.length, pending: plan.pending.length };
+    },
+    [checked, update, onCreated]
+  );
+  const clearPickedPlace = useCallback(() => editPicked(() => ({ place: null, cleared: true })), [editPicked]);
+
   const publishPicked = useCallback(async () => {
     await publishMany(checked);
     if (!alive.current) return;
@@ -469,6 +495,9 @@ export default function Upload() {
   const selectable = items.filter(isEditable);
   const allPicked = selectable.length > 0 && selectable.every((i) => pickedIds.has(i.id));
   const publishedCount = (counts.get('published') ?? 0) + (counts.get('duplicate') ?? 0);
+  // the photos taken around the same spot as the one on screen, one click to select
+  const nearby = useMemo(() => (selected ? nearbyGroup(items, selected.id) : []), [items, selected]);
+  const nearbyPicked = nearby.length > 1 && nearby.length === picked.length && nearby.every((id) => pickedIds.has(id));
 
   // Esc drops a selection (but not while typing in a field)
   const selecting = picked.length > 0;
@@ -534,16 +563,29 @@ export default function Upload() {
                 <h2 className="up-h serif">
                   队列 <span className="mono">{items.length}</span>
                 </h2>
-                {selectable.length > 1 && (
-                  <button
-                    type="button"
-                    className="btn btn-quiet up-pickall"
-                    aria-pressed={allPicked}
-                    onClick={() => setChecked(allPicked ? [] : selectable.map((i) => i.id))}
-                  >
-                    {allPicked ? '取消全选' : '全选'}
-                  </button>
-                )}
+                <div className="up-picktools">
+                  {nearby.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-quiet up-pickall"
+                      aria-pressed={nearbyPicked}
+                      title="选中和当前照片在同一处拍的照片"
+                      onClick={() => setChecked(nearbyPicked ? [] : nearby)}
+                    >
+                      同处 {nearby.length} 张
+                    </button>
+                  )}
+                  {selectable.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-quiet up-pickall"
+                      aria-pressed={allPicked}
+                      onClick={() => setChecked(allPicked ? [] : selectable.map((i) => i.id))}
+                    >
+                      {allPicked ? '取消全选' : '全选'}
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="up-summary small" aria-label="状态统计">
                 {SUMMARY.filter((s) => counts.get(s.key)).map((s) => (
@@ -605,6 +647,11 @@ export default function Upload() {
             {batch ? (
               <UploadBatch
                 items={picked}
+                all={items}
+                extras={extras}
+                onPlace={placePicked}
+                onClearPlace={clearPickedPlace}
+                onCreated={onCreated}
                 onEdit={editPicked}
                 onPublish={() => void publishPicked()}
                 onClear={() => setChecked([])}

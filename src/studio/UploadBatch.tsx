@@ -1,18 +1,28 @@
+import type { Poi } from '../../shared/types';
 import { Icon } from '../components/icons';
+import BatchPlace, { type ApplyResult } from './BatchPlace';
+import type { PlaceChoice } from './match';
 import { GEO, SegRow, VISIBILITY } from './PhotoFields';
 import { applyTagEdit, commonTags } from './tag-board';
 import TagPicker from './TagPicker';
 import ThemePicker from './ThemePicker';
 import { inBulk, isEditable, type Item } from './upload-model';
 
-// The right column while several photos are selected in the queue: their tags, visibility, location precision and
-// themes edited together, and one button that publishes them. A tag or theme only some of them have is drawn
+// The right column while several photos are selected in the queue: their place, tags, visibility, location precision
+// and themes edited together, and one button that publishes them. A tag or theme only some of them have is drawn
 // half-on; clicking it gives it to all. Photos already sent are shown but not changed.
 // Docs: /docs/product/features/upload.md#一起整理
 
 interface Props {
   /** the selected photos, in queue order */
   items: Item[];
+  /** the whole queue (a photo without GPS may take its place from a neighbour) */
+  all: Item[];
+  /** places created in this session */
+  extras: Poi[];
+  onPlace: (choice: PlaceChoice, fromCandidates: boolean) => Promise<ApplyResult>;
+  onClearPlace: () => void;
+  onCreated: (poi: Poi) => void;
   /** applies a change to every selected photo that can still be edited */
   onEdit: (fn: (it: Item) => Partial<Item>) => void;
   onPublish: () => void;
@@ -28,7 +38,20 @@ function shared<T>(values: readonly T[]): T | null {
   return values.length && values.every((v) => v === values[0]) ? values[0] : null;
 }
 
-export default function UploadBatch({ items, onEdit, onPublish, onClear, onShow, shownId, bulk }: Props) {
+export default function UploadBatch({
+  items,
+  all,
+  extras,
+  onPlace,
+  onClearPlace,
+  onCreated,
+  onEdit,
+  onPublish,
+  onClear,
+  onShow,
+  shownId,
+  bulk
+}: Props) {
   const open = items.filter(isEditable);
   const tags = commonTags(open.map((it) => it.tags));
   const themes = commonTags(open.map((it) => it.themeIds));
@@ -65,6 +88,15 @@ export default function UploadBatch({ items, onEdit, onPublish, onClear, onShow,
       </ul>
 
       <div className="up-form pf">
+        <BatchPlace
+          key={items.map((it) => it.id).join()}
+          items={items}
+          all={all}
+          extras={extras}
+          onApply={onPlace}
+          onClear={onClearPlace}
+          onCreated={onCreated}
+        />
         <div className="pf-row pf-top">
           <span className="pf-k">标签</span>
           <div className="pf-v">
