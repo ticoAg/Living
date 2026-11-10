@@ -17,6 +17,12 @@
 .bw-filter[aria-expanded='true'] { background: var(--mat); }
 .bw-filter-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--ink); color: var(--paper); font-size: 12px; }
 .bw .mono { font-variant-numeric: tabular-nums; }
+/* the line saying a photo list stopped at its limit (browse/ui.tsx TruncatedNote): quiet, but outside any folded filter */
+.bw-limit { margin: 0; font: 400 12px/1.5 var(--mono); color: var(--ink-2); }
+.gal-limit { padding-top: 12px; }
+.gal-limit + .gal-masonry { padding-top: 20px; }
+.mpg-top > .mpg-limit { flex-basis: 100%; }
+.idx-totals .bw-limit { font: inherit; }
 /* the base .chip loses its pressed look to data-included when a selected chip sits inside a selected subtree */
 .chip[aria-pressed='true'][data-included='true'] { background: var(--ink); color: var(--paper); }
 
@@ -284,6 +290,7 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .gal-head .tagf { padding-bottom: 0; }
   .gal-head > .btn-living { order: 2; margin-left: auto; }
   .gal-masonry { padding-top: 24px; }
+  .gal-limit + .gal-masonry { padding-top: 16px; }
   /* tag rows scroll sideways instead of stacking into a wall of chips */
   .tagf { margin-inline: calc(var(--gutter) * -1); }
   .tagf-row { flex-wrap: nowrap; overflow-x: auto; margin-left: 0; padding: 2px var(--gutter) 2px calc(var(--gutter) - 10px); scrollbar-width: none; }
@@ -306,6 +313,8 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .mpg-filters { order: 4; flex: 1 1 100%; }
   .mpg-filters[data-open='false'] { display: none; }
   .mpg-map { flex-basis: 100%; height: calc(100svh - var(--header-h) - var(--nav-foot, 0px) - 136px); min-height: 320px; }
+  .mpg-top > .mpg-limit { order: 5; }
+  .mpg:has(.mpg-limit) .mpg-map { height: calc(100svh - var(--header-h) - var(--nav-foot, 0px) - 162px); }
   .mpg-panel { flex-basis: 100%; max-width: none; }
   .idx { gap: 40px; }
   .idx-head { padding-top: 28px; }

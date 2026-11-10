@@ -37,6 +37,14 @@ export function isUniqueViolation(e: unknown): boolean {
   return e instanceof Error && /UNIQUE constraint failed|SQLITE_CONSTRAINT_UNIQUE|SQLITE_CONSTRAINT_PRIMARYKEY/i.test(e.message);
 }
 
+/**
+ * The first `limit` of `rows`, and whether there were more. Query `limit + 1` rows for this: the extra row only tells
+ * that the list goes on, without counting the rest.
+ */
+export function capped<T>(rows: T[], limit: number): { rows: T[]; truncated: boolean } {
+  return rows.length > limit ? { rows: rows.slice(0, limit), truncated: true } : { rows, truncated: false };
+}
+
 export function parseJson<T>(s: string | null | undefined): T | null {
   if (!s) return null;
   try {

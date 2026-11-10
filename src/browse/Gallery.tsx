@@ -11,7 +11,7 @@ import { livingForFilter } from './links';
 import Masonry from './Masonry';
 import { byTakenDesc } from './sort';
 import TagFilter from './TagFilter';
-import { EmptyState, FilterToggle, LoadError } from './ui';
+import { EmptyState, FilterToggle, LoadError, TruncatedNote } from './ui';
 import { replaceQuery, splitIds, useQuery } from './url';
 
 // The masonry gallery shared by the home page (everyone's public photos) and a profile (`owner`).
@@ -30,7 +30,7 @@ export default function Gallery({ owner }: { owner?: string }) {
   const rawTags = useMemo(() => splitIds(q.get('tags')), [q]);
   const city = q.get('city') ?? '';
 
-  const { photos, error, reload } = usePhotoList(owner ? `owner=${enc(owner)}` : '');
+  const { photos, truncated, error, reload } = usePhotoList(owner ? `owner=${enc(owner)}` : '');
   const { tree, error: tagsError } = useTagTree(owner);
   const { pois, byId: poiById, error: poisError } = usePoiList(owner);
 
@@ -129,6 +129,7 @@ export default function Gallery({ owner }: { owner?: string }) {
           </button>
         )}
       </div>
+      {truncated && !error && <TruncatedNote className="gal-limit" />}
       {body}
     </div>
   );

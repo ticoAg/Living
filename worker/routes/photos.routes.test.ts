@@ -1,7 +1,7 @@
 // Upload, edit and delete against real D1 and R2: docs/api/photos.md.
 
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
-import type { PhotoDetail } from '../../shared/types';
+import { PHOTO_LIST_LIMIT, type PhotoDetail, type PhotoListResponse } from '../../shared/types';
 import {
   Client,
   expectStatus,
@@ -270,6 +270,55 @@ describe('GET /api/photos ordering', () => {
         .map((p) => p.id)
         .sort()
     ).toEqual([undated.id, undatedLater.id].sort());
+  });
+});
+
+describe('GET /api/photos limit', () => {
+  /** `n` public photos of `owner` straight into D1, one minute apart; `bulk00001` is the oldest. */
+  async function addPhotos(owner: Client, n: number, from = 1) {
+    await platform.env.DB.prepare(
+      `WITH RECURSIVE seq(i) AS (SELECT ?2 UNION ALL SELECT i + 1 FROM seq WHERE i < ?3)
+       INSERT INTO photos (id, owner_id, taken_at, width, height, file_key, variants, visibility)
+       SELECT printf('ph_bulk%05d', i), ?1, strftime('%Y-%m-%dT%H:%M:%S', '2020-01-01', '+' || i || ' minutes'), 3, 2,
+              'o/x/' || i || '.jpg', '{}', 'public'
+       FROM seq`
+    )
+      .bind(owner.me.id, from, from + n - 1)
+      .run();
+  }
+  const list = async (client: Client, query = '') => expectStatus(await client.get<PhotoListResponse>(`/api/photos${query}`), 200);
+
+  it('says the list is complete when it is', async () => {
+    await upload(alice, { visibility: 'public' });
+    expect((await list(new Client(platform))).truncated).toBe(false);
+    expect((await list(alice, '?mine=1')).truncated).toBe(false);
+    expect(await list(alice, '?owner=nobody')).toEqual({ photos: [], truncated: false });
+  });
+
+  it(`returns at most ${PHOTO_LIST_LIMIT} photos, the newest, and says when older ones were left out`, async () => {
+    await addPhotos(alice, PHOTO_LIST_LIMIT);
+    const full = await list(new Client(platform));
+    expect(full.photos).toHaveLength(PHOTO_LIST_LIMIT);
+    expect(full.truncated).toBe(false);
+
+    await addPhotos(alice, 1, PHOTO_LIST_LIMIT + 1);
+    for (const [client, query] of [
+      [new Client(platform), ''],
+      [alice, '?mine=1'],
+      [bob, '?owner=alice']
+    ] as const) {
+      const cut = await list(client, query);
+      expect(cut.truncated, query).toBe(true);
+      expect(cut.photos, query).toHaveLength(PHOTO_LIST_LIMIT);
+      expect(cut.photos[0].id, query).toBe(`ph_bulk${String(PHOTO_LIST_LIMIT + 1).padStart(5, '0')}`);
+      // the oldest is the one left out
+      expect(
+        cut.photos.some((p) => p.id === 'ph_bulk00001'),
+        query
+      ).toBe(false);
+    }
+    // other people's lists are not affected
+    expect((await list(bob, '?mine=1')).truncated).toBe(false);
   });
 });
 

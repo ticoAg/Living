@@ -91,6 +91,19 @@ export interface PhotoSummary {
   focus: [number, number] | null;
 }
 
+/**
+ * The most photos `GET /api/photos` returns, newest capture first. There is no paging: past it the oldest photos are
+ * left out and the response says `truncated`. docs/api/photos.md
+ */
+export const PHOTO_LIST_LIMIT = 5000;
+
+/** `GET /api/photos`. */
+export interface PhotoListResponse {
+  photos: PhotoSummary[];
+  /** More photos matched than `PHOTO_LIST_LIMIT`; the oldest were left out. */
+  truncated: boolean;
+}
+
 export interface PhotoDetail extends PhotoSummary {
   note: string | null;
   tz: string | null;

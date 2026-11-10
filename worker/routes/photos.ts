@@ -1,6 +1,13 @@
 import { Hono } from 'hono';
 import { distance } from '../../shared/geo';
-import type { GeoPrivacy, PoiMethod, Variants, Visibility } from '../../shared/types';
+import {
+  PHOTO_LIST_LIMIT,
+  type GeoPrivacy,
+  type PhotoListResponse,
+  type PoiMethod,
+  type Variants,
+  type Visibility
+} from '../../shared/types';
 import type { AppEnv } from '../env';
 import {
   duplicate,
@@ -33,7 +40,7 @@ import { loadPhotoDetail, loadPhotoRow, PHOTO_FROM, SUMMARY_COLS, toSummary, typ
 import { findOrCreatePoi, getPoiRow, parseNewPoi, type PoiRow } from '../lib/poi';
 import { zoneAt } from '../lib/privacy';
 import { requireUser, viewerId } from '../lib/session';
-import { isUniqueViolation, nowIso, parseJson, prep, prepQ, Sql } from '../lib/sql';
+import { capped, isUniqueViolation, nowIso, parseJson, prep, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
 import { has, optBool, optEnum, optFocus, optTakenAt, optText, strArray } from '../lib/validate';
 import { photoById, photoList, photoLocation } from '../lib/visibility';
@@ -41,7 +48,6 @@ import type { SessionUser } from '../../shared/types';
 
 export const photos = new Hono<AppEnv>({ strict: false });
 
-const LIST_LIMIT = 5000;
 const IDS_LIMIT = 200;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -74,7 +80,7 @@ photos.get('/', async (c) => {
     const u = await db.prepare('SELECT id FROM users WHERE handle = ?1').bind(ownerHandle).first<{ id: string }>();
     if (!u) {
       listCache(c, viewer);
-      return c.json({ photos: [] });
+      return c.json({ photos: [], truncated: false } satisfies PhotoListResponse);
     }
     ownerId = u.id;
   }
@@ -92,14 +98,15 @@ photos.get('/', async (c) => {
     db,
     // Newest capture first; photos without a capture time (NULL sorts last when descending) fall back to upload order.
     // rowid is insertion order, so ties follow upload time and the (visibility|owner_id, taken_at) indexes serve the
-    // ordering without a sort, stopping at the limit.
+    // ordering without a sort, stopping at the limit. One row past the limit tells that the list was cut short.
     `SELECT ${SUMMARY_COLS} FROM ${PHOTO_FROM} WHERE ${where.join(' AND ')}
-     ORDER BY p.taken_at DESC, p.rowid DESC LIMIT ${LIST_LIMIT}`,
+     ORDER BY p.taken_at DESC, p.rowid DESC LIMIT ${PHOTO_LIST_LIMIT + 1}`,
     q
   ).all<PhotoRow>();
+  const { rows, truncated } = capped(res.results, PHOTO_LIST_LIMIT);
 
   listCache(c, viewer);
-  return c.json({ photos: res.results.map((r) => toSummary(r, viewer)) });
+  return c.json({ photos: rows.map((r) => toSummary(r, viewer)), truncated } satisfies PhotoListResponse);
 });
 
 // ---- detail ---------------------------------------------------------------------------------------------------

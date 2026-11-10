@@ -27,7 +27,7 @@ import { fitViewport } from '../browse/mapfit';
 import { shortCity, shortProvince } from '../browse/regions';
 import SwapMap from '../browse/SwapMap';
 import { byTakenDesc } from '../browse/sort';
-import { FilterToggle, LoadError, Loading, spanText } from '../browse/ui';
+import { FilterToggle, LoadError, Loading, spanText, TruncatedNote } from '../browse/ui';
 import { replaceQuery, splitIds, useQuery } from '../browse/url';
 import Img from '../components/Img';
 import { CategoryIcon, Icon } from '../components/icons';
@@ -75,7 +75,7 @@ function sameAlbum(a: Album, b: Album): boolean {
  */
 export default function MapPage() {
   const { pois, byId: poiById, error: poisError } = usePoiList();
-  const { photos, error, reload } = usePhotoList('');
+  const { photos, truncated, error, reload } = usePhotoList('');
   const { tree } = useTagTree();
   const q = useQuery();
   const poiParam = q.get('poi') ?? '';
@@ -329,6 +329,7 @@ export default function MapPage() {
             </button>
           )}
         </div>
+        {truncated && <TruncatedNote className="mpg-limit" />}
       </div>
 
       <div className="mpg-body">

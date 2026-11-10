@@ -6,7 +6,10 @@ tags: [api, photos]
 ---
 # GET /api/photos
 
-返回 `{ "photos": PhotoSummary[] }`，按 `takenAt` 倒序（无拍摄时间的按上传时间排在最后），上限 5000。
+返回 `{ "photos": PhotoSummary[], "truncated": boolean }`（`PhotoListResponse`），按 `takenAt` 倒序（无拍摄时间的按上传时间排在最后）。
+
+- 一次最多 5000 张（`shared/types.ts` 的 `PHOTO_LIST_LIMIT`），没有分页。符合条件的照片更多时，只返回最新的 5000 张，`truncated` 为 `true`；更早的照片不出现在这次的结果里，所以也不出现在图库、地图、索引、Living 和照片页的上一张、下一张里。图库、地图和索引这时显示一行「只显示最近的 5000 张」。
+- `truncated` 由多查一行判断：查询取 5001 行，有第 5001 行就是被截断了，这一行不返回。
 
 | 参数 | 含义 |
 |---|---|

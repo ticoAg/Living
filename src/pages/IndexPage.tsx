@@ -3,7 +3,7 @@ import { Link } from 'wouter';
 import { usePhotoList, usePoiList, useTagTree } from '../browse/api';
 import { useDocTitle, useScrollTop } from '../browse/hooks';
 import { galleryLink } from '../browse/links';
-import { LoadError, Loading } from '../browse/ui';
+import { LoadError, Loading, TruncatedNote } from '../browse/ui';
 import { CategoryIcon } from '../components/icons';
 import { inclusiveCounts, swatchFill, type TagNode } from '../lib/tags';
 import '../styles/browse.css';
@@ -19,7 +19,7 @@ interface CityGroup {
 }
 
 export default function IndexPage() {
-  const { photos, error, reload } = usePhotoList('');
+  const { photos, truncated, error, reload } = usePhotoList('');
   const { tree } = useTagTree();
   const { byId: poiById } = usePoiList();
   useDocTitle('索引');
@@ -144,6 +144,7 @@ export default function IndexPage() {
           <span>{photos.length} 张</span>
           <span>{tagTotal} 个标签</span>
           <span>{placeTotal} 处地点</span>
+          {truncated && <TruncatedNote as="span" />}
         </p>
       </div>
 

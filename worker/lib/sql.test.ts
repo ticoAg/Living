@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
-import { Sql, addDaysIso, isUniqueViolation, likeContains, norm, nowIso, parseJson, prep, prepQ } from './sql';
+import { Sql, addDaysIso, capped, isUniqueViolation, likeContains, norm, nowIso, parseJson, prep, prepQ } from './sql';
 
 describe('norm', () => {
   it('turns undefined and null into NULL', () => {
@@ -190,6 +190,21 @@ describe('isUniqueViolation', () => {
     expect(isUniqueViolation({ message: 'UNIQUE constraint failed' })).toBe(false);
     expect(isUniqueViolation(null)).toBe(false);
     expect(isUniqueViolation(undefined)).toBe(false);
+  });
+});
+
+describe('capped', () => {
+  it('keeps a list that fits, and says it is complete', () => {
+    expect(capped([1, 2, 3], 3)).toEqual({ rows: [1, 2, 3], truncated: false });
+    expect(capped([], 3)).toEqual({ rows: [], truncated: false });
+  });
+
+  it('cuts the extra row off a list queried with limit + 1, and says it was cut', () => {
+    expect(capped([1, 2, 3, 4], 3)).toEqual({ rows: [1, 2, 3], truncated: true });
+  });
+
+  it('cuts any longer list to the limit too', () => {
+    expect(capped([1, 2, 3, 4, 5, 6], 3)).toEqual({ rows: [1, 2, 3], truncated: true });
   });
 });
 

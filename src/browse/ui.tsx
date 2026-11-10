@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'wouter';
+import { PHOTO_LIST_LIMIT } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { ApiError } from '../lib/api';
 
@@ -44,6 +45,14 @@ export function LoadError({
       </div>
     </div>
   );
+}
+
+/**
+ * The one line saying a photo list stopped at PHOTO_LIST_LIMIT (`truncated` in GET /api/photos, which has no paging):
+ * the oldest photos are missing from the page. `as` lets it sit inside a line of other figures.
+ */
+export function TruncatedNote({ as: Tag = 'p', className }: { as?: 'p' | 'span'; className?: string }) {
+  return <Tag className={className ? `bw-limit ${className}` : 'bw-limit'}>只显示最近的 {PHOTO_LIST_LIMIT} 张</Tag>;
 }
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
