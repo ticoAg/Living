@@ -134,8 +134,9 @@ export default defineConfig(({ mode }) => ({
       'typescript/no-misused-spread': 'off'
     },
     overrides: [
-      // The Worker has no React; `usePlatform()` in the route tests is a test fixture, not a hook.
-      { files: ['worker/**'], rules: { 'react/rules-of-hooks': 'off' } },
+      // Neither the Worker nor the browser tests have React: `usePlatform()` in the route tests is a test fixture, and
+      // `use` in the Playwright fixtures is Playwright's callback, not React's hook.
+      { files: ['worker/**', 'e2e/**'], rules: { 'react/rules-of-hooks': 'off' } },
       // Pointer-only conveniences with a keyboard path elsewhere: the user menu closes after a pick (a link's own click
       // bubbles up), a click on Living's stage shows the bar (keys and focus do too), the picker's backdrop closes it (Esc).
       {
