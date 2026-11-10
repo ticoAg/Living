@@ -144,5 +144,10 @@ export default defineConfig(({ mode }) => ({
   test:
     mode === 'routes'
       ? { include: [ROUTE_TESTS], environment: 'node', hookTimeout: 60_000, testTimeout: 20_000 }
-      : { include: ['{src,worker,shared}/**/*.test.ts'], exclude: [...defaultExclude, ROUTE_TESTS], environment: 'node' }
+      : { include: ['{src,worker,shared}/**/*.test.ts'], exclude: [...defaultExclude, ROUTE_TESTS], environment: 'node' },
+  // The pre-commit hook (.vite-hooks/pre-commit runs `vp staged`): format and lint the staged files, fixing what can be
+  // fixed and staging the fixes. Type errors are reported for those files only; the full check and the tests stay in CI.
+  staged: {
+    '*': 'vp check --fix --no-error-on-unmatched-pattern'
+  }
 }));

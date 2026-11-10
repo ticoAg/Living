@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: 本地开发
-description: 安装依赖、建本地 D1、写入站长邀请码，用 Vite+ 一条命令在本机跑起前端、Worker 和本地 D1、R2、KV；单元测试与路由测试怎么跑。
+description: 安装依赖、建本地 D1、写入站长邀请码，用 Vite+ 一条命令在本机跑起前端、Worker 和本地 D1、R2、KV；提交前钩子；单元测试与路由测试怎么跑。
 tags: [runbook, dev]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/package.json
@@ -18,7 +18,7 @@ sources:
 
 # 第一次启动
 
-1. 安装依赖：
+1. 安装依赖。安装完会顺带装好 Git 提交前钩子，见 [提交前检查](#提交前检查)：
 
    ```bash
    npm install
@@ -60,6 +60,28 @@ sources:
 | 跑一次定时任务 | 开发服务器运行时 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"`，补全本地照片的省份并清理过期的地点缓存，见 [定时任务](/architecture/cloudflare.md#定时任务) |
 
 格式与 lint 的设置都在 `vite.config.ts` 的 `fmt` 和 `lint` 里：单引号、不加尾随逗号、行宽 140；CSS 保持一条规则一行，`docs/` 不格式化。Lint 在 Oxlint 默认插件之外开了 `react`（含 React Hooks）和 `jsx-a11y`：条件调用 Hook、`useEffect` / `useMemo` 缺依赖或依赖每次渲染都变是错误，`<img>` 缺 `alt`、列表缺 `key`、可点击的 `div` 没有键盘操作是告警；关掉的规则（全局的在 `lint.rules`，只对个别文件的在 `lint.overrides`）旁边写着原因。类型检查按就近的 `tsconfig.json` 进行：`worker/` 用 `worker/tsconfig.json`（Workers 类型），其余用根目录的 `tsconfig.json`。
+
+# 提交前检查
+
+每次 `git commit` 前，钩子对**暂存的文件**跑一遍格式化和 lint：能自动修的（格式、可修复的 lint 规则）直接修好并重新暂存，修不了的错误（包括这些文件里的类型错误）拦下这次提交并打印出来。全量类型检查和测试不在钩子里跑，留给 PR 检查，所以提交只多几秒。
+
+| 部分 | 位置 |
+|---|---|
+| 钩子脚本 | `.vite-hooks/pre-commit`，内容是 `vp staged` |
+| 对暂存文件跑什么 | `vite.config.ts` 的 `staged`：`vp check --fix --no-error-on-unmatched-pattern`（`docs/`、CSS 这类不格式化的文件跳过，不报错） |
+| 安装 | `package.json` 的 `prepare`，即 `scripts/install-hooks.mjs`，在 `npm install`、`npm ci` 之后自动执行 `vp config --no-agent`：生成 `.vite-hooks/_/`（已被忽略）并把本仓库的 `core.hooksPath` 指向它 |
+
+安装这一步绝不让 `npm install` / `npm ci` 失败：设了 `CI` 时（GitHub Actions 和 Cloudflare Workers Builds 都会设）、目录里没有 `.git` 时（tarball、拷贝出来的目录）、设了 `VP_GIT_HOOKS=0` 时直接跳过，什么也不输出；`vp config` 自己出错（比如没装 git）时只打印一行提示。
+
+```bash
+npx vp hooks status        # 看钩子是否就位
+npx vp hooks disable       # 在这个克隆里关掉，之后的 npm install 也不会再装回来
+npx vp hooks enable        # 重新打开
+VP_GIT_HOOKS=0 git commit  # 只跳过这一次
+```
+
+- 钩子要求 Node 22.22.1 以上（22 系列）或 24.11 以上、Git 2.32 以上，这是 `vp staged` 的要求。
+- 用 git worktree 时，`core.hooksPath` 写在各工作树共用的配置里，值是相对路径 `.vite-hooks/_`，每个工作树找自己目录下的那份：哪个工作树执行过 `npm install`，哪个就有钩子，其余照常提交。
 
 # 单元测试
 

@@ -17,6 +17,7 @@
     "check": "vp check",
     "test": "vp test",
     "test:routes": "vp test --mode routes",
+    "prepare": "node scripts/install-hooks.mjs",
     "build": "vp check --no-fmt && vp test && vp build",
     "db:migrate:local": "wrangler d1 migrations apply living --local",
     "db:migrate:remote": "wrangler d1 migrations apply living --remote",
