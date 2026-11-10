@@ -1,6 +1,8 @@
 # Directory Update Log
 
 ## 2026-11-10
+* **Update**: 提交前钩子对暂存文件跑格式化和 lint（能修的自动修），`npm install` / `npm ci` 后自动就位，CI 和没有 `.git` 的环境跳过，见 [提交前检查](/runbooks/local-dev.md#提交前检查)；新增浏览器冒烟测试 `npm run test:e2e`（构建后在独立的本地库上走一遍上传、发布和各页面，外加分块失效、会话过期、图库顺序、手机溢出、快速点击几条回归），PR 检查有单独的 e2e job，见 [冒烟测试](/runbooks/local-dev.md#冒烟测试)。
+* **Update**: 页面刚加载完就点站内链接时，目标页不再卡在加载状态：共享 GET 缓存改用 `useSyncExternalStore` 订阅，见 [前端分区](/architecture/frontend.md)。
 * **Update**: 照片上传在服务端拆成读表单、查询、写 R2、落库四步（`worker/lib/upload.ts`），注册设置移到 `worker/lib/settings.ts`，地点名称搜索移到 `searchPlaces`，路由之间不再互相引用，见 [照片接口](/api/photos.md)。
 * **Update**: Lint 开启 React Hooks 与无障碍规则，`vp check` 保持零告警，见 [工具链采用 Vite+](/architecture/decisions/0006-vite-plus.md)。
 * **Update**: 地图页切换城市时，新地图在图集画出后立即淡入，不再等满 6 秒，见 [地图](/product/features/map.md)。
