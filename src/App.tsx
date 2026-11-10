@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
+import ReLogin from './components/ReLogin';
 import { SessionProvider } from './lib/session';
 import {
   Explore,
@@ -72,6 +73,7 @@ export default function App() {
           <Routes />
         </Suspense>
       </ErrorBoundary>
+      <ReLogin />
     </SessionProvider>
   );
 }

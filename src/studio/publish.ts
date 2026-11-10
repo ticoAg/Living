@@ -1,4 +1,5 @@
 import type { PhotoDetail } from '../../shared/types';
+import { reportUnauthenticated } from '../lib/api';
 
 // POST /api/photos as multipart with upload progress. This does not go through lib/api.ts because a
 // 409 duplicate carries `photoId` in the body, which ApiError does not keep, and fetch has no upload progress.
@@ -30,6 +31,8 @@ export function uploadPhoto(form: FormData, onProgress?: (fraction: number) => v
       } catch {
         body = null;
       }
+      // the session layer asks for the password again; the photo stays in the queue to be sent once more
+      if (xhr.status === 401) reportUnauthenticated('/api/photos');
       if (xhr.status >= 200 && xhr.status < 300 && body?.photo) {
         resolve({ ok: true, photo: body.photo });
         return;

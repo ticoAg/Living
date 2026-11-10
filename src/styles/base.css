@@ -177,3 +177,11 @@ h1, h2, h3 { text-wrap: balance; }
 .loading { padding: 80px 0; text-align: center; color: var(--ink-2); }
 .loading-late { min-height: 100vh; animation: loading-late 0s 400ms both; }
 @keyframes loading-late { from { visibility: hidden; } }
+
+/* sign-in dialog for an expired session (components/ReLogin.tsx); its form is styled by studio.css */
+.relogin { width: min(440px, calc(100vw - 32px)); max-width: none; padding: 0; border: 1px solid var(--rule-2); border-radius: 4px; background: var(--sheet); color: var(--ink); box-shadow: 0 28px 70px -20px rgba(28, 32, 30, 0.5); }
+.relogin::backdrop { background: rgba(28, 32, 30, 0.5); }
+.relogin-panel { display: flex; flex-direction: column; gap: 12px; padding: 28px clamp(20px, 5vw, 32px) 20px; }
+.relogin-title { margin: 0; font: 600 20px / 1.5 var(--serif); letter-spacing: 0.3em; }
+.relogin-panel > p { margin: 0 0 8px; }
+.relogin-later { align-self: center; min-height: 44px; }
