@@ -1,6 +1,8 @@
 # Directory Update Log
 
 ## 2026-11-10
+* **Update**: 上传时多选的照片可以一起选地点（候选取各自匹配结果的并集，离得太远的不套用），队列里一键选中同一处拍的一组，见 [上传与整理](/product/features/upload.md#一起选地点)。
+* **Update**: 上传页同时处理两张照片（实测 20 张 2400 万像素从 21 秒降到 12 秒），已填的内容按文件存为草稿、刷新后重新加入同样的文件自动恢复，见 [上传与整理](/product/features/upload.md#草稿)。
 * **Update**: 字体改为自托管（宋体按 unicode-range 切片、只带用到的字重，字体样式表不阻塞渲染），界面改用系统黑体，不再请求 Google Fonts，见 [前端分区](/architecture/frontend.md)。
 * **Update**: 接口有了路由测试：`npm run test:routes` 在本地 D1、R2、KV 上跑可见性矩阵、账号、上传、照片、主题、标签、地点和站点管理，PR 检查会跑它，不进 `npm run build`，见 [路由测试](/runbooks/local-dev.md#路由测试)；顺带修了地点别名以字符串提交时不去重、不限 20 个的问题。
 * **Update**: 小字的三级墨加深到在纸面和卡纸上都不低于 4.5:1；小地图的署名加载后收成 ⓘ，见 [前端分区](/architecture/frontend.md)。
