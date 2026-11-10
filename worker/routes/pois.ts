@@ -190,13 +190,15 @@ pois.patch('/:id', async (c) => {
   }
   if (has(body, 'aliases')) {
     const raw = body.aliases;
-    const list =
+    // One string is split first; either way the list is held to the same limits and merged like an array.
+    const parts =
       typeof raw === 'string'
         ? raw
             .split(/[,，;；、\n]/)
             .map((s) => s.trim())
             .filter(Boolean)
-        : strArray(raw, '别名', POI_LIMITS.aliasCount, POI_LIMITS.aliasMax);
+        : raw;
+    const list = strArray(parts, '别名', POI_LIMITS.aliasCount, POI_LIMITS.aliasMax);
     aliases = list.length ? JSON.stringify(list.map((s) => optText(s, '别名', POI_LIMITS.aliasMax)).filter(Boolean)) : null;
   }
 

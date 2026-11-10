@@ -70,8 +70,7 @@ describe('PATCH /api/pois/:id', () => {
     expect(expectStatus(res, 200).poi.aliases).toEqual(['West Lake', '钱塘湖', '明圣湖', '西子湖', '金牛湖', '上湖']);
   });
 
-  // docs/api/pois.md: "重复的合并"; the array form is merged, the string form is not.
-  it.fails('merges repeated aliases given as one string', async () => {
+  it('merges repeated aliases given as one string', async () => {
     const poi = await createPoi(alice, { name: '西湖', category: '湖', lat: 30.24, lng: 120.14 });
     const res = await alice.patch(`/api/pois/${poi.id}`, { aliases: '西子湖，西子湖、West Lake' });
     expect(expectStatus(res, 200).poi.aliases).toEqual(['西子湖', 'West Lake']);
@@ -84,8 +83,7 @@ describe('PATCH /api/pois/:id', () => {
     expectStatus(await alice.patch(`/api/pois/${poi.id}`, { aliases: aliases.slice(1) }), 200);
   });
 
-  // docs/api/pois.md: at most 20 aliases; only the array form is held to it.
-  it.fails('holds aliases given as one string to the 20-alias limit', async () => {
+  it('holds aliases given as one string to the 20-alias limit', async () => {
     const poi = await createPoi(alice, { name: '西湖', category: '湖', lat: 30.24, lng: 120.14 });
     const aliases = Array.from({ length: 21 }, (_, i) => `别名${i}`);
     expect((await alice.patch(`/api/pois/${poi.id}`, { aliases: aliases.join('、') })).status).toBe(400);
