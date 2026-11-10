@@ -1,5 +1,5 @@
 import { useCallback, useId, useMemo, useRef, useState, type FormEvent } from 'react';
-import { POI_CATEGORIES, type MatchCandidate, type Poi } from '../../shared/types';
+import { POI_CATEGORIES, POI_LIMITS, type MatchCandidate, type Poi } from '../../shared/types';
 import { distance as geoDistance, fmtDistance } from '../../shared/geo';
 import { POI_SEARCH_LIMITS } from '../../shared/limits';
 import { CategoryIcon, Icon } from '../components/icons';
@@ -350,7 +350,7 @@ export function PlaceCustom({
               className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              maxLength={40}
+              maxLength={POI_LIMITS.nameMax}
               placeholder="如 家门口的桥"
               disabled={!at || busy}
               required

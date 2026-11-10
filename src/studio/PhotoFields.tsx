@@ -97,7 +97,7 @@ export default function PhotoFields({ value, onChange, tags, geoLocked, toggles 
             className="input pf-input"
             value={value.title}
             onChange={(e) => onChange({ title: e.target.value })}
-            maxLength={120}
+            maxLength={PHOTO_LIMITS.titleMax}
             placeholder="可不填"
             disabled={disabled}
             autoComplete="off"
