@@ -8,6 +8,8 @@ tags: [architecture, frontend]
 
 React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vite-plus.md)（Vite 8 与 Rolldown 构建，Vitest、Oxlint、Oxfmt）；MapLibre 6 按需加载，它的 Worker 用 `?worker&url` 单独构建后交给 `setWorkerUrl`（见 `src/components/MapView.tsx`）；exifr、thumbhash 只在上传页加载；HEIC 解码器（libheif 的 WebAssembly 构建，在 Worker 里运行）只在选了浏览器打不开的 HEIC 文件时才加载。
 
+字体自托管，不连第三方字体服务。界面文字用系统黑体（苹方、微软雅黑、Noto Sans CJK / 思源黑体），不下载。宋体、等宽、字标三种网络字体来自 `@fontsource/*`，只带用到的字重，全部 woff2，随 `/assets/` 一年 immutable 缓存：Noto Serif SC 500/600/700 保留 Google 的约 100 个 unicode-range 切片，页面只下载自己用到的字所在的那几片；DM Mono 400/500 与 Spectral 300/500 只带 latin 子集。`@font-face` 规则由 `vite.config.ts` 里的 `fonts()` 插件生成（虚拟模块 `virtual:fonts.css`，约 300 条，未压缩约 275 KB、brotli 约 21 KB），单独成一个样式表，不进主样式表：构建时 `index.html` 以 `media="print"` 加 `onload` 的方式引用它，与入口脚本并行下载而不阻塞渲染；`src/main.tsx` 的动态 `import()` 在开发时加载它。字标字体（Spectral 500）在 `index.html` 里 preload，页眉的 LIVING 不会先以 Georgia 闪一下。`font-display: swap`：字体到达前文字先用字体栈里的下一个字体显示，不出现空白。中文字形等宽，换字体基本只换笔画不换排版；实测字体换入造成的 CLS 每页不超过 0.004。
+
 # 路由与归属
 
 | 路由 | 页面文件 | 分区 |
@@ -63,7 +65,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 
 # 设计令牌
 
-纸面 `#F1F2EE`、卡纸 `#E6E8E2`、墨 `#1C201E`、次级墨 `#5A605C`、三级墨 `#686E6A`（11–13px 的小字，在纸面和卡纸 `#FAFAF8` 上都不低于 4.5:1）、细线 `#D3D6D0`、湖蓝 `#2B5F86`（链接、水体注记）、赭 `#8F5530`（等高线、匹配半径、朝向）。字体：宋体 Noto Serif SC 用于地名与标题（加宽字距 0.24–0.5em），Noto Sans SC 用于界面，DM Mono 用于坐标与数字，Spectral 用于 LIVING 字标。Living 模式使用深色（`--night*` 令牌）。
+纸面 `#F1F2EE`、卡纸 `#E6E8E2`、墨 `#1C201E`、次级墨 `#5A605C`、三级墨 `#686E6A`（11–13px 的小字，在纸面和卡纸 `#FAFAF8` 上都不低于 4.5:1）、细线 `#D3D6D0`、湖蓝 `#2B5F86`（链接、水体注记）、赭 `#8F5530`（等高线、匹配半径、朝向）。字体（`base.css` 的 `--serif`、`--sans`、`--mono`、`--latin`）：宋体 Noto Serif SC 用于地名与标题（加宽字距 0.24–0.5em，字重 500/600/700，写 400 的地方显示为 500），系统黑体用于界面，DM Mono 用于坐标与数字（400/500），Spectral 用于 LIVING 字标和大号数字（300/500，无斜体）。样式里要用新的字重或斜体，先在 `vite.config.ts` 的 `FONTS` 里加上，否则浏览器会用相近字重或合成粗体。Living 模式使用深色（`--night*` 令牌）。
 
 # 约定
 
