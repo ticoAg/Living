@@ -1,5 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
-import { Sql, addDaysIso, capped, isUniqueViolation, likeContains, norm, nowIso, parseJson, prep, prepQ } from './sql';
+import {
+  Sql,
+  addDaysIso,
+  capped,
+  insertSql,
+  isUniqueViolation,
+  likeContains,
+  norm,
+  nowIso,
+  parseJson,
+  prep,
+  prepInsert,
+  prepQ
+} from './sql';
 
 describe('norm', () => {
   it('turns undefined and null into NULL', () => {
@@ -102,6 +115,40 @@ describe('prep / prepQ', () => {
     const sql = `SELECT * FROM t WHERE a = ${q.p(false)} AND b = ${q.p('y')}`;
     prepQ(db, sql, q);
     expect(bound).toEqual([{ sql: 'SELECT * FROM t WHERE a = ?1 AND b = ?2', params: [0, 'y'] }]);
+  });
+});
+
+describe('insertSql / prepInsert', () => {
+  it('names every column and binds its value in the same position', () => {
+    const q = new Sql();
+    const sql = insertSql('photos', { id: 'ph_1', title: null, lat: 30.25, in_living: true, palette: ['#fff'] }, q);
+    expect(sql).toBe('INSERT INTO photos (id, title, lat, in_living, palette) VALUES (?1, ?2, ?3, ?4, ?5)');
+    expect(q.params).toEqual(['ph_1', null, 30.25, 1, '["#fff"]']);
+  });
+
+  it('continues the numbering of a Sql that already holds values', () => {
+    const q = new Sql();
+    q.p('before');
+    expect(insertSql('t', { a: 1, b: undefined }, q)).toBe('INSERT INTO t (a, b) VALUES (?2, ?3)');
+    expect(q.params).toEqual(['before', 1, null]);
+  });
+
+  it('refuses an empty row and names that are not plain identifiers', () => {
+    expect(() => insertSql('t', {}, new Sql())).toThrow(/no columns/);
+    expect(() => insertSql('t', { 'a; DROP TABLE t': 1 }, new Sql())).toThrow(/bad identifier/);
+    expect(() => insertSql('t (x)', { a: 1 }, new Sql())).toThrow(/bad identifier/);
+    expect(() => insertSql('t', { '1a': 1 }, new Sql())).toThrow(/bad identifier/);
+  });
+
+  it('prepInsert binds the normalised values to the generated statement', () => {
+    const bound: { sql: string; params: unknown[] }[] = [];
+    const db = {
+      prepare: (sql: string) => ({ bind: (...params: unknown[]) => bound.push({ sql, params }) })
+    } as unknown as D1Database;
+    prepInsert(db, 'photo_tags', { photo_id: 'ph_1', tag_id: 'bridge', source: 'manual' });
+    expect(bound).toEqual([
+      { sql: 'INSERT INTO photo_tags (photo_id, tag_id, source) VALUES (?1, ?2, ?3)', params: ['ph_1', 'bridge', 'manual'] }
+    ]);
   });
 });
 

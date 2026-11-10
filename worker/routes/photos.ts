@@ -10,39 +10,16 @@ import {
   type Visibility
 } from '../../shared/types';
 import type { AppEnv } from '../env';
-import {
-  duplicate,
-  forbidden,
-  invalid,
-  listCache,
-  notFound,
-  paramId,
-  readJson,
-  tooLarge,
-  unauthenticated,
-  upstream,
-  type Ctx
-} from '../lib/http';
+import { forbidden, invalid, listCache, notFound, paramId, readJson, unauthenticated, type Ctx } from '../lib/http';
 import { newId } from '../lib/ids';
 import { purgeVariantCache } from '../lib/mediaCache';
-import {
-  GEO_PRIVACIES,
-  isFile,
-  MAX_ORIGINAL_BYTES,
-  MAX_REQUEST_BYTES,
-  MAX_VARIANT_BYTES,
-  originalKind,
-  parseCreateMeta,
-  POI_METHODS,
-  variantKind,
-  VISIBILITIES
-} from '../lib/photoInput';
+import { GEO_PRIVACIES, POI_METHODS, VISIBILITIES } from '../lib/photoInput';
 import { loadPhotoDetail, loadPhotoRow, PHOTO_FROM, SUMMARY_COLS, toSummary, type PhotoRow } from '../lib/photos';
 import { findOrCreatePoi, getPoiRow, parseNewPoi, type PoiRow } from '../lib/poi';
-import { zoneAt } from '../lib/privacy';
 import { requireUser, viewerId } from '../lib/session';
-import { capped, isUniqueViolation, nowIso, parseJson, prep, prepQ, Sql } from '../lib/sql';
+import { capped, nowIso, parseJson, prep, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
+import { readUploadForm, resolveUpload, savePhoto, storeFiles, uploadFiles, type Upload } from '../lib/upload';
 import { has, optBool, optEnum, optFocus, optTakenAt, optText, strArray } from '../lib/validate';
 import { photoById, photoList, photoLocation } from '../lib/visibility';
 import type { SessionUser } from '../../shared/types';
@@ -123,213 +100,13 @@ photos.get('/:id', async (c) => {
 photos.post('/', async (c) => {
   const user = await requireUser(c);
   const db = c.env.DB;
-
-  if (Number(c.req.header('content-length') ?? 0) > MAX_REQUEST_BYTES) throw tooLarge('上传内容太大：原图不能超过 50 MB');
-  if (!(c.req.header('content-type') ?? '').toLowerCase().startsWith('multipart/form-data'))
-    throw invalid('上传需要使用 multipart/form-data');
-
-  let form: FormData;
-  try {
-    form = await c.req.formData();
-  } catch {
-    throw invalid('无法解析上传内容，请重试');
-  }
-
-  // meta
-  const metaPart = form.get('meta');
-  const metaText = typeof metaPart === 'string' ? metaPart : isFile(metaPart) ? await metaPart.text() : null;
-  if (metaText === null) throw invalid('缺少 meta（JSON）');
-  if (metaText.length > 200_000) throw tooLarge('meta 太大');
-  let metaJson: unknown;
-  try {
-    metaJson = JSON.parse(metaText);
-  } catch {
-    throw invalid('meta 不是有效的 JSON');
-  }
-  const meta = parseCreateMeta(metaJson);
-
-  // files
-  const original = form.get('original');
-  if (!isFile(original) || original.size === 0) throw invalid('缺少原图（original）');
-  if (original.size > MAX_ORIGINAL_BYTES) throw tooLarge('原图超过 50 MB，请先压缩或缩小后再上传');
-  const originalType = originalKind(original);
-
-  const sizes = ['s', 'm', 'l'] as const;
-  const files = {} as Record<(typeof sizes)[number], File>;
-  const kinds = {} as Record<(typeof sizes)[number], { ext: 'webp' | 'jpg'; type: string }>;
-  for (const k of sizes) {
-    const part = form.get(k);
-    if (!isFile(part) || part.size === 0) throw invalid(`缺少尺寸图「${k}」`);
-    if (part.size > MAX_VARIANT_BYTES) throw tooLarge(`尺寸图「${k}」太大`);
-    files[k] = part;
-    kinds[k] = await variantKind(part, `尺寸图「${k}」`);
-  }
-
-  // Same owner + same bytes → 409 with the existing photo.
-  if (meta.sha256) {
-    const dup = await db
-      .prepare('SELECT id FROM photos WHERE owner_id = ?1 AND sha256 = ?2')
-      .bind(user.id, meta.sha256)
-      .first<{ id: string }>();
-    if (dup) throw duplicate('这张照片已经上传过了', { photoId: dup.id });
-  }
-
-  // Everything that can be checked before touching storage.
-  let poi: PoiRow | null = null;
-  if (meta.poiId) {
-    poi = await getPoiRow(db, meta.poiId);
-    if (!poi) throw invalid('所选地点不存在');
-  }
-  let geoPrivacy: GeoPrivacy = meta.geoPrivacy;
-  if (meta.lat !== null && meta.lng !== null && (await zoneAt(db, user.id, meta.lat, meta.lng))) geoPrivacy = 'hidden';
-  const manualTags = await usableTagIds(db, user.id, meta.tagIds);
-  const suggestedTags = (await usableTagIds(db, user.id, meta.suggestedTagIds)).filter((id) => !manualTags.includes(id));
-  const themeIds = meta.themeIds.length
-    ? (
-        await db
-          .prepare('SELECT id FROM themes WHERE owner_id = ?1 AND id IN (SELECT value FROM json_each(?2))')
-          .bind(user.id, JSON.stringify(meta.themeIds))
-          .all<{ id: string }>()
-      ).results.map((r) => r.id)
-    : [];
-
+  const form = await readUploadForm(c.req.raw);
+  const refs = await resolveUpload(db, user.id, form.meta);
   const photoId = newId.photo();
-  const originalKey = `o/${user.id}/${photoId}.${originalType.ext}`;
-  const variants: Variants = {
-    s: { key: `v/${photoId}/s.${kinds.s.ext}`, w: meta.sizes.s[0], h: meta.sizes.s[1] },
-    m: { key: `v/${photoId}/m.${kinds.m.ext}`, w: meta.sizes.m[0], h: meta.sizes.m[1] },
-    l: { key: `v/${photoId}/l.${kinds.l.ext}`, w: meta.sizes.l[0], h: meta.sizes.l[1] }
-  };
-
-  // R2 first: if storage fails nothing is written to D1.
-  const objects: [string, Blob, string][] = [
-    [originalKey, original, originalType.type],
-    [variants.s.key, files.s, kinds.s.type],
-    [variants.m.key, files.m, kinds.m.type],
-    [variants.l.key, files.l, kinds.l.type]
-  ];
-  const keys = objects.map(([k]) => k);
-  const stored = await Promise.allSettled(
-    objects.map(([key, blob, contentType]) =>
-      c.env.MEDIA.put(key, blob, { httpMetadata: { contentType }, customMetadata: { ownerId: user.id, photoId } })
-    )
-  );
-  const failed = stored.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-  if (failed) {
-    console.error('upload: R2 put failed', failed.reason instanceof Error ? failed.reason.message : failed.reason);
-    await c.env.MEDIA.delete(keys).catch(() => {});
-    throw upstream('图片存储暂时不可用，请稍后重试');
-  }
-
-  try {
-    if (!poi && meta.newPoi) poi = await findOrCreatePoi(db, meta.newPoi, user.id);
-    const hasPoint = meta.lat !== null && meta.lng !== null;
-    // The server owns the distance whenever it can compute it.
-    const poiDistance = poi
-      ? hasPoint
-        ? round1(distance(meta.lat as number, meta.lng as number, poi.lat, poi.lng))
-        : meta.poiDistance
-      : null;
-    const poiMethod: PoiMethod | null = poi ? (meta.poiMethod ?? 'manual') : null;
-    const now = nowIso();
-
-    const statements = [
-      prep(
-        db,
-        `INSERT INTO photos (id, owner_id, title, note, taken_at, tz, lat, lng, alt, heading, geo_privacy, city, district,
-           poi_id, poi_distance, poi_method, camera, lens, focal, focal35, aperture, shutter, iso, width, height,
-           file_key, file_type, file_size, variants, thumbhash, palette, focus_x, focus_y, visibility, in_living, favorite,
-           sha256, uploaded_at, province)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23,
-           ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39)`,
-        photoId,
-        user.id,
-        meta.title,
-        meta.note,
-        meta.takenAt,
-        meta.tz,
-        meta.lat,
-        meta.lng,
-        meta.alt,
-        meta.heading,
-        geoPrivacy,
-        meta.city,
-        meta.district,
-        poi?.id ?? null,
-        poiDistance,
-        poiMethod,
-        meta.camera,
-        meta.lens,
-        meta.focal,
-        meta.focal35,
-        meta.aperture,
-        meta.shutter,
-        meta.iso,
-        meta.width,
-        meta.height,
-        originalKey,
-        originalType.type,
-        original.size,
-        JSON.stringify(variants),
-        meta.thumbhash,
-        meta.palette ? JSON.stringify(meta.palette) : null,
-        meta.focus?.[0] ?? null,
-        meta.focus?.[1] ?? null,
-        meta.visibility,
-        meta.inLiving,
-        meta.favorite,
-        meta.sha256,
-        now,
-        meta.province
-      )
-    ];
-    if (manualTags.length) {
-      statements.push(
-        prep(
-          db,
-          `INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, source) SELECT ?1, value, 'manual' FROM json_each(?2)`,
-          photoId,
-          JSON.stringify(manualTags)
-        )
-      );
-    }
-    if (suggestedTags.length) {
-      statements.push(
-        prep(
-          db,
-          `INSERT OR IGNORE INTO photo_tags (photo_id, tag_id, source) SELECT ?1, value, 'suggested' FROM json_each(?2)`,
-          photoId,
-          JSON.stringify(suggestedTags)
-        )
-      );
-    }
-    for (const themeId of themeIds) {
-      statements.push(
-        prep(
-          db,
-          `INSERT INTO theme_items (id, theme_id, position, kind, photo_id)
-           VALUES (?1, ?2, (SELECT COALESCE(MAX(position), -1) + 1 FROM theme_items WHERE theme_id = ?2), 'photo', ?3)`,
-          newId.item(),
-          themeId,
-          photoId
-        ),
-        prep(db, 'UPDATE themes SET updated_at = ?1 WHERE id = ?2', now, themeId)
-      );
-    }
-    await db.batch(statements);
-  } catch (e) {
-    await c.env.MEDIA.delete(keys).catch(() => {});
-    if (isUniqueViolation(e) && meta.sha256) {
-      // Lost a race with an identical upload.
-      const dup = await db
-        .prepare('SELECT id FROM photos WHERE owner_id = ?1 AND sha256 = ?2')
-        .bind(user.id, meta.sha256)
-        .first<{ id: string }>();
-      if (dup) throw duplicate('这张照片已经上传过了', { photoId: dup.id });
-    }
-    throw e;
-  }
-
+  const upload: Upload = { photoId, ownerId: user.id, form, refs, files: uploadFiles(user.id, photoId, form) };
+  // R2 first: if storage fails nothing is written to D1; if D1 fails the files are deleted again.
+  await storeFiles(c.env.MEDIA, upload);
+  await savePhoto(db, c.env.MEDIA, upload);
   const photo = await loadPhotoDetail(db, photoId, user.id);
   return c.json({ photo }, 201);
 });

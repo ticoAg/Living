@@ -254,6 +254,50 @@ describe('POST /api/photos', () => {
     // the parts that did get stored are removed again
     expect(await r2Keys()).toEqual([]);
   });
+
+  it('removes the stored files again when the rows cannot be written', async () => {
+    const db = platform.env.DB;
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    platform.env.DB = { ...db, batch: () => Promise.reject(new Error('D1 is down')) } as unknown as D1Database;
+    try {
+      const res = await uploadRaw(alice, uploadForm({ themeIds: [] }));
+      expect(res.status).toBe(500);
+    } finally {
+      platform.env.DB = db;
+      error.mockRestore();
+    }
+    expect(await row('SELECT COUNT(*) AS n FROM photos')).toEqual({ n: 0 });
+    expect(await r2Keys()).toEqual([]);
+  });
+
+  it('answers 409 with the photo that won a race to the same bytes, and keeps only its files', async () => {
+    const sha = newSha();
+    const first = await upload(alice, { sha256: sha });
+    const db = platform.env.DB;
+    // The duplicate check before storage misses the first photo, as if both requests had passed it at once.
+    let missed = false;
+    const precheck = 'SELECT id FROM photos WHERE owner_id = ?1 AND sha256 = ?2';
+    platform.env.DB = {
+      ...db,
+      prepare: (sql: string) => {
+        if (sql !== precheck || missed) return db.prepare(sql);
+        missed = true;
+        return { bind: () => ({ first: async () => null }) } as unknown as D1PreparedStatement;
+      }
+    } as unknown as D1Database;
+    try {
+      const res = await uploadRaw(alice, uploadForm({ sha256: sha }));
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({ error: 'duplicate', photoId: first.id });
+    } finally {
+      platform.env.DB = db;
+    }
+    expect(missed).toBe(true);
+    expect(await row('SELECT COUNT(*) AS n FROM photos')).toEqual({ n: 1 });
+    expect(await r2Keys()).toEqual(
+      [first.variants.l.key, first.variants.m.key, first.variants.s.key, `o/${alice.me.id}/${first.id}.jpg`].sort()
+    );
+  });
 });
 
 describe('GET /api/photos ordering', () => {

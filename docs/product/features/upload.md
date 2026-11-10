@@ -16,6 +16,8 @@ sources:
     title: 识别 HEIC、检查完整性、读取色彩空间
   - resource: https://github.com/ticoAg/Living/blob/main/worker/lib/photoInput.ts
     title: 上传校验
+  - resource: https://github.com/ticoAg/Living/blob/main/worker/lib/upload.ts
+    title: 服务端的上传步骤：读表单、查询、写 R2、落库
   - resource: https://github.com/ticoAg/Living/blob/main/src/studio/upload-model.ts
     title: 队列状态、多选和全部发布的规则
   - resource: https://github.com/ticoAg/Living/blob/main/src/studio/upload-drafts.ts
