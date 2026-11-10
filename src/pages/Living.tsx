@@ -123,8 +123,9 @@ export default function Living() {
 
   const today = localDate(now);
   const playlist = useMemo(
-    () => (status === 'ready' && pool ? buildPlaylist({ photos: pool, source, tree, seed, today: new Date(), startId }) : EMPTY),
-    // `today` stands for the date: the "那年今日" list rolls over at midnight
+    () =>
+      status === 'ready' && pool ? buildPlaylist({ photos: pool, source, tree, seed, today: new Date(`${today}T00:00`), startId }) : EMPTY,
+    // the "那年今日" list rolls over at midnight, when `today` changes
     [status, pool, source, tree, seed, startId, today]
   );
 

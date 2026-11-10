@@ -24,14 +24,19 @@ export default function SwapMap({ viewKey, viewport, ...props }: MapProps & { vi
   const [fading, setFading] = useState(false);
   const newest = layers[layers.length - 1];
 
+  // `viewport` travels with the key: it is read when the key changes, and later changes to it must not rebuild the map.
+  const latestViewport = useRef(viewport);
+  useEffect(() => {
+    latestViewport.current = viewport;
+  }, [viewport]);
+
   // another view key: build a second map (its viewport is captured now, with the key)
   useEffect(() => {
     setLayers((ls) => {
       const last = ls[ls.length - 1];
-      return last.key === viewKey ? ls : [...ls.slice(-1), { id: last.id + 1, key: viewKey, viewport }];
+      return last.key === viewKey ? ls : [...ls.slice(-1), { id: last.id + 1, key: viewKey, viewport: latestViewport.current }];
     });
     setFading(false);
-    // `viewport` travels with the key; later changes to it must not rebuild the map
   }, [viewKey]);
 
   // when the newest map shows its markers, fade it in, then retire the older map

@@ -82,7 +82,8 @@ function PlaceEditor({
   onChange: (c: PlaceChoice | null) => void;
   disabled?: boolean;
 }) {
-  const coords = photo.lat != null && photo.lng != null ? { lat: photo.lat, lng: photo.lng } : null;
+  const { lat, lng } = photo;
+  const coords = useMemo(() => (lat != null && lng != null ? { lat, lng } : null), [lat, lng]);
   const m = useMatch(coords ? { ...coords, heading: photo.heading } : null);
   const [open, setOpen] = useState(false);
   const [extras, setExtras] = useState<Poi[]>([]);

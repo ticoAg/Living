@@ -1,15 +1,17 @@
 import { useMemo } from 'react';
-import { useSearch } from 'wouter';
+import { useSearch } from 'wouter/use-browser-location';
 
 // Filter state lives in the address bar (?tags=a,b&city=杭州&sort=shuffle). Reads go through wouter's
 // useSearch so components re-render on change; writes use history.replaceState (wouter patches it to
 // notify subscribers) so filtering does not pile up history entries.
 
-/** Current query string as URLSearchParams. Reads the raw `location.search`: wouter's copy is URI-decoded. */
+/**
+ * Current query string as URLSearchParams. Uses the browser-location hook, which returns the raw `location.search`:
+ * the router's `useSearch` from 'wouter' URI-decodes it, which would break values holding an encoded `&` or `=`.
+ */
 export function useQuery(): URLSearchParams {
   const search = useSearch();
-  // `search` only serves as the change signal
-  return useMemo(() => new URLSearchParams(window.location.search), [search]);
+  return useMemo(() => new URLSearchParams(search), [search]);
 }
 
 export const splitIds = (v: string | null | undefined): string[] =>

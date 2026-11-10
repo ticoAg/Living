@@ -98,12 +98,47 @@ export default defineConfig(({ mode }) => ({
   },
   lint: {
     ignorePatterns: ['dist/**', '.wrangler/**'],
+    // `plugins` replaces Oxlint's default set, so the defaults (unicorn, typescript, oxc) are listed too.
+    plugins: ['unicorn', 'typescript', 'oxc', 'react', 'jsx-a11y'],
     jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
     rules: {
       'vite-plus/prefer-vite-plus-imports': 'error',
+      'react/rules-of-hooks': 'error',
+      'react/exhaustive-deps': 'error',
+      // Components keep the last loaded value, or the latest props for callbacks, in a ref read during render.
+      'react/refs': 'off',
+      // Effects reset state when a key changes, load fetched data into an editable draft, or create object URLs.
+      'react/set-state-in-effect': 'off',
+      // It flags locals that an effect or async callback reassigns (in-flight flags, timer ids); they never leave the closure.
+      'react/immutability': 'off',
+      // Only matters to the React Compiler, which the app does not use; it also misreads stable state setters.
+      'react/preserve-manual-memoization': 'off',
+      // `role="status"` on a div or p, `role="group"` on a div: <output> and <fieldset> carry form semantics and styling.
+      'jsx-a11y/prefer-tag-over-role': 'off',
+      // Focus goes to the field the visitor just opened: the login form, an inline rename, a new theme's title.
+      'jsx-a11y/no-autofocus': 'off',
+      // `nickname` is a valid autofill token (HTML spec) that the rule does not know.
+      'jsx-a11y/autocomplete-valid': 'off',
+      // A native checkbox with role="switch" exposes its checked state; aria-checked would duplicate it.
+      'jsx-a11y/role-has-required-aria-props': 'off',
+      // Forms, list rows, labels and <main> take key, drag and hover handlers for delegation, drop zones and highlights;
+      // the actions themselves are real buttons and inputs.
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
+      // The photo editor's focus picker is a focusable group moved with the arrow keys; ARIA has no 2-D slider role.
+      'jsx-a11y/no-noninteractive-tabindex': 'off',
       // Length limits count Unicode code points on both client and server, which is what spreading a string gives.
       'typescript/no-misused-spread': 'off'
     },
+    overrides: [
+      // The Worker has no React; `usePlatform()` in the route tests is a test fixture, not a hook.
+      { files: ['worker/**'], rules: { 'react/rules-of-hooks': 'off' } },
+      // Pointer-only conveniences with a keyboard path elsewhere: the user menu closes after a pick (a link's own click
+      // bubbles up), a click on Living's stage shows the bar (keys and focus do too), the picker's backdrop closes it (Esc).
+      {
+        files: ['src/components/Header.tsx', 'src/pages/Living.tsx', 'src/themes/PhotoPicker.tsx'],
+        rules: { 'jsx-a11y/click-events-have-key-events': 'off', 'jsx-a11y/no-static-element-interactions': 'off' }
+      }
+    ],
     options: { typeAware: true, typeCheck: true }
   },
   test:

@@ -24,6 +24,9 @@ import { errMsg } from './util';
 
 /** Candidates shown before "显示全部". */
 const SHORT_LIST = 8;
+// Stable empty lists, so memos that depend on them do not recompute on every render.
+const NO_CANDIDATES: MatchCandidate[] = [];
+const NO_POIS: Poi[] = [];
 /** MapLibre needs WebGL 2; without it the schematic plot stands in for the map. */
 const HAS_WEBGL2 = typeof WebGL2RenderingContext !== 'undefined';
 
@@ -419,7 +422,7 @@ export default function PlacePicker({
   onRetry,
   value,
   onChange,
-  extras = [],
+  extras = NO_POIS,
   onCreated,
   customAt,
   privacyZone,
@@ -430,7 +433,7 @@ export default function PlacePicker({
   const [active, setActive] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const radius = match?.radius ?? DEFAULT_RADIUS;
-  const candidates = match?.res?.candidates ?? [];
+  const candidates = match?.res?.candidates ?? NO_CANDIDATES;
   // The nearest first; the rest one click away (the chosen place always stays in view).
   const chosenAt = candidates.findIndex((c) => c.key === value?.key);
   const listed = showAll || chosenAt >= SHORT_LIST ? candidates : candidates.slice(0, SHORT_LIST);

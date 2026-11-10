@@ -50,7 +50,7 @@ sources:
 |---|---|
 | 改前端 | 保存即热更新 |
 | 改 Worker | 保存后开发服务器自动重载 Worker |
-| 检查 | `npm run check`，即 `vp check`：格式、Oxlint（含类型感知规则）和类型检查一起跑 |
+| 检查 | `npm run check`，即 `vp check`：格式、Oxlint（含类型感知规则、React Hooks 与无障碍规则）和类型检查一起跑，要求零告警 |
 | 自动修复 | `npx vp check --fix`，格式化并应用能自动修复的 lint 规则 |
 | 测试 | `npm test`，即 `vp test`（Vitest）；监听模式用 `npx vp test watch` |
 | 路由测试 | `npm run test:routes`：接口在本地 D1、R2、KV 上跑，见 [路由测试](#路由测试) |
@@ -59,7 +59,7 @@ sources:
 | 新增迁移 | `npx wrangler d1 migrations create living <描述>`，写好后 `npm run db:migrate:local`，规则见 [部署](/runbooks/deploy.md) |
 | 跑一次定时任务 | 开发服务器运行时 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"`，补全本地照片的省份并清理过期的地点缓存，见 [定时任务](/architecture/cloudflare.md#定时任务) |
 
-格式与 lint 的设置都在 `vite.config.ts` 的 `fmt` 和 `lint` 里：单引号、不加尾随逗号、行宽 140；CSS 保持一条规则一行，`docs/` 不格式化。类型检查按就近的 `tsconfig.json` 进行：`worker/` 用 `worker/tsconfig.json`（Workers 类型），其余用根目录的 `tsconfig.json`。
+格式与 lint 的设置都在 `vite.config.ts` 的 `fmt` 和 `lint` 里：单引号、不加尾随逗号、行宽 140；CSS 保持一条规则一行，`docs/` 不格式化。Lint 在 Oxlint 默认插件之外开了 `react`（含 React Hooks）和 `jsx-a11y`：条件调用 Hook、`useEffect` / `useMemo` 缺依赖或依赖每次渲染都变是错误，`<img>` 缺 `alt`、列表缺 `key`、可点击的 `div` 没有键盘操作是告警；关掉的规则（全局的在 `lint.rules`，只对个别文件的在 `lint.overrides`）旁边写着原因。类型检查按就近的 `tsconfig.json` 进行：`worker/` 用 `worker/tsconfig.json`（Workers 类型），其余用根目录的 `tsconfig.json`。
 
 # 单元测试
 
