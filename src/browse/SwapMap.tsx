@@ -46,7 +46,8 @@ export default function SwapMap({ viewKey, viewport, ...props }: MapProps & { vi
     const start = Date.now();
     let fade: ReturnType<typeof setTimeout> | undefined;
     const poll = setInterval(() => {
-      const drawn = box.current?.querySelector(`[data-layer="${newest.id}"] .map-pt`);
+      // plain point markers, or the albums the map page draws (mapAlbums.ts)
+      const drawn = box.current?.querySelector(`[data-layer="${newest.id}"] :is(.map-pt, .map-album)`);
       if (!drawn && Date.now() - start < GIVE_UP_MS) return;
       clearInterval(poll);
       setFading(true);
