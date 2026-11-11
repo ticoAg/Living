@@ -40,14 +40,20 @@ const MATCH_BUDGET_MS = 4_000;
  * the page gets the answer it would get offline (no site places exist at that point), and the specs move on.
  */
 export async function boundMatching(context: BrowserContext): Promise<void> {
+  // A test that does not wait for place matching can end while the Worker is still asking. The page is gone by the
+  // time the answer is there, and answering it then throws ("Fetch response has been disposed"), which would fail a
+  // test that has already passed: there is nobody left to answer.
+  const gone = () => {};
   await context.route('**/api/pois/match', async (route) => {
     let response;
     try {
       response = await route.fetch({ timeout: MATCH_BUDGET_MS });
     } catch {
-      return route.fulfill({ json: { candidates: [], province: null, city: null, district: null, provider: 'local', privacyZone: null } });
+      return route
+        .fulfill({ json: { candidates: [], province: null, city: null, district: null, provider: 'local', privacyZone: null } })
+        .catch(gone);
     }
-    return route.fulfill({ response });
+    return route.fulfill({ response }).catch(gone);
   });
 }
 

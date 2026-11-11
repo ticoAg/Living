@@ -61,7 +61,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放；署名在地图加载后收成 ⓘ（地图页 `/map` 保持 MapLibre 默认） |
 | `src/components/icons.tsx` | 地点类别符号 `CategoryIcon`、界面图标 `Icon` |
 | `src/components/Header.tsx` | 站点页眉与导航；手机上（≤640px）页眉一行（字标、上传、账户），四个分区移到底部固定栏，登录后栏的正中是拍照按钮 |
-| `src/components/CaptureButton.tsx` | 手机底栏的拍照按钮：打开系统相机，把照片连同手机定位交给上传队列，见 [拍照](/product/features/upload.md#拍照) |
+| `src/components/CaptureButton.tsx` | 手机底栏的拍照按钮：打开页面内相机（`src/studio/CameraSheet.tsx`，按需加载），拍下的照片连同手机定位交给上传队列；系统相机作为备选，见 [拍照](/product/features/upload.md#拍照) |
 | `src/components/ErrorBoundary.tsx` | 路由外的错误边界：分块失效时重新加载，其他错误显示「出错了」 |
 | `src/styles/base.css` | 设计令牌与通用控件（按钮、标签片、色块、分段、输入框） |
 

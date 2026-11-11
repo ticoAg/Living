@@ -155,9 +155,17 @@ test.describe('a link pressed the moment the page is up', () => {
 
 const fixture = (name: string) => fileURLToPath(new URL(`fixtures/${name}`, import.meta.url));
 
-/** Tap the camera button in the bottom bar and answer the camera with a file, as the system camera would. */
-async function shoot(page: Page, file: string) {
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('.nav-capture').tap()]);
+/** Open the site's camera from the bottom bar and wait for its live picture (a fake camera, see playwright.config.ts). */
+async function openCamera(page: Page) {
+  await page.locator('.nav-capture').tap();
+  const camera = page.locator('dialog.cam');
+  await expect(camera.locator('video')).toBeVisible();
+  return camera;
+}
+
+/** Leave the site's camera for the system one and answer it with a file, as the system camera would. */
+async function systemShot(page: Page, file: string) {
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: /系统相机/ }).tap()]);
   await chooser.setFiles(file);
 }
 
@@ -166,44 +174,85 @@ test.describe('the camera button in the phone bar', () => {
   const HERE = { latitude: 30.2431, longitude: 120.1505, accuracy: 12 };
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, geolocation: HERE });
 
-  test("queues the photo with the phone's position when its file has none", async ({ page, context }) => {
-    await context.grantPermissions(['geolocation']);
+  test("takes photos inside the page and queues them with the phone's position", async ({ page, context }) => {
+    await context.grantPermissions(['geolocation', 'camera']);
     await page.goto('/themes');
     const bar = page.getByRole('navigation', { name: '主导航' });
-    await expect(bar.getByLabel('拍照')).toBeAttached();
+    await expect(bar.getByRole('button', { name: '拍照' })).toBeVisible();
     // in the middle of the bar: two sections on each side
     const order = await bar.locator('a.nav-link, .nav-capture').evaluateAll((els) => els.map((el) => el.className));
     expect(order).toEqual(['nav-link', 'nav-link', 'nav-capture', 'nav-link', 'nav-link']);
 
-    await shoot(page, fixture('no-position.jpg'));
+    const camera = await openCamera(page);
+    await expect(camera.getByRole('status')).toHaveText('位置精度约 12 米');
+    await noOverflow(page);
+    // the page never leaves the foreground: no file chooser, no other app
+    await camera.getByRole('button', { name: '拍摄' }).tap();
+    await expect(camera.getByRole('button', { name: '完成（1）' })).toBeVisible();
+    await camera.getByRole('button', { name: '拍摄' }).tap();
+    await camera.getByRole('button', { name: '完成（2）' }).tap();
+
     await expect(page).toHaveURL(/\/upload$/);
+    await expect(camera).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /队列\s*2/ })).toBeVisible();
     await expect(page.locator('.up-fix')).toContainText('用的是手机定位，精度约 12 米');
     const facts = page.locator('.exl');
     await expect(facts).toContainText('30°14′35″N');
     await expect(facts).toContainText('120°09′02″E');
-    // the file has no time either: the moment it came back stands in
+    // a still has no time of its own: the moment of the shot stands in
     await expect(facts).not.toContainText('无拍摄时间');
     await noOverflow(page);
   });
 
-  test("keeps the file's own position", async ({ page, context }) => {
+  test('closing the camera without a photo stays on the page', async ({ page, context }) => {
+    await context.grantPermissions(['geolocation', 'camera']);
+    await page.goto('/themes');
+    const camera = await openCamera(page);
+    await camera.getByRole('button', { name: '关闭' }).tap();
+    await expect(camera).toHaveCount(0);
+    await expect(page).toHaveURL(/\/themes$/);
+    // and the camera is let go
+    expect(await page.evaluate(() => document.querySelectorAll('video').length)).toBe(0);
+  });
+
+  test('says so when the phone gives no position', async ({ page, context }) => {
+    await context.grantPermissions(['camera']);
+    await page.goto('/');
+    const camera = await openCamera(page);
+    await expect(camera.getByRole('status')).toHaveText('没有定位，照片不带位置');
+    await camera.getByRole('button', { name: '拍摄' }).tap();
+    await camera.getByRole('button', { name: '完成（1）' }).tap();
+    await expect(page).toHaveURL(/\/upload$/);
+    await expect(page.locator('.up-fix')).toContainText('也没拿到手机定位', { timeout: 15_000 });
+    await expect(page.locator('.exl')).toContainText('无坐标');
+  });
+
+  test('offers the system camera when the page cannot open one', async ({ page, context }) => {
     await context.grantPermissions(['geolocation']);
+    // the browser refuses the camera, as it does when the permission was denied
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('Permission denied', 'NotAllowedError'));
+    });
+    await page.goto('/');
+    await page.locator('.nav-capture').tap();
+    const camera = page.locator('dialog.cam');
+    await expect(camera.getByRole('alert')).toContainText('没有相机权限');
+    await expect(camera.getByRole('button', { name: '拍摄' })).toBeDisabled();
+    await systemShot(page, fixture('no-position.jpg'));
+    await expect(page).toHaveURL(/\/upload$/);
+    await expect(camera).toHaveCount(0);
+    await expect(page.locator('.up-fix')).toContainText('用的是手机定位，精度约 12 米');
+  });
+
+  test("the system camera's photo keeps the position in its file", async ({ page, context }) => {
+    await context.grantPermissions(['geolocation', 'camera']);
     await page.goto('/upload');
-    await shoot(page, fixture('1-west-lake-1.jpg'));
+    await openCamera(page);
+    await systemShot(page, fixture('1-west-lake-1.jpg'));
     await expect(page).toHaveURL(/\/upload$/);
     await expect(page.locator('.exl')).toContainText('N');
     await expect(page.locator('.exl')).not.toContainText('30°14′35″N');
     await expect(page.locator('.up-fix')).toHaveCount(0);
-  });
-
-  test('says so when the phone gives no position', async ({ page, context }) => {
-    // not granted: the request is refused or left unanswered, and the page stops waiting a few seconds after the shot
-    await context.clearPermissions();
-    await page.goto('/');
-    await shoot(page, fixture('no-position.jpg'));
-    await expect(page).toHaveURL(/\/upload$/);
-    await expect(page.locator('.up-fix')).toContainText('也没拿到手机定位', { timeout: 15_000 });
-    await expect(page.locator('.exl')).toContainText('无坐标');
   });
 });
 
