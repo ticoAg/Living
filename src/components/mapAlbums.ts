@@ -141,7 +141,7 @@ function addBoundaries(map: MLMap): void {
         ],
         layout: { 'line-join': 'round' },
         // MapLibre's types want literal expressions here; these are checked by the style validator at runtime
-        paint: { 'line-color': '#8F5530', 'line-dasharray': b.dash, 'line-opacity': b.opacity as number, 'line-width': b.width as number }
+        paint: { 'line-color': '#96562E', 'line-dasharray': b.dash, 'line-opacity': b.opacity as number, 'line-width': b.width as number }
       },
       beforeId
     );

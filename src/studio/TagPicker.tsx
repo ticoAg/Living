@@ -6,13 +6,13 @@ import { Icon } from '../components/icons';
 import { api } from '../lib/api';
 import { buildTagTree, isSwatch, swatchFill, type TagNode } from '../lib/tags';
 import { invalidate, useApi } from '../lib/useApi';
-import { boardChoices, boardRows, firstChoice, searchBoard, type BoardItem, type TagEdit } from './tag-board';
+import { boardChoices, boardRows, firstChoice, searchBoard, type BoardItem, type BoardRow, type TagEdit } from './tag-board';
 import { errMsg, useKeep } from './util';
 
 // Tag board for the upload form, the upload batch panel and the photo editor. The search box holds the chosen tags as
 // tokens; typing narrows the board, ↑ ↓ move through the matches, Enter adds the highlighted one (or offers to create
-// the tag), Backspace in an empty box takes off the last token. Below it every tag is in view, one row per root (题材 ·
-// 光与天气 · 季节 · 色调 · people's own roots), each a toggle; groups such as 自然 or 天气 start their run of tags. A
+// the tag), Backspace in an empty box takes off the last token. Below it every tag is in view as a two-column table:
+// a label (the group 自然 or 天气, or the root 季节 for tags right under it) and that line's tags, each a toggle. A
 // season, a light and a tone exclude the others of their kind (tag-board.ts). Editing several photos at once, a tag
 // only some of them have is drawn half-on; clicking it gives it to all. Docs: /docs/product/features/hierarchical-tags.md#打标签
 
@@ -25,7 +25,7 @@ interface Props {
   disabled?: boolean;
 }
 
-/** A group label and the tag after it go together, so a line never ends on a label. */
+/** A group label deeper in a line and the tag after it go together, so a line never ends on a label. */
 function runs(items: readonly BoardItem[]): BoardItem[][] {
   const out: BoardItem[][] = [];
   for (let i = 0; i < items.length; i++) {
@@ -33,6 +33,29 @@ function runs(items: readonly BoardItem[]): BoardItem[][] {
     if (items[i].group && next && !next.group) out.push([items[i], items[++i]]);
     else out.push([items[i]]);
   }
+  return out;
+}
+
+interface Line {
+  /** the group that heads the line (自然, 天气); null for tags that sit directly under the root */
+  head: BoardItem | null;
+  items: BoardItem[];
+}
+
+/**
+ * A root's tags as the board's lines: each group right under the root heads a line of its own tags; tags that sit
+ * directly under the root share a line headed by the root itself. A root of one's own always gets that line, since
+ * it is a tag that can be chosen.
+ */
+function lines(row: BoardRow): Line[] {
+  const out: Line[] = [];
+  for (const it of row.items) {
+    const last = out[out.length - 1];
+    if (it.level === 1 && it.group) out.push({ head: it, items: [] });
+    else if (last && (it.level > 1 || !last.head)) last.items.push(it);
+    else out.push({ head: null, items: [it] });
+  }
+  if (row.root.ownerId && !out.some((l) => !l.head)) out.unshift({ head: null, items: [] });
   return out;
 }
 
@@ -211,19 +234,30 @@ export default function TagPicker({ value, mixed = [], onEdit, disabled }: Props
         <div className="tp-board">
           {shown.rows.map((row) => (
             <div key={row.root.id} className="tp-row" role="group" aria-label={row.root.name}>
-              {/* a preset root (题材, 季节…) only heads its row; a root of one's own is a tag like any other */}
-              {row.root.ownerId ? chip(row.root, true) : <span className="tp-root">{row.root.name}</span>}
-              <span className="tp-chips">
-                {runs(row.items).map((run) =>
-                  run.length > 1 ? (
-                    <span key={run[0].node.id} className="tp-run">
-                      {run.map((it) => chip(it.node, it.group))}
-                    </span>
+              {lines(row).map((line, i) => (
+                <div key={line.head?.node.id ?? `under-${i}`} className="tp-line">
+                  {/* the line's label: its group, which can be chosen too; else the root. A preset root (季节, 色调)
+                      only names the line, a root of one's own is a tag like any other */}
+                  {line.head ? (
+                    chip(line.head.node, true)
+                  ) : row.root.ownerId ? (
+                    chip(row.root, true)
                   ) : (
-                    chip(run[0].node, run[0].group)
-                  )
-                )}
-              </span>
+                    <span className="tp-root">{row.root.name}</span>
+                  )}
+                  <span className="tp-chips">
+                    {runs(line.items).map((run) =>
+                      run.length > 1 ? (
+                        <span key={run[0].node.id} className="tp-run">
+                          {run.map((it) => chip(it.node, it.group))}
+                        </span>
+                      ) : (
+                        chip(run[0].node, run[0].group)
+                      )
+                    )}
+                  </span>
+                </div>
+              ))}
             </div>
           ))}
           {term && !shown.exact && !creating && (

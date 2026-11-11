@@ -18,7 +18,7 @@ Living 把一个人拍下的照片，变成一本按地点、时间和主题组�
 1. **照片自己知道在哪**：根据 EXIF 里的 GPS 和镜头朝向，自动匹配到具体地点（断桥、孤山），而不只是一个坐标。见 [地点匹配](/product/features/poi-matching.md)。
 2. **按自己的方式整理**：预置一套多层级标签，用户可以在任意层级添加自己的标签。见 [多层级标签](/product/features/hierarchical-tags.md)。
 3. **每张照片都能写几句**：照片笔记连起来就是游记。见 [照片笔记](/product/features/photo-notes.md) 和 [主题](/product/features/themes.md)。
-4. **好看地回看**：测绘图集风格的图库、地图和地点页，以及适合放在客厅的 [Living 模式](/product/features/living-mode.md)。
+4. **好看地回看**：照片优先的图库、地图和地点页，以及适合放在客厅的 [Living 模式](/product/features/living-mode.md)。
 
 # 设计原则
 
@@ -28,4 +28,6 @@ Living 把一个人拍下的照片，变成一本按地点、时间和主题组�
 
 # 设计稿
 
-视觉方向为"测绘图集"：冷调纸面底色、宋体地名加宽字距、湖蓝与等高线赭色。设计画布：<https://claude.ai/artifact/8K26mkEtt3Xk55Lm4kr53F>（图库、照片、地点、地图、索引、上传匹配、Living 播放与设置、字段说明）。
+视觉方向为「画廊」：明亮的暖白底、白色的浮起表面、大圆角和柔和的阴影，照片优先；控件是填充的胶囊而不是描边的方框；地名和标题用宋体，界面用黑体；湖蓝表示链接与已匹配，赭色表示匹配半径、朝向与待确认。令牌与控件见 [前端分区](/architecture/frontend.md#设计令牌)。
+
+最初的方向是「测绘图集」（冷调纸面、处处加宽字距的宋体、黑色方块按钮），设计画布：<https://claude.ai/artifact/8K26mkEtt3Xk55Lm4kr53F>。画布上的页面结构仍然适用，配色、字距和控件样式以现在的令牌为准。

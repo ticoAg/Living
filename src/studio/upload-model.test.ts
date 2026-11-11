@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { Processed } from './process';
-import { bulkSendable, inBulk, isEditable, newItem, pickRows, runSummary, type Item } from './upload-model';
+import { bulkSendable, inBulk, isEditable, newItem, pickRows, runSummary, stepRow, type Item } from './upload-model';
 
 const at = (lat: number | null, lng: number | null, takenAt: string | null = '2026-03-20T18:00:00') =>
   ({ exif: { lat, lng, takenAt, tz: '+08:00', heading: null } }) as unknown as Processed;
@@ -113,5 +113,25 @@ describe('runSummary', () => {
   });
   it('leaves nothing behind for a run that tried nothing', () => {
     expect(runSummary({ done: 0, duplicate: 0, failed: 0 }, false)).toBeNull();
+  });
+});
+
+describe('stepRow', () => {
+  const order = ['a', 'b', 'c'];
+
+  it('moves to the neighbour in the queue', () => {
+    expect(stepRow(order, 'a', 1)).toBe('b');
+    expect(stepRow(order, 'c', -1)).toBe('b');
+  });
+
+  it('stops at either end', () => {
+    expect(stepRow(order, 'c', 1)).toBeNull();
+    expect(stepRow(order, 'a', -1)).toBeNull();
+  });
+
+  it('starts from the first photo when none is on screen or the one on screen has left the queue', () => {
+    expect(stepRow(order, null, 1)).toBe('b');
+    expect(stepRow(order, 'gone', 1)).toBe('b');
+    expect(stepRow([], null, 1)).toBeNull();
   });
 });

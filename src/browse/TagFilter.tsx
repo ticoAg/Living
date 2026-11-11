@@ -90,8 +90,15 @@ export default function TagFilter({ tree, selected, counts, onToggle }: Props) {
         }
       }
       flush();
+      // a row that opens with plain tags (季节) is named by its root, where the other rows open with a group (自然, 光线)
+      const named = root.children.length > 0 && root.children[0].children.length === 0;
       return (
         <div key={root.id} className="tagf-row" role="group" aria-label={root.name}>
+          {named && (
+            <span className="tagf-label" aria-hidden="true">
+              {root.name}
+            </span>
+          )}
           {clusters.map((cluster, i) => (
             <Fragment key={i}>
               {i > 0 && <span className="tagf-sep" aria-hidden="true" />}

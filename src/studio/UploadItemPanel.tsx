@@ -17,7 +17,7 @@ interface Props {
   onRetryProcess: (id: string) => void;
 }
 
-/** Middle column: the photo, what the file knows about itself in two lines, and the place chooser. */
+/** Middle column: the photo, its name and status, what the file knows about itself in two lines, and the place chooser. */
 export default function UploadItemPanel({ item, all, extras, onCreated, onPlace, onRadius, onRetryMatch, onRetryProcess }: Props) {
   const preview = useObjectUrl(item.p?.variants.m.blob);
   const place = placeOf(item, all);
@@ -26,8 +26,21 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
 
   return (
     <div className="up-panel up-photo">
+      {/* the photo leads the card; its dominant colours sit on its corner */}
+      {item.stage === 'ready' && item.p && (
+        <figure className="up-figure">
+          <div className="up-preview">{preview && <img src={preview} alt={`${item.file.name} 的预览`} />}</div>
+          {item.p.palette.length > 0 && (
+            <div className="up-palette" aria-label="主色">
+              {item.p.palette.map((c) => (
+                <span key={c} style={{ background: c }} title={c} />
+              ))}
+            </div>
+          )}
+        </figure>
+      )}
       <div className="up-panel-head">
-        <h2 className="up-h up-name serif" title={item.file.name}>
+        <h2 className="up-h up-name" title={item.file.name}>
           {item.file.name}
         </h2>
         <StatusChip item={item} all={all} />
@@ -53,17 +66,6 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
 
       {item.stage === 'ready' && item.p && (
         <>
-          <figure className="up-figure">
-            <div className="up-preview">{preview && <img src={preview} alt={`${item.file.name} 的预览`} />}</div>
-            {item.p.palette.length > 0 && (
-              <div className="up-palette" aria-label="主色">
-                {item.p.palette.map((c) => (
-                  <span key={c} style={{ background: c }} title={c} />
-                ))}
-              </div>
-            )}
-          </figure>
-
           <ExifLine
             x={{ ...item.p.exif, width: item.p.width, height: item.p.height, bytes: item.file.size }}
             sizes={`已生成 ${(['s', 'm', 'l'] as const)
