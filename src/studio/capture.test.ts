@@ -7,8 +7,10 @@ import {
   onCaptured,
   pickerAccept,
   SETTLE_MS,
+  shareWatch,
   startLocating,
   takeCaptured,
+  trackPosition,
   wallClock,
   withCapture,
   type DeviceFix
@@ -169,6 +171,236 @@ describe('startLocating', () => {
     loc.settle();
     loc.stop();
     await expect(loc.fix).resolves.toBeNull();
+  });
+});
+
+describe('shareWatch', () => {
+  /** A phone that, like a browser, answers a watch only when it has something new: one real watch at a time. */
+  function phone() {
+    const real = fakeGeo();
+    let started = 0;
+    const watchPosition = real.watchPosition.bind(real);
+    real.watchPosition = (...args: Parameters<typeof watchPosition>) => {
+      started++;
+      return watchPosition(...args);
+    };
+    return { real, started: () => started };
+  }
+  const coords = (p: GeolocationPosition) => [p.coords.latitude, p.coords.longitude, p.coords.accuracy];
+
+  it('gives a newcomer the latest position at once, while the phone stands still', async () => {
+    const { real, started } = phone();
+    const geo = shareWatch(real);
+    const first = vi.fn();
+    geo.watchPosition(first, null, { enableHighAccuracy: true, maximumAge: 0 });
+    real.report(30.26, 120.15, 12);
+    expect(first).toHaveBeenCalledTimes(1);
+
+    const second = vi.fn();
+    geo.watchPosition(second);
+    expect(second).not.toHaveBeenCalled(); // after watchPosition has returned, as a browser does
+    await Promise.resolve();
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(coords(second.mock.calls[0][0])).toEqual([30.26, 120.15, 12]);
+    // one watch on the phone, with the first listener's options
+    expect(started()).toBe(1);
+    expect(real.options).toEqual({ enableHighAccuracy: true, maximumAge: 0 });
+  });
+
+  it('passes every new position and error on to all listeners', () => {
+    const { real } = phone();
+    const geo = shareWatch(real);
+    const a = { ok: vi.fn(), fail: vi.fn() };
+    const b = { ok: vi.fn(), fail: vi.fn() };
+    geo.watchPosition(a.ok, a.fail);
+    geo.watchPosition(b.ok, b.fail);
+    real.report(30.26, 120.15, 40);
+    real.refuse(2);
+    real.report(30.27, 120.16, 20);
+    for (const w of [a, b]) {
+      expect(w.ok).toHaveBeenCalledTimes(2);
+      expect(w.fail).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('a listener that left hears nothing more, and the phone is let go with the last one', async () => {
+    const { real } = phone();
+    const geo = shareWatch(real);
+    const a = vi.fn();
+    const b = vi.fn();
+    const ida = geo.watchPosition(a);
+    const idb = geo.watchPosition(b);
+    real.report(30.26, 120.15, 40);
+    geo.clearWatch(ida);
+    real.report(30.27, 120.16, 20);
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(b).toHaveBeenCalledTimes(2);
+    expect(real.cleared).toEqual([]);
+    geo.clearWatch(idb);
+    geo.clearWatch(idb);
+    expect(real.cleared).toEqual([7]);
+    // left before the replay it was owed
+    const c = vi.fn();
+    geo.watchPosition(vi.fn());
+    real.report(30.26, 120.15, 40);
+    geo.clearWatch(geo.watchPosition(c));
+    await Promise.resolve();
+    expect(c).not.toHaveBeenCalled();
+  });
+
+  it('starts over after everyone has left: an old position is not handed to the next listener', async () => {
+    const { real, started } = phone();
+    const geo = shareWatch(real);
+    geo.clearWatch(geo.watchPosition(vi.fn()));
+    real.report(30.26, 120.15, 12); // nobody is listening any more
+    const later = vi.fn();
+    geo.watchPosition(later);
+    await Promise.resolve();
+    expect(later).not.toHaveBeenCalled();
+    expect(started()).toBe(2);
+    real.report(31.0, 121.0, 15);
+    expect(coords(later.mock.calls[0][0])).toEqual([31.0, 121.0, 15]);
+  });
+
+  it('tells a newcomer about a refusal, which is final', async () => {
+    const { real } = phone();
+    const geo = shareWatch(real);
+    geo.watchPosition(vi.fn(), vi.fn());
+    real.refuse(1);
+    const fail = vi.fn();
+    geo.watchPosition(vi.fn(), fail);
+    await Promise.resolve();
+    expect(fail).toHaveBeenCalledTimes(1);
+    expect(fail.mock.calls[0][0].code).toBe(1);
+  });
+
+  it('serves a camera screen and a single photo at the same time', async () => {
+    vi.useFakeTimers();
+    const { real } = phone();
+    const geo = shareWatch(real);
+    const screen = trackPosition(geo);
+    real.report(30.26, 120.15, 12);
+    // the system camera is asked for while the screen is still following the phone, which does not move
+    const one = startLocating(geo);
+    await expect(one.fix).resolves.toEqual({ lat: 30.26, lng: 120.15, accuracy: 12 });
+    screen.stop();
+    expect(real.cleared).toEqual([7]);
+    vi.useRealTimers();
+  });
+});
+
+describe('trackPosition', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('answers at once from a good latest fix, and keeps following the phone', async () => {
+    const geo = fakeGeo();
+    const t = trackPosition(geo);
+    expect(t.now()).toEqual({ state: 'waiting' });
+    geo.report(30.26, 120.15, 10);
+    await expect(t.fixNow()).resolves.toEqual({ lat: 30.26, lng: 120.15, accuracy: 10 });
+    // the phone moved: the next photo is where the phone is now, not where the best fix was
+    geo.report(30.27, 120.16, 18);
+    await expect(t.fixNow()).resolves.toEqual({ lat: 30.27, lng: 120.16, accuracy: 18 });
+    expect(t.now()).toEqual({ state: 'found', fix: { lat: 30.27, lng: 120.16, accuracy: 18 } });
+    expect(geo.cleared).toEqual([]);
+    expect(geo.options).toMatchObject({ enableHighAccuracy: true, maximumAge: 0 });
+  });
+
+  it('a photo taken on a coarse fix waits a little for a better one', async () => {
+    const geo = fakeGeo();
+    const t = trackPosition(geo);
+    geo.report(30.3, 120.2, 400);
+    let got: DeviceFix | null | undefined;
+    void t.fixNow().then((f) => (got = f));
+    await vi.advanceTimersByTimeAsync(1000);
+    geo.report(30.26, 120.15, 60);
+    geo.report(30.28, 120.17, 150);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS - 1001);
+    expect(got).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(got).toEqual({ lat: 30.26, lng: 120.15, accuracy: 60 });
+  });
+
+  it('a good fix ends the wait of every photo waiting', async () => {
+    const geo = fakeGeo();
+    const t = trackPosition(geo);
+    geo.report(30.3, 120.2, 400);
+    const one = t.fixNow();
+    const two = t.fixNow();
+    geo.report(30.26, 120.15, 9);
+    await expect(one).resolves.toMatchObject({ accuracy: 9 });
+    await expect(two).resolves.toMatchObject({ accuracy: 9 });
+  });
+
+  it('before the phone has answered, gives it time (a permission prompt), then the short wait', async () => {
+    const geo = fakeGeo();
+    const t = trackPosition(geo);
+    let got: DeviceFix | null | undefined;
+    void t.fixNow().then((f) => (got = f));
+    await vi.advanceTimersByTimeAsync(ASK_MS - 1000);
+    expect(got).toBeUndefined();
+    geo.report(30.3, 120.2, 90);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS - 1);
+    expect(got).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(got).toEqual({ lat: 30.3, lng: 120.2, accuracy: 90 });
+  });
+
+  it('gives null when the phone never answers, when it refuses, and for a fix too coarse to place a photo', async () => {
+    const silent = fakeGeo();
+    const a = trackPosition(silent);
+    let got: DeviceFix | null | undefined;
+    void a.fixNow().then((f) => (got = f));
+    await vi.advanceTimersByTimeAsync(ASK_MS);
+    expect(got).toBeNull();
+
+    const no = fakeGeo();
+    const b = trackPosition(no);
+    const pending = b.fixNow();
+    no.refuse(1);
+    await expect(pending).resolves.toBeNull();
+    await expect(b.fixNow()).resolves.toBeNull();
+    expect(b.now()).toEqual({ state: 'refused' });
+
+    const far = fakeGeo();
+    const c = trackPosition(far);
+    far.report(30.3, 120.2, COARSE_M + 1);
+    const coarse = c.fixNow();
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    await expect(coarse).resolves.toBeNull();
+  });
+
+  it('tells its listeners about fixes and refusals', () => {
+    const geo = fakeGeo();
+    const t = trackPosition(geo);
+    const heard = vi.fn();
+    const off = t.subscribe(heard);
+    geo.report(30.26, 120.15, 40);
+    geo.refuse(2);
+    expect(heard).toHaveBeenCalledTimes(2);
+    off();
+    geo.report(30.26, 120.15, 30);
+    expect(heard).toHaveBeenCalledTimes(2);
+  });
+
+  it('stop ends the watch and gives waiting photos the best fix they have', async () => {
+    const geo = fakeGeo();
+    const t = trackPosition(geo);
+    geo.report(30.3, 120.2, 200);
+    const pending = t.fixNow();
+    t.stop();
+    await expect(pending).resolves.toEqual({ lat: 30.3, lng: 120.2, accuracy: 200 });
+    expect(geo.cleared).toEqual([7]);
+    // asked after the camera closed: what was last known
+    await expect(t.fixNow()).resolves.toEqual({ lat: 30.3, lng: 120.2, accuracy: 200 });
+  });
+
+  it('refuses where there is no geolocation', async () => {
+    const t = trackPosition(undefined);
+    expect(t.now()).toEqual({ state: 'refused' });
+    await expect(t.fixNow()).resolves.toBeNull();
+    t.stop();
   });
 });
 

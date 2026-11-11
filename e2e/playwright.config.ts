@@ -31,7 +31,12 @@ export default defineConfig({
     timezoneId: 'Asia/Shanghai',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    launchOptions: process.env.E2E_CHROMIUM ? { executablePath: process.env.E2E_CHROMIUM } : {}
+    launchOptions: {
+      // A camera that is not there, for the site's own camera: getUserMedia gets a generated picture, and the
+      // question whether the page may use it is answered yes (the headless shell refuses the camera without this).
+      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+      ...(process.env.E2E_CHROMIUM ? { executablePath: process.env.E2E_CHROMIUM } : {})
+    }
   },
   projects: [
     // registers the owner, uploads and publishes the sample photos, walks every page and saves the session

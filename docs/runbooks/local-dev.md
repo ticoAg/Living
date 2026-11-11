@@ -137,6 +137,7 @@ npx playwright install chromium  # 第一次跑之前装浏览器（只需一次
 | `e2e/playwright.config.ts` | 两个项目：`story` 先跑并把登录态存到 `.wrangler/e2e/owner.json`，`regressions` 依赖它、用这份登录态 |
 
 - **不碰开发数据**：`vite.config.ts` 读环境变量 `LIVING_STATE_DIR`，设了就把 Cloudflare 插件的 `persistState` 指到那里。冒烟测试用 `.wrangler/e2e-state/`，每次跑之前删掉重建：`wrangler d1 migrations apply living --local --persist-to .wrangler/e2e-state` 应用 `migrations/` 的全部迁移，再写入站长邀请码 `E2EOWNER01`。`npm run dev` 用的 `.wrangler/state/` 不变。
+- **相机是假的**：浏览器带 `--use-fake-device-for-media-stream` 和 `--use-fake-ui-for-media-stream` 启动，页面内相机拿到的是一段生成的画面，是否允许使用相机自动答「是」（Playwright 默认用的无头版 Chromium 不带后一个参数就拒绝相机）。手机定位用 Playwright 的 `geolocation` 设定。「相机打不开」的用例把 `getUserMedia` 换成拒绝。
 - **不依赖网络**：浏览器里所有发往外部的请求都由 `page.route` 应答，OpenFreeMap 的样式换成只有底色的空样式，地图不请求瓦片。地点匹配是 Worker 去请求 Photon、Nominatim（或高德），浏览器拦不到；用例不依赖匹配结果，地点用接口直接建好再关联。断网时这些请求立刻失败、接口照样返回站内候选，整套不比联网时慢（实测离线约 30 秒、联网约 38 秒，都含构建）。如果网络是「丢包不回应」那种，Worker 每次要等满 8 秒超时，所以测试给 `/api/pois/match` 设了 4 秒的上限，超时就按离线时的结果（没有候选）回给页面。
 - **样例图**：`e2e/fixtures/` 下 3 张 900×600 / 600×900 的 JPEG，每张十几 KB，是用 Python 的 PIL 画的风景色块、用 piexif 写入 EXIF：GPS 在杭州断桥附近（30.259°N, 120.148°E）、`GPSImgDirection` 朝向 75°/120°/300°、拍摄时间 2026-05-02 06:41、2026-05-02 17:12、2026-05-03 19:05（+08:00）、相机 FUJIFILM X-T5。生成脚本不在仓库里；要换图，保证 EXIF 能被 `exifr` 读出这几项即可。
 - **浏览器**：默认用 Playwright 自己下载的 Chromium（版本跟着 lockfile 里的 `@playwright/test`）。机器上已经有 Chromium 时，设 `E2E_CHROMIUM=<可执行文件路径>` 改用它，不必再下载。只想跑一部分：`npx playwright test --config e2e -g 会话过期`（先 `npx vp build`）。
