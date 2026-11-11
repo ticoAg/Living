@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'wouter';
+import { PHOTO_LIST_LIMIT } from '../../shared/types';
+import { Icon } from '../components/icons';
 import { ApiError } from '../lib/api';
 
 // Small shared pieces for loading, failure and empty states.
@@ -45,6 +47,14 @@ export function LoadError({
   );
 }
 
+/**
+ * The one line saying a photo list stopped at PHOTO_LIST_LIMIT (`truncated` in GET /api/photos, which has no paging):
+ * the oldest photos are missing from the page. `as` lets it sit inside a line of other figures.
+ */
+export function TruncatedNote({ as: Tag = 'p', className }: { as?: 'p' | 'span'; className?: string }) {
+  return <Tag className={className ? `bw-limit ${className}` : 'bw-limit'}>只显示最近的 {PHOTO_LIST_LIMIT} 张</Tag>;
+}
+
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="bw-state">
@@ -55,6 +65,37 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The button that unfolds a page's filters on a phone (hidden on wider screens, where the filters always show; see
+ * .bw-filter in browse.css). The number of chosen filters sits on it, so a folded filter still shows it is on.
+ */
+export function FilterToggle({
+  open,
+  onToggle,
+  count,
+  controls
+}: {
+  open: boolean;
+  onToggle: () => void;
+  count: number;
+  controls: string;
+}) {
+  return (
+    <button type="button" className="btn btn-quiet bw-filter" aria-expanded={open} aria-controls={controls} onClick={onToggle}>
+      <Icon name="sliders" size={18} />
+      筛选
+      {count > 0 && (
+        <>
+          <span className="bw-filter-n mono" aria-hidden="true">
+            {count}
+          </span>
+          <span className="visually-hidden">，已选 {count} 个</span>
+        </>
+      )}
+    </button>
   );
 }
 

@@ -1,15 +1,17 @@
-import { useDeferredValue, useEffect, useMemo, type ReactNode } from 'react';
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
+import type { PhotoSummary } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { useSession } from '../lib/session';
 import { buildTagTree, filterByTags, inclusiveCounts } from '../lib/tags';
 import { enc, usePhotoList, usePoiList, useTagTree } from './api';
 import { setBrowseList } from './context';
-import GalleryTile from './GalleryTile';
+import GalleryTile, { galleryTileSize } from './GalleryTile';
 import { livingForFilter } from './links';
+import Masonry from './Masonry';
 import { byTakenDesc } from './sort';
 import TagFilter from './TagFilter';
-import { EmptyState, LoadError } from './ui';
+import { EmptyState, FilterToggle, LoadError, TruncatedNote } from './ui';
 import { replaceQuery, splitIds, useQuery } from './url';
 
 // The masonry gallery shared by the home page (everyone's public photos) and a profile (`owner`).
@@ -17,6 +19,8 @@ import { replaceQuery, splitIds, useQuery } from './url';
 // toggling a chip is instant. State lives in the address bar: ?tags=a,b&city=杭州
 
 const EMPTY_TREE = buildTagTree([]);
+
+const photoId = (p: PhotoSummary) => p.id;
 
 const SKELETON_RATIOS = ['4 / 5', '3 / 2', '2 / 3', '1 / 1', '3 / 4', '3 / 2', '4 / 5', '2 / 3', '3 / 2', '1 / 1', '3 / 4', '4 / 3'];
 
@@ -26,7 +30,7 @@ export default function Gallery({ owner }: { owner?: string }) {
   const rawTags = useMemo(() => splitIds(q.get('tags')), [q]);
   const city = q.get('city') ?? '';
 
-  const { photos, error, reload } = usePhotoList(owner ? `owner=${enc(owner)}` : '');
+  const { photos, truncated, error, reload } = usePhotoList(owner ? `owner=${enc(owner)}` : '');
   const { tree, error: tagsError } = useTagTree(owner);
   const { pois, byId: poiById, error: poisError } = usePoiList(owner);
 
@@ -45,13 +49,22 @@ export default function Gallery({ owner }: { owner?: string }) {
   // chips answer at once; the (large) tile list catches up right behind them
   const listed = useDeferredValue(shown);
 
+  // the photo page steps through the whole filtered list, not just the tiles rendered so far
   useEffect(() => {
     setBrowseList(shown.map((p) => p.id));
   }, [shown]);
 
+  const poiOf = useCallback((p: PhotoSummary) => (p.poiId ? poiById.get(p.poiId) : undefined), [poiById]);
+  const tileSize = useCallback((p: PhotoSummary) => galleryTileSize(p, poiOf(p)), [poiOf]);
+  const tile = useCallback((p: PhotoSummary) => <GalleryTile photo={p} poi={poiOf(p)} />, [poiOf]);
+
   const toggleTag = (id: string) =>
     replaceQuery({ tags: (selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]).join(',') });
   const clear = () => replaceQuery({ tags: null, city: null });
+
+  // phones fold the tag rows behind a button (browse.css); wider screens always show them
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterId = useId();
 
   const filtered = selected.length > 0 || !!city;
   const total = shown.length;
@@ -90,20 +103,19 @@ export default function Gallery({ owner }: { owner?: string }) {
       </EmptyState>
     );
   } else {
-    body = (
-      <div className="gal-masonry">
-        {listed.map((p) => (
-          <GalleryTile key={p.id} photo={p} poi={p.poiId ? poiById.get(p.poiId) : undefined} />
-        ))}
-      </div>
-    );
+    body = <Masonry className="gal-masonry" items={listed} keyOf={photoId} measure={tileSize} render={tile} />;
   }
+
+  const hasFilter = !!photos && !!tree && tree.roots.length > 0;
 
   return (
     <div className="gal">
       <div className="gal-head">
-        <div className="gal-head-tags">
-          {photos && tree && tree.roots.length > 0 && <TagFilter tree={tree} selected={selected} counts={counts} onToggle={toggleTag} />}
+        {hasFilter && (
+          <FilterToggle open={filterOpen} onToggle={() => setFilterOpen((o) => !o)} count={selected.length} controls={filterId} />
+        )}
+        <div className="gal-head-tags" id={filterId} data-open={filterOpen}>
+          {hasFilter && <TagFilter tree={tree} selected={selected} counts={counts} onToggle={toggleTag} />}
         </div>
         {total > 0 ? (
           <Link href={livingHref} className="btn btn-primary btn-living" aria-label={livingLabel}>
@@ -117,6 +129,7 @@ export default function Gallery({ owner }: { owner?: string }) {
           </button>
         )}
       </div>
+      {truncated && !error && <TruncatedNote className="gal-limit" />}
       {body}
     </div>
   );

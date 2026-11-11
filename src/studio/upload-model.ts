@@ -306,3 +306,12 @@ export function buildForm(it: Item, all: Item[]): FormData {
   for (const k of ['s', 'm', 'l'] as const) fd.append(k, p.variants[k].blob, `${k}.${p.variants[k].ext}`);
   return fd;
 }
+
+/** The line a publishing run leaves behind; null when nothing was tried and the run was not stopped. */
+export function runSummary(t: { done: number; duplicate: number; failed: number }, stopped: boolean): string | null {
+  const parts = [`已发布 ${t.done} 张`];
+  if (t.duplicate) parts.push(`${t.duplicate} 张以前传过`);
+  if (t.failed) parts.push(`${t.failed} 张失败，可以重试`);
+  if (!stopped && !t.duplicate && !t.failed && !t.done) return null;
+  return `${stopped ? '已停止。' : ''}${parts.join('，')}。`;
+}

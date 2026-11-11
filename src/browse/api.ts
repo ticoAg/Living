@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Poi, PhotoSummary, Tag } from '../../shared/types';
+import type { PhotoListResponse, Poi, Tag } from '../../shared/types';
 import { useApi } from '../lib/useApi';
 import { buildTagTree, type TagTree } from '../lib/tags';
 
@@ -16,11 +16,11 @@ export function unwrap<T extends object>(data: unknown, key: string): T | undefi
 
 /**
  * Photo lists. `query` is the part after `?`: '' = all public photos, 'owner=alice', 'poi=poi_x'.
- * Pass null to skip the request.
+ * Pass null to skip the request. `truncated`: the list stops at PHOTO_LIST_LIMIT, the oldest photos are missing.
  */
 export function usePhotoList(query: string | null) {
-  const r = useApi<{ photos: PhotoSummary[] }>(query === null ? null : `/api/photos${query ? `?${query}` : ''}`);
-  return { photos: r.data?.photos, error: r.error, reload: r.reload };
+  const r = useApi<PhotoListResponse>(query === null ? null : `/api/photos${query ? `?${query}` : ''}`);
+  return { photos: r.data?.photos, truncated: r.data?.truncated === true, error: r.error, reload: r.reload };
 }
 
 /** Tag tree: presets plus the requester's own tags, or the given owner's. */

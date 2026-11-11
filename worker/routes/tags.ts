@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { TAG_LIMITS } from '../../shared/limits';
 import type { SessionUser } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { conflict, forbidden, invalid, listCache, notFound, paramId, readJson } from '../lib/http';
@@ -85,7 +86,7 @@ tags.post('/', async (c) => {
   const body = await readJson(c);
   const db = c.env.DB;
 
-  const name = reqStr(body, 'name', '标签名称', 1, 24);
+  const name = reqStr(body, 'name', '标签名称', 1, TAG_LIMITS.nameMax);
   const parentId = body.parentId === undefined || body.parentId === null || body.parentId === '' ? null : body.parentId;
   if (parentId !== null && typeof parentId !== 'string') throw invalid('上级标签格式不对');
   const color = optColor(body.color);
@@ -123,7 +124,7 @@ tags.patch('/:id', async (c) => {
   let parentChanged = false;
 
   if (has(body, 'name')) {
-    name = reqStr(body, 'name', '标签名称', 1, 24);
+    name = reqStr(body, 'name', '标签名称', 1, TAG_LIMITS.nameMax);
     nameChanged = name !== tag.name;
   }
   if (has(body, 'parentId')) {

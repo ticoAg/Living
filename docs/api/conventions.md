@@ -6,6 +6,8 @@ tags: [api]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/shared/types.ts
     title: 接口类型
+  - resource: https://github.com/ticoAg/Living/blob/main/shared/limits.ts
+    title: 输入上限
 ---
 # 格式
 
@@ -39,6 +41,8 @@ sources:
 
 `message` 用中文，直接说明原因和解决办法。
 
+文字长度和条数的上限（标题、笔记、导语、标签名、显示名、简介、密码等）定义在 `shared/limits.ts`，Worker 校验和前端表单用同一份。长度按 Unicode 码点计，中文和 emoji 都算一个字符；密码按 UTF-16 码元计。
+
 # 可见性
 
 请求者为照片或主题的所有者时看到全部内容。对其他人：
@@ -49,11 +53,13 @@ sources:
 
 # 位置精度（对非所有者）
 
-| `geoPrivacy` | `lat` `lng` | `heading` `alt` | `poiId` `poi` `poiDistance` | `district` |
-|---|---|---|---|---|
-| `exact` | 原值 | 原值 | 原值 | 原值 |
-| `fuzzy` | `shared/geo.ts` 的 `fuzz()` 取整 | null | 原值 | 原值 |
-| `hidden` | null | null | null | null |
+| `geoPrivacy` | `lat` `lng` | `heading` `alt` | `poiId` `poi` | `poiDistance` | `district` |
+|---|---|---|---|---|---|
+| `exact` | 原值 | 原值 | 原值 | 原值 | 原值 |
+| `fuzzy` | `shared/geo.ts` 的 `fuzz()` 取整 | null | 原值 | null | 原值 |
+| `hidden` | null | null | null | null | null |
+
+`fuzzy` 的 `poiDistance` 为 null：`poi` 带着地点的精确坐标，再给出到它的距离，取整后的位置就被缩回到几十米内。`poiMethod` 只在 `hidden` 时为 null。
 
 `province` 和 `city` 始终返回。列表（`PhotoSummary`）和详情（`PhotoDetail`）都带 `district`，按上表处理。
 

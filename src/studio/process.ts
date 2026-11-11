@@ -2,8 +2,8 @@
 // EXIF → decode (orientation applied) → three WebP/JPEG sizes → ThumbHash → palette → SHA-256.
 // The generated sizes carry no EXIF. Heavy libraries (exifr, thumbhash) are imported lazily so they only load
 // on the upload page; a HEIC/HEIF file the browser cannot open itself is decoded by libheif (WebAssembly, in a
-// worker) loaded only for that file, see heic.ts. Files are processed one at a time by the caller to bound
-// memory.
+// worker) loaded only for that file, see heic.ts. The caller runs a few files at a time and caps how many
+// (process-queue.ts): each one holds its decoded bitmap until the largest size is drawn.
 // Docs: /docs/product/features/upload.md
 
 import { isComplete, isHeif } from './heif';
@@ -532,7 +532,8 @@ function toBase64(bytes: Uint8Array): string {
 
 /**
  * Run the whole pipeline for one file. Throws an Error with a user-facing Chinese message on failure.
- * Callers process files sequentially; every bitmap and scratch canvas is released before returning.
+ * Several may run at once; the decoded bitmap is closed as soon as the largest size is drawn from it, and every scratch
+ * canvas is released before returning.
  * `onPhase` hears about the HEIC decoder being fetched and running, and `null` when that part is over.
  */
 export async function processFile(file: File, onPhase?: (phase: ProcessPhase | null) => void): Promise<Processed> {

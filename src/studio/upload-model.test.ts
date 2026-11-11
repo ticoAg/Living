@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { Processed } from './process';
-import { bulkSendable, inBulk, isEditable, newItem, pickRows, type Item } from './upload-model';
+import { bulkSendable, inBulk, isEditable, newItem, pickRows, runSummary, type Item } from './upload-model';
 
 const at = (lat: number | null, lng: number | null, takenAt: string | null = '2026-03-20T18:00:00') =>
   ({ exif: { lat, lng, takenAt, tz: '+08:00', heading: null } }) as unknown as Processed;
@@ -98,5 +98,20 @@ describe('pickRows', () => {
     expect(pickRows(order, ['b', 'c', 'd'], 'd', 'a', 'range', 'b')).toEqual({ checked: ['a', 'b'], current: 'a' });
     expect(pickRows(order, [], 'c', 'c', 'range', null)).toEqual({ checked: ['c'], current: 'c' });
     expect(pickRows(order, [], 'c', 'e', 'range', 'gone')).toEqual({ checked: ['e'], current: 'e' });
+  });
+});
+
+describe('runSummary', () => {
+  it('counts what a run sent, skipped and could not send', () => {
+    expect(runSummary({ done: 3, duplicate: 0, failed: 0 }, false)).toBe('已发布 3 张。');
+    expect(runSummary({ done: 2, duplicate: 6, failed: 1 }, false)).toBe('已发布 2 张，6 张以前传过，1 张失败，可以重试。');
+    expect(runSummary({ done: 0, duplicate: 1, failed: 0 }, false)).toBe('已发布 0 张，1 张以前传过。');
+  });
+  it('says when the run was stopped, even before anything went out', () => {
+    expect(runSummary({ done: 1, duplicate: 0, failed: 0 }, true)).toBe('已停止。已发布 1 张。');
+    expect(runSummary({ done: 0, duplicate: 0, failed: 0 }, true)).toBe('已停止。已发布 0 张。');
+  });
+  it('leaves nothing behind for a run that tried nothing', () => {
+    expect(runSummary({ done: 0, duplicate: 0, failed: 0 }, false)).toBeNull();
   });
 });

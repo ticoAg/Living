@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { destination, distance, wgs84ToGcj02 } from '../../shared/geo';
 import type { Env } from '../env';
 import type { PoiRow } from '../lib/poi';
-import { fakeD1, fakeKv, type DbCall } from '../test-utils';
+import { fakeD1, fakeKv, fakePlaceCache, type DbCall } from '../test-utils';
 import { matchPlaces } from './match';
 
 // matchPlaces end to end: local table + provider + reverse geocode + privacy zones, with the network and
@@ -43,14 +43,17 @@ interface World {
 function makeEnv(world: World = {}, extra: Partial<Env> = {}) {
   const pois = world.pois ?? [];
   const widest = pois.reduce((m, p) => Math.max(m, p.radius), 0);
-  const d1 = fakeD1((call: DbCall) => {
-    if (call.sql.includes('MAX(radius)')) return { r: widest };
-    if (call.sql.includes('FROM pois')) return pois;
-    if (call.sql.includes('privacy_zones')) return world.zones ?? [];
-    return null;
-  });
+  const cache = fakePlaceCache();
+  const d1 = fakeD1(
+    cache.wrap((call: DbCall) => {
+      if (call.sql.includes('MAX(radius)')) return { r: widest };
+      if (call.sql.includes('FROM pois')) return pois;
+      if (call.sql.includes('privacy_zones')) return world.zones ?? [];
+      return null;
+    })
+  );
   const kv = fakeKv();
-  return { env: { DB: d1.db, KV: kv.kv, ...extra } as unknown as Env, kv, d1 };
+  return { env: { DB: d1.db, KV: kv.kv, ...extra } as unknown as Env, kv, d1, cache };
 }
 
 /** Replaces `fetch`; every request is answered by `handler` and logged. */
@@ -336,12 +339,15 @@ describe('matchPlaces with AMap', () => {
 describe('matchPlaces caching', () => {
   const elements = [elementAt(0, 100, 1, { name: '雷峰塔', tourism: 'attraction' })];
 
-  it('stores provider answers in KV under keys with the source, a coordinate grid and the radius', async () => {
+  it('stores provider answers in the D1 cache under keys with the source, a coordinate grid and the radius', async () => {
     stubFetch(osm({ elements }));
-    const { env, kv } = makeEnv();
+    const { env, kv, cache } = makeEnv();
+    const before = Math.floor(Date.now() / 1000);
     await matchPlaces(env, 'u_1', INPUT);
-    expect([...kv.store.keys()].sort()).toEqual(['geo:rev2:osm:30.232:120.148', 'poi:near:photon:30.2316:120.1479:300']);
-    expect(kv.puts.every((p) => (p.options as { expirationTtl: number }).expirationTtl === 604_800)).toBe(true);
+    expect([...cache.rows.keys()].sort()).toEqual(['geo:rev2:osm:30.232:120.148', 'poi:near:photon:30.2316:120.1479:300']);
+    for (const row of cache.rows.values()) expect(row.expiresAt - before).toBeGreaterThanOrEqual(604_800);
+    // KV's daily write allowance is left to sessions and the login rate limit
+    expect(kv.puts).toEqual([]);
   });
 
   it('asks each provider only once for the same spot, however many photos are taken there', async () => {

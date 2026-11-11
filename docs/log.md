@@ -1,5 +1,27 @@
 # Directory Update Log
 
+## 2026-11-10
+* **Update**: 主题编辑、Living、上传三个页面组件拆成分区目录里的 Hook 与纯函数模块，页面只做编排，行为与 DOM 不变，见 [前端分区](/architecture/frontend.md)。
+* **Update**: 提交前钩子对暂存文件跑格式化和 lint（能修的自动修），`npm install` / `npm ci` 后自动就位，CI 和没有 `.git` 的环境跳过，见 [提交前检查](/runbooks/local-dev.md#提交前检查)；新增浏览器冒烟测试 `npm run test:e2e`（构建后在独立的本地库上走一遍上传、发布和各页面，外加分块失效、会话过期、图库顺序、手机溢出、快速点击几条回归），PR 检查有单独的 e2e job，见 [冒烟测试](/runbooks/local-dev.md#冒烟测试)。
+* **Update**: 页面刚加载完就点站内链接时，目标页不再卡在加载状态：共享 GET 缓存改用 `useSyncExternalStore` 订阅，见 [前端分区](/architecture/frontend.md)。
+* **Update**: 照片上传在服务端拆成读表单、查询、写 R2、落库四步（`worker/lib/upload.ts`），注册设置移到 `worker/lib/settings.ts`，地点名称搜索移到 `searchPlaces`，路由之间不再互相引用，见 [照片接口](/api/photos.md)。
+* **Update**: Lint 开启 React Hooks 与无障碍规则，`vp check` 保持零告警，见 [工具链采用 Vite+](/architecture/decisions/0006-vite-plus.md)。
+* **Update**: 地图页切换城市时，新地图在图集画出后立即淡入，不再等满 6 秒，见 [地图](/product/features/map.md)。
+* **Update**: 输入长度上限集中定义在 `shared/limits.ts`，后端校验和前端的 maxLength、提示文案都引用它，数值不变，见 [接口约定](/api/conventions.md)。
+* **Update**: 地点与逆地理缓存从 KV 移到 D1 的 place_cache 表，每小时清理过期行；KV 每天 1000 次写入只留给会话和登录限流，批量上传不再导致当天无法登录，见 [place_cache](/data/place-cache.md)。
+* **Update**: 新增隐私区域时，本人坐标落在区域内的已有照片一并改为隐藏位置，设置页显示改了几张；位置精度 fuzzy 的照片对他人不再返回到地点的距离，见 [隐私](/product/features/privacy.md)。
+* **Update**: 照片列表超过 5000 张时响应带 truncated，图库、地图、索引显示「只显示最近的 5000 张」，见 [照片接口](/api/photos.md)。
+* **Update**: 上传时多选的照片可以一起选地点（候选取各自匹配结果的并集，离得太远的不套用），队列里一键选中同一处拍的一组，见 [上传与整理](/product/features/upload.md#一起选地点)。
+* **Update**: 上传页同时处理两张照片（实测 20 张 2400 万像素从 21 秒降到 12 秒），已填的内容按文件存为草稿、刷新后重新加入同样的文件自动恢复，见 [上传与整理](/product/features/upload.md#草稿)。
+* **Update**: 字体改为自托管（宋体按 unicode-range 切片、只带用到的字重，字体样式表不阻塞渲染），界面改用系统黑体，不再请求 Google Fonts，见 [前端分区](/architecture/frontend.md)。
+* **Update**: 接口有了路由测试：`npm run test:routes` 在本地 D1、R2、KV 上跑可见性矩阵、账号、上传、照片、主题、标签、地点和站点管理，PR 检查会跑它，不进 `npm run build`，见 [路由测试](/runbooks/local-dev.md#路由测试)；顺带修了地点别名以字符串提交时不去重、不限 20 个的问题。
+* **Update**: 小字的三级墨加深到在纸面和卡纸上都不低于 4.5:1；小地图的署名加载后收成 ⓘ，见 [前端分区](/architecture/frontend.md)。
+* **Update**: 图库、个人主页和地点页的瀑布流改成按行排列（第一行是最新的几张），分段渲染，返回时恢复已渲染的照片和滚动位置，见 [图库](/product/features/gallery.md)。
+* **Update**: 手机版面：页眉一行，导航移到底部固定栏；图库和地图的筛选收进「筛选」按钮；标签管理每个标签一行，操作收进「更多」，见 [前端分区](/architecture/frontend.md)。
+* **Update**: 页面、静态资源、`/api`、`/media` 响应加上 nosniff、Referrer-Policy，页面禁止被 iframe 嵌入，见 [Cloudflare 资源](/architecture/cloudflare.md)。
+* **Update**: 发布后旧页面取不到分块时整页重新加载一次，仍失败则显示可刷新的错误状态，不再白屏，见 [前端分区](/architecture/frontend.md)。
+* **Update**: 会话过期时就地弹出重新登录，填写的内容不丢；共享 GET 缓存 5 分钟后在挂载或回到标签页时后台刷新，见 [账号](/product/features/accounts.md)。
+
 ## 2026-11-08
 * **Update**: 域名改为 Worker 路由 `living.ticoag.fun/*`，DNS 记录手动维护，不再使用自定义域名，见 [Cloudflare 资源](/architecture/cloudflare.md#资源)。
 * **Update**: 上传页"全部发布（N）"取代"发布全部已匹配"：一键照原样发布队列里所有没发的照片，待确认和无位置的不关联地点；刚拖进来就能点，处理和匹配完的照片依次发出，结束后报告发了几张、几张已存在、几张失败，见 [全部发布](/product/features/upload.md#全部发布)。

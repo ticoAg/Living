@@ -66,6 +66,34 @@ export function fakeD1(answer: (call: DbCall) => unknown = () => null) {
   return { db, calls };
 }
 
+/**
+ * The `place_cache` table (providers/cache.ts) in memory, for a `fakeD1` answer: `wrap(answer)` answers the cache's
+ * statements from `rows` and passes every other statement on to `answer`.
+ */
+export function fakePlaceCache() {
+  const rows = new Map<string, { value: string; expiresAt: number }>();
+  const own = (call: DbCall): unknown => {
+    if (call.sql.startsWith('SELECT')) {
+      const [key, now] = call.params as [string, number];
+      const row = rows.get(key);
+      return row && row.expiresAt > now ? { value: row.value } : null;
+    }
+    if (call.sql.startsWith('INSERT')) {
+      const [key, value, expiresAt] = call.params as [string, string, number];
+      rows.set(key, { value, expiresAt });
+    } else if (call.sql.startsWith('DELETE')) {
+      const [now] = call.params as [number];
+      for (const [key, row] of rows) if (row.expiresAt <= now) rows.delete(key);
+    }
+    return null;
+  };
+  const wrap =
+    (answer: (call: DbCall) => unknown = () => null) =>
+    (call: DbCall): unknown =>
+      call.sql.includes('place_cache') ? own(call) : answer(call);
+  return { rows, wrap };
+}
+
 /** An in-memory KV namespace holding JSON values; `puts` records each write with its options. */
 export function fakeKv(initial: Record<string, unknown> = {}) {
   const store = new Map<string, string>(Object.entries(initial).map(([key, value]) => [key, JSON.stringify(value)]));

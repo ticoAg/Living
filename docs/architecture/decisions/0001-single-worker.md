@@ -26,6 +26,8 @@ Workers 的 Static Assets 可以直接托管构建产物，同时运行 Worker �
 
 为什么必须写 `run_worker_first`：在单页应用模式下，浏览器的页面跳转请求（带 `Sec-Fetch-Mode: navigate`）如果没有匹配到静态文件，会直接得到 `index.html`，不经过 Worker。不列出这两个前缀，在地址栏打开 `/api/…`，或在新标签页打开 `/media/…` 的图片、下载原图，拿到的都会是前端页面。
 
+`run_worker_first` 写成路径列表后，Cloudflare 不再看 `Sec-Fetch-Mode`：列表之外的请求只要没有匹配到静态文件，不论是不是页面跳转，都得到 `index.html`。所以发布后旧标签页请求已删除的分块（`/assets/…`）时拿到的也是 `index.html`，由前端识别为分块失效并整页重新加载，见 [前端分区](/architecture/frontend.md#分块失效与错误)。Worker 的 `notFound` 对 `/assets/` 下的路径回 404，但按现在的配置这类请求到不了 Worker。
+
 # 后果
 
 - 同源：Cookie 不需要 CORS 配置，写请求只需校验 `Origin`，见 [接口约定](/api/conventions.md)。

@@ -4,6 +4,15 @@ import type { PhotoSummary, Poi } from '../../shared/types';
 import Img from '../components/Img';
 import { CategoryIcon } from '../components/icons';
 import { fmtDay } from '../lib/format';
+import type { MasonryItem } from './columns';
+
+// below the picture: the 10px flex gap and a caption of one fixed-height line (.gal-cap in browse.css)
+const CAPTION = 10 + 19;
+
+/** Size of a tile for the masonry layout, without measuring it. */
+export function galleryTileSize(photo: PhotoSummary, poi: Poi | undefined): MasonryItem {
+  return { ratio: photo.width / photo.height, extra: poi?.name || photo.city ? CAPTION : 0 };
+}
 
 /** Masonry tile: the photo at its own ratio; under it the place symbol and name, or the city in muted ink. */
 const GalleryTile = memo(function GalleryTile({ photo, poi }: { photo: PhotoSummary; poi: Poi | undefined }) {

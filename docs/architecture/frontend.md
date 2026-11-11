@@ -8,6 +8,8 @@ tags: [architecture, frontend]
 
 React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vite-plus.md)（Vite 8 与 Rolldown 构建，Vitest、Oxlint、Oxfmt）；MapLibre 6 按需加载，它的 Worker 用 `?worker&url` 单独构建后交给 `setWorkerUrl`（见 `src/components/MapView.tsx`）；exifr、thumbhash 只在上传页加载；HEIC 解码器（libheif 的 WebAssembly 构建，在 Worker 里运行）只在选了浏览器打不开的 HEIC 文件时才加载。
 
+字体自托管，不连第三方字体服务。界面文字用系统黑体（苹方、微软雅黑、Noto Sans CJK / 思源黑体），不下载。宋体、等宽、字标三种网络字体来自 `@fontsource/*`，只带用到的字重，全部 woff2，随 `/assets/` 一年 immutable 缓存：Noto Serif SC 500/600/700 保留 Google 的约 100 个 unicode-range 切片，页面只下载自己用到的字所在的那几片；DM Mono 400/500 与 Spectral 300/500 只带 latin 子集。`@font-face` 规则由 `vite.config.ts` 里的 `fonts()` 插件生成（虚拟模块 `virtual:fonts.css`，约 300 条，未压缩约 275 KB、brotli 约 21 KB），单独成一个样式表，不进主样式表：构建时 `index.html` 以 `media="print"` 加 `onload` 的方式引用它，与入口脚本并行下载而不阻塞渲染；`src/main.tsx` 的动态 `import()` 在开发时加载它。字标字体（Spectral 500）在 `index.html` 里 preload，页眉的 LIVING 不会先以 Georgia 闪一下。`font-display: swap`：字体到达前文字先用字体栈里的下一个字体显示，不出现空白。中文字形等宽，换字体基本只换笔画不换排版；实测字体换入造成的 CLS 每页不超过 0.004。
+
 # 路由与归属
 
 | 路由 | 页面文件 | 分区 |
@@ -27,9 +29,19 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `/themes` `/themes/new` | `src/pages/Themes.tsx`、`ThemeEditor.tsx` | themes |
 | `/t/:id` `/t/:id/edit` | `src/pages/ThemeReader.tsx`、`ThemeEditor.tsx` | themes |
 
-页面模块按路由拆分，统一在 `src/routes.ts` 声明。首屏之后浏览器空闲时依次预取 browse、themes、living 的分块（省流量模式与 2G 下跳过）；鼠标停在站内链接上约 80ms、按下或键盘聚焦时，预取目标路由的分块和它挂载时要发的 GET 请求（进入共享缓存），所以切页通常不再出现「加载中」。分块确实没到时，「加载中」在 400ms 后才显示。`src/lib/scroll.ts` 按历史记录保存滚动位置：前进、后退回到离开时的位置，新跳转从顶部开始。
+页面模块按路由拆分，统一在 `src/routes.ts` 声明。首屏之后浏览器空闲时依次预取 browse、themes、living 的分块（省流量模式与 2G 下跳过）；鼠标停在站内链接上约 80ms、按下或键盘聚焦时，预取目标路由的分块和它挂载时要发的 GET 请求（进入共享缓存），所以切页通常不再出现「加载中」。分块确实没到时，「加载中」在 400ms 后才显示。`src/lib/scroll.ts` 按历史记录保存滚动位置：前进、后退回到离开时的位置，新跳转从顶部开始。瀑布流（`src/browse/Masonry.tsx`）分段渲染，已渲染的张数记在当前历史记录的 `history.state` 里，返回时先渲染出同样多的照片，滚动位置才能恢复。
 
-分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。
+## 分块失效与错误
+
+每次发布都会换掉 `/assets/` 下带哈希的文件。发布前打开的标签页再去取旧分块时，静态资源找不到文件，按单页应用的规则回一份 `index.html`，`import()` 因此失败。
+
+- `src/components/ErrorBoundary.tsx` 包在路由外面，页眉留在边界外；地址变化时清除错误状态，所以从页眉的链接就能离开。
+- 分块加载失败（`src/lib/chunks.ts` 的 `isChunkError`）时整页跳到当前地址一次，拿到新的 `index.html` 和新的分块名；跳转期间显示「加载中」。`sessionStorage` 记下跳转时间，一分钟内再次失败就不再跳转，显示「页面没能加载」和「刷新」按钮，不会循环刷新。
+- 后台预取的分块失败时（Vite 的 `vite:preloadError` 事件），不刷新眼前的页面（上面可能有没保存的内容），只记下「版本已过期」：之后点站内链接改为整页跳转到目标地址，页面自己的离开提醒仍然有效。
+- 其他渲染错误显示「出错了」和「刷新」按钮。
+- `React.lazy` 一旦失败会一直抛同一个错误，所以恢复靠整页跳转，不在页面内重试；预取失败不会让 `lazy` 失败，渲染时会重新请求。
+
+分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；主题编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`。
 
 # 共享模块（改动需要协调）
 
@@ -37,24 +49,28 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 |---|---|
 | `shared/types.ts` | 前后端共用的接口类型，即 [接口约定](/api/conventions.md) 的代码形式 |
 | `shared/geo.ts` | 距离、方位角、坐标转换、扇形与圆、度分秒格式 |
-| `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()` |
-| `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)` |
+| `shared/limits.ts` | 输入上限：照片、主题、主题条目、标签、账号（含用户名格式 `HANDLE_RE`）、隐私区域、邀请码、地点搜索与地区名；地点编辑的 `POI_LIMITS` 留在 `shared/types.ts`，在这里再导出。Worker 的校验和表单的 `maxLength`、提示文案、发送前检查都引用它，不另写数字 |
+| `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()`；`/api/auth/*` 以外的 401 经 `onSessionLost` 通知会话层 |
+| `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢 |
+| `src/lib/chunks.ts` | 分块失效的识别与一次性整页重新加载，见 [分块失效与错误](#分块失效与错误) |
 | `src/lib/scroll.ts` | 按历史记录恢复滚动位置；页面经 `useScrollTop` 调用 |
-| `src/lib/session.tsx` | `useSession()`：当前用户、站点信息、退出 |
+| `src/lib/session.tsx` | `useSession()`：当前用户、站点信息、退出。请求遇到 401 时向服务端确认，会话确已失效就标记 `expired`（页眉显示未登录，页面保留原用户以免表单被卸载）并打开 `src/components/ReLogin.tsx` 的重新登录对话框，见 [账号](/product/features/accounts.md#会话过期) |
 | `src/lib/tags.ts` | 标签树、子孙展开、按标签筛选、包含计数 |
 | `src/lib/format.ts` | 日期、时段、距今、距离、度分秒 |
 | `src/components/Img.tsx` | 响应式图片 + ThumbHash 占位 |
-| `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放 |
+| `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放；署名在地图加载后收成 ⓘ（地图页 `/map` 保持 MapLibre 默认） |
 | `src/components/icons.tsx` | 地点类别符号 `CategoryIcon`、界面图标 `Icon` |
-| `src/components/Header.tsx` | 站点页眉与导航 |
+| `src/components/Header.tsx` | 站点页眉与导航；手机上（≤640px）页眉一行（字标、上传、账户），四个分区移到底部固定栏 |
+| `src/components/ErrorBoundary.tsx` | 路由外的错误边界：分块失效时重新加载，其他错误显示「出错了」 |
 | `src/styles/base.css` | 设计令牌与通用控件（按钮、标签片、色块、分段、输入框） |
 
 # 设计令牌
 
-纸面 `#F1F2EE`、卡纸 `#E6E8E2`、墨 `#1C201E`、次级墨 `#5A605C`、细线 `#D3D6D0`、湖蓝 `#2B5F86`（链接、水体注记）、赭 `#8F5530`（等高线、匹配半径、朝向）。字体：宋体 Noto Serif SC 用于地名与标题（加宽字距 0.24–0.5em），Noto Sans SC 用于界面，DM Mono 用于坐标与数字，Spectral 用于 LIVING 字标。Living 模式使用深色（`--night*` 令牌）。
+纸面 `#F1F2EE`、卡纸 `#E6E8E2`、墨 `#1C201E`、次级墨 `#5A605C`、三级墨 `#686E6A`（11–13px 的小字，在纸面和卡纸 `#FAFAF8` 上都不低于 4.5:1）、细线 `#D3D6D0`、湖蓝 `#2B5F86`（链接、水体注记）、赭 `#8F5530`（等高线、匹配半径、朝向）。字体（`base.css` 的 `--serif`、`--sans`、`--mono`、`--latin`）：宋体 Noto Serif SC 用于地名与标题（加宽字距 0.24–0.5em，字重 500/600/700，写 400 的地方显示为 500），系统黑体用于界面，DM Mono 用于坐标与数字（400/500），Spectral 用于 LIVING 字标和大号数字（300/500，无斜体）。样式里要用新的字重或斜体，先在 `vite.config.ts` 的 `FONTS` 里加上，否则浏览器会用相近字重或合成粗体。Living 模式使用深色（`--night*` 令牌）。
 
 # 约定
 
 - 文案用中文，简短；能用版面说明的不加说明文字。
 - 交互控件用真实的 `button`、`a`、`input`，触控目标不小于 44px，图标按钮带 `aria-label`。
 - 地址栏承载可分享的状态（筛选、选中地点、Living 参数）。
+- 手机（≤640px）：`--header-h` 是 52px；底部导航栏的高度是 `--nav-foot`（含安全区，没有页眉的页面为 0），页面底部留白、滚动定位和吸底的操作栏都让开它。筛选收进「筛选」按钮（`FilterToggle`），按钮上显示已选个数。

@@ -1,7 +1,7 @@
 ---
 type: Pipeline
 title: 构建与发布
-description: PR 上由 GitHub Actions 跑 Vite+ 的检查、测试和构建；合并到 main 后 Cloudflare Workers Builds 自动检查、测试、构建、执行 D1 迁移并部署，启用构建缓存。
+description: PR 上由 GitHub Actions 跑 Vite+ 的检查、测试和构建，另一个 job 在浏览器里跑冒烟测试；合并到 main 后 Cloudflare Workers Builds 自动检查、测试、构建、执行 D1 迁移并部署，启用构建缓存。
 tags: [architecture, cloudflare, ci]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/.github/workflows/ci.yml
@@ -11,14 +11,26 @@ sources:
 ---
 # PR 检查
 
-`.github/workflows/ci.yml` 在每个 PR 上运行，Node 版本取 `.node-version`：
+`.github/workflows/ci.yml` 在每个 PR 上运行，Node 版本取 `.node-version`，两个 job 并行。`check`：
 
 | 步骤 | 命令 |
 |---|---|
 | 安装 | `npm ci` |
 | 格式、lint、类型检查 | `npx vp check` |
-| 测试 | `npx vp test` |
+| 单元测试 | `npx vp test` |
+| 路由测试 | `npm run test:routes`（本地 D1、R2、KV 上的接口测试，见 [路由测试](/runbooks/local-dev.md#路由测试)） |
 | 构建 | `npx vp build` |
+
+`e2e`：在浏览器里对构建产物跑冒烟测试，见 [冒烟测试](/runbooks/local-dev.md#冒烟测试)。
+
+| 步骤 | 命令 |
+|---|---|
+| 安装 | `npm ci` |
+| 浏览器 | `npx playwright install --with-deps chromium`；`~/.cache/ms-playwright` 按 `@playwright/test` 的版本缓存，命中缓存时只补系统依赖（`npx playwright install-deps chromium`） |
+| 冒烟测试 | `npm run test:e2e`（构建、在新建的测试库上起 `vp preview`、跑 Playwright） |
+| 失败时 | 上传 `.wrangler/e2e/report` 和 `.wrangler/e2e/results`（截图、trace）为产物 `playwright-report`，保留 14 天 |
+
+`npm ci` 在这里不会装 Git 钩子：`prepare` 见到 `CI` 就跳过，见 [提交前检查](/runbooks/local-dev.md#提交前检查)。
 
 # 部署触发
 
@@ -32,7 +44,7 @@ sources:
 | Node | `.node-version`（24） |
 | 构建缓存 | 开启（缓存依赖与构建产物） |
 
-Workers Builds 会在构建前按 `package-lock.json` 自动安装依赖。部署前的构建不检查格式：格式问题在 PR 检查里拦下，不阻塞已经合并的修复上线。
+Workers Builds 会在构建前按 `package-lock.json` 自动安装依赖。部署前的构建不检查格式：格式问题在 PR 检查里拦下，不阻塞已经合并的修复上线。路由测试和冒烟测试也只在 PR 检查里跑：它们要启动 workerd（冒烟测试还要浏览器），在 Workers Builds 里能否启动没有验证过，不能让部署被它们卡住。
 
 # 流程
 

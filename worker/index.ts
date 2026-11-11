@@ -1,12 +1,14 @@
-// Living — one Worker: JSON API (/api), media from R2 (/media), and the SPA via static assets; plus the hourly region job.
+// Living — one Worker: JSON API (/api), media from R2 (/media), and the SPA via static assets; plus the hourly job
+// (provinces, place cache cleanup).
 // Contract: /docs/api/
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AppEnv, Env } from './env';
-import { forbidden, HttpError } from './lib/http';
+import { forbidden, HttpError, REFERRER_POLICY } from './lib/http';
 import { fillRegions } from './lib/regions';
+import { purgePlaceCache } from './providers/cache';
 import { admin } from './routes/admin';
 import { auth } from './routes/auth';
 import { me } from './routes/me';
@@ -60,10 +62,12 @@ app.use('/api/*', async (c, next) => {
 });
 
 // API responses are never cached unless a handler opts in (public lists, media).
+// The security headers match public/_headers, which covers the pages and static files the Worker never sees.
 app.use('/api/*', async (c, next) => {
   await next();
   if (!c.res.headers.has('Cache-Control')) c.res.headers.set('Cache-Control', 'no-store');
   c.res.headers.set('X-Content-Type-Options', 'nosniff');
+  c.res.headers.set('Referrer-Policy', REFERRER_POLICY);
 });
 
 app.route('/api/site', site);
@@ -84,6 +88,11 @@ app.notFound((c) => {
   const path = new URL(c.req.url).pathname;
   if (path.startsWith('/api/') || path === '/api') return c.json(NOT_FOUND, 404, { 'Cache-Control': 'no-store' });
   if (path.startsWith('/media/')) return c.json({ error: 'not_found', message: '文件不存在' }, 404, { 'Cache-Control': 'no-store' });
+  // A missing hashed file is a chunk from an earlier deploy: answer 404 rather than the page HTML. Note that with
+  // run_worker_first as a list (wrangler.jsonc), the static assets answer a missing file with index.html themselves,
+  // navigation or not, so today this only runs when the Worker is reached some other way. The page recovers from
+  // either answer (src/lib/chunks.ts).
+  if (path.startsWith('/assets/')) return c.text('Not found', 404, { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   // Anything else belongs to the SPA (normally served before the Worker runs).
   return c.env.ASSETS.fetch(c.req.raw);
 });
@@ -114,14 +123,14 @@ app.onError((err, c) => {
   return c.json({ error: 'internal', message: '服务器出错了，请稍后再试' }, 500, { 'Cache-Control': 'no-store' });
 });
 
-/** The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts). */
+/**
+ * The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts), and expired rows of the
+ * place cache (providers/cache.ts). The two are independent: one failing does not stop the other.
+ */
 async function scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-  ctx.waitUntil(
-    fillRegions(env).then(
-      (run) => console.log('regions', JSON.stringify(run)),
-      (e: unknown) => console.error('regions: run failed', e instanceof Error ? (e.stack ?? e.message) : e)
-    )
-  );
+  const failed = (job: string) => (e: unknown) => console.error(`${job}: run failed`, e instanceof Error ? (e.stack ?? e.message) : e);
+  ctx.waitUntil(fillRegions(env).then((run) => console.log('regions', JSON.stringify(run)), failed('regions')));
+  ctx.waitUntil(purgePlaceCache(env.DB).then((purged) => console.log('place cache', JSON.stringify({ purged })), failed('place cache')));
 }
 
 export default { fetch: app.fetch, scheduled } satisfies ExportedHandler<Env>;

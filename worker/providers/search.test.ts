@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import type { Env } from '../env';
-import { fakeKv } from '../test-utils';
+import { fakeD1, fakeKv, fakePlaceCache } from '../test-utils';
 import { nameMatches, searchExternal } from './match';
 
 // Name search for the upload place picker: near the photo when it has a position, otherwise anywhere.
@@ -36,7 +36,8 @@ afterEach(() => {
 
 const env = (extra: Partial<Env> = {}) => {
   const kv = fakeKv();
-  return { env: { KV: kv.kv, ...extra } as unknown as Env, kv };
+  const cache = fakePlaceCache();
+  return { env: { DB: fakeD1(cache.wrap()).db, KV: kv.kv, ...extra } as unknown as Env, kv, cache };
 };
 
 /** Photon's word search finds only `searchHits`; its nearby list holds `nearby`; Nominatim finds nothing. */
@@ -80,9 +81,10 @@ describe('searchExternal near a photo', () => {
 
   it('caches the search per term and roughly per kilometre', async () => {
     answer = world([], []);
-    const { env: e, kv } = env();
+    const { env: e, kv, cache } = env();
     await searchExternal(e, ' 断桥 '.trim(), AT);
-    expect([...kv.store.keys()].sort()).toEqual(['poi:near:photon:30.2593:120.1516:1000', 'poi:q:osm:断桥:30.26:120.15']);
+    expect(kv.store.size).toBe(0);
+    expect([...cache.rows.keys()].sort()).toEqual(['poi:near:photon:30.2593:120.1516:1000', 'poi:q:osm:断桥:30.26:120.15']);
   });
 
   it('still answers from the nearby list when name search is down', async () => {

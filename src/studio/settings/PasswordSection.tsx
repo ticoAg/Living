@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { ACCOUNT_LIMITS } from '../../../shared/limits';
 import { api } from '../../lib/api';
 import { errMsg } from '../util';
 
@@ -14,7 +15,7 @@ export default function PasswordSection() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
-    if (next.length < 8) return setMsg({ ok: false, text: '新密码至少需要 8 个字符' });
+    if (next.length < ACCOUNT_LIMITS.passwordMin) return setMsg({ ok: false, text: `新密码至少需要 ${ACCOUNT_LIMITS.passwordMin} 个字符` });
     if (next !== again) return setMsg({ ok: false, text: '两次输入的新密码不一样' });
     if (next === current) return setMsg({ ok: false, text: '新密码和当前密码相同' });
     setBusy(true);
@@ -50,7 +51,7 @@ export default function PasswordSection() {
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
             autoComplete="current-password"
-            maxLength={256}
+            maxLength={ACCOUNT_LIMITS.passwordMax}
             required
           />
         </div>
@@ -65,12 +66,12 @@ export default function PasswordSection() {
             value={next}
             onChange={(e) => setNext(e.target.value)}
             autoComplete="new-password"
-            maxLength={256}
+            maxLength={ACCOUNT_LIMITS.passwordMax}
             required
             aria-describedby="se-pw-hint"
           />
           <span id="se-pw-hint" className="small muted">
-            至少 8 位。
+            至少 {ACCOUNT_LIMITS.passwordMin} 位。
           </span>
         </div>
         <div className="field">
@@ -84,7 +85,7 @@ export default function PasswordSection() {
             value={again}
             onChange={(e) => setAgain(e.target.value)}
             autoComplete="new-password"
-            maxLength={256}
+            maxLength={ACCOUNT_LIMITS.passwordMax}
             required
           />
         </div>

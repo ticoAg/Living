@@ -6,10 +6,10 @@ import type { PoiRow } from './poi';
 
 // docs/api/conventions.md#位置精度对非所有者
 //
-//  geoPrivacy | lat, lng      | heading, alt | poiId, poi, poiDistance | district
-//  exact      | as stored     | as stored    | as stored               | as stored
-//  fuzzy      | fuzz()        | null         | as stored               | as stored
-//  hidden     | null          | null         | null                    | null
+//  geoPrivacy | lat, lng      | heading, alt | poiId, poi | poiDistance | district
+//  exact      | as stored     | as stored    | as stored  | as stored   | as stored
+//  fuzzy      | fuzz()        | null         | as stored  | null        | as stored
+//  hidden     | null          | null         | null       | null        | null
 //
 // The owner always sees everything. `province` and `city` are always returned; `district` follows the table in lists too.
 
@@ -244,7 +244,7 @@ describe('toDetail', () => {
     expect(d.poi?.name).toBe('断桥');
   });
 
-  it('fuzzy photo seen by someone else: rounded position, no heading or altitude, place and district kept', async () => {
+  it('fuzzy photo seen by someone else: rounded position, no heading, altitude or distance, place and district kept', async () => {
     const { db } = detailDb();
     const d = await toDetail(db, row({ geo_privacy: 'fuzzy' }), STRANGER);
     expect(d).toMatchObject({
@@ -254,10 +254,21 @@ describe('toDetail', () => {
       alt: null,
       district: '西湖区',
       poiId: 'poi_1',
-      poiDistance: 42,
+      poiDistance: null,
       poiMethod: 'auto'
     });
     expect(d.poi?.name).toBe('断桥');
+  });
+
+  it('does not let a fuzzy photo’s distance to its place undo the rounding', async () => {
+    const { db } = detailDb();
+    for (const viewer of [STRANGER, null]) {
+      const d = await toDetail(db, row({ geo_privacy: 'fuzzy' }), viewer);
+      expect(d.poiDistance).toBeNull();
+      // the place, with its exact centre, is still there
+      expect(d.poi?.id).toBe('poi_1');
+    }
+    expect((await toDetail(db, row({ geo_privacy: 'fuzzy' }), OWNER)).poiDistance).toBe(42);
   });
 
   it('hidden photo seen by someone else: no position, heading, altitude, district or place at all', async () => {

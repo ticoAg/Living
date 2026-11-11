@@ -16,6 +16,7 @@ const json = async (res: Response) => (await res.json()) as Record<string, unkno
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('GET /api/site', () => {
@@ -46,7 +47,58 @@ describe('GET /api/site', () => {
     const res = await request('/api/site');
     expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
     expect(res.headers.get('Content-Type')).toContain('application/json');
+  });
+});
+
+describe('GET /media/v/… security headers', () => {
+  const KEY = 'v/ph_1/s.webp';
+  const variant = { key: KEY, w: 480, h: 320 };
+  const row = { owner_id: 'u_1', visibility: 'public', variants: JSON.stringify({ s: variant, m: variant, l: variant }) };
+  const ctx = { waitUntil: () => {}, passThroughOnException: () => {}, props: {} } as unknown as ExecutionContext;
+  const get = (env: Env, headers: Record<string, string> = {}) => app.request(`${SITE}/media/${KEY}`, { headers }, env, ctx);
+
+  /** Cache API stand-in; `hit` is what `match` answers. */
+  function stubCache(hit?: Response) {
+    vi.stubGlobal('caches', { default: { match: async () => hit, put: async () => {} } });
+  }
+  /** R2 stand-in: answers with a body, or without one (what R2 does when `onlyIf` says the ETag still matches). */
+  function mediaEnv(withBody: boolean): Env {
+    const obj = {
+      httpEtag: '"e1"',
+      size: 3,
+      httpMetadata: { contentType: 'image/webp' },
+      ...(withBody ? { body: new Blob(['abc']).stream() } : {})
+    };
+    return makeEnv({ MEDIA: { get: async () => obj } } as unknown as Partial<Env>, row);
+  }
+  const expectSecurity = (res: Response) => {
+    expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  };
+
+  it('are set on a response read from R2, full or 304', async () => {
+    stubCache();
+    const full = await get(mediaEnv(true));
+    expect(full.status).toBe(200);
+    expectSecurity(full);
+    const notModified = await get(mediaEnv(false), { 'if-none-match': '"e1"' });
+    expect(notModified.status).toBe(304);
+    expectSecurity(notModified);
+  });
+
+  it('are added to an edge-cache hit stored without them, and to its 304', async () => {
+    const cached = () => new Response('abc', { headers: { ETag: '"e1"', 'Content-Type': 'image/webp', 'Cache-Control': 'public' } });
+    stubCache(cached());
+    const hit = await get(makeEnv());
+    expect(hit.status).toBe(200);
+    expect(await hit.text()).toBe('abc');
+    expectSecurity(hit);
+    stubCache(cached());
+    const notModified = await get(makeEnv(), { 'if-none-match': '"e1"' });
+    expect(notModified.status).toBe(304);
+    expectSecurity(notModified);
   });
 });
 
@@ -67,9 +119,23 @@ describe('unknown paths', () => {
   });
 
   it('hand everything else to the single-page app', async () => {
-    const res = await request('/map');
-    expect(res.status).toBe(200);
-    expect(await res.text()).toContain('<title>Living</title>');
+    for (const path of ['/map', '/@song', '/assets', '/assetsx/a.js']) {
+      const res = await request(path);
+      expect(res.status, path).toBe(200);
+      expect(await res.text(), path).toContain('<title>Living</title>');
+    }
+  });
+
+  it('answer a missing build file with 404, not the page, so a stale chunk import fails cleanly', async () => {
+    let asked = false;
+    const env = makeEnv({ ASSETS: { fetch: async () => ((asked = true), new Response('<!doctype html>')) } } as unknown as Partial<Env>);
+    for (const path of ['/assets/Upload-Bl8QK5JD.js', '/assets/studio-x.css', '/assets/']) {
+      const res = await request(path, {}, env);
+      expect(res.status, path).toBe(404);
+      expect(res.headers.get('Content-Type'), path).toContain('text/plain');
+      expect(res.headers.get('Cache-Control'), path).toBe('no-store');
+    }
+    expect(asked).toBe(false);
   });
 });
 

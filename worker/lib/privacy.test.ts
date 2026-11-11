@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { destination } from '../../shared/geo';
 import { fakeD1 } from '../test-utils';
-import { zoneAt } from './privacy';
+import { photosToHide, zoneAt } from './privacy';
 
 interface Zone {
   id: string;
@@ -70,5 +70,32 @@ describe('zoneAt', () => {
     expect(calls[0].sql).toMatch(/FROM privacy_zones WHERE owner_id = \?1/);
     expect(calls[0].sql).toMatch(/ORDER BY created_at/);
     expect(calls[0].params).toEqual(['u_42']);
+  });
+});
+
+describe('photosToHide', () => {
+  /** A photo `meters` from the centre of HOME towards `bearing`. */
+  const photoAt = (id: string, bearing: number, meters: number) => {
+    const [lat, lng] = destination(HOME.lat, HOME.lng, bearing, meters);
+    return { id, lat, lng };
+  };
+
+  it('keeps the photos inside the circle, not those in the corners of the box around it', async () => {
+    const rows = [photoAt('in', 0, 150), photoAt('edge', 90, 199), photoAt('corner', 45, 260), photoAt('out', 180, 201)];
+    const { db } = fakeD1(() => rows);
+    expect(await photosToHide(db, 'u_1', HOME)).toEqual(['in', 'edge']);
+  });
+
+  it('asks for the user’s own photos that are not hidden yet, within a box that holds the circle', async () => {
+    const { db, calls } = fakeD1(() => []);
+    await photosToHide(db, 'u_42', HOME);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].sql).toMatch(/FROM photos\s+WHERE owner_id = \?1 AND geo_privacy != 'hidden'/);
+    const [owner, latMin, latMax, lngMin, lngMax] = calls[0].params as [string, number, number, number, number];
+    expect(owner).toBe('u_42');
+    for (const bearing of [0, 90, 180, 270]) {
+      const [lat, lng] = destination(HOME.lat, HOME.lng, bearing, HOME.radius);
+      expect(lat >= latMin && lat <= latMax && lng >= lngMin && lng <= lngMax, `${bearing}°`).toBe(true);
+    }
   });
 });

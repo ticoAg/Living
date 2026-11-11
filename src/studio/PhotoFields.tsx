@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { PHOTO_LIMITS } from '../../shared/limits';
 import type { GeoPrivacy, Visibility } from '../../shared/types';
 import { applyTagEdit } from './tag-board';
 import TagPicker from './TagPicker';
@@ -96,7 +97,7 @@ export default function PhotoFields({ value, onChange, tags, geoLocked, toggles 
             className="input pf-input"
             value={value.title}
             onChange={(e) => onChange({ title: e.target.value })}
-            maxLength={120}
+            maxLength={PHOTO_LIMITS.titleMax}
             placeholder="可不填"
             disabled={disabled}
             autoComplete="off"
@@ -114,7 +115,7 @@ export default function PhotoFields({ value, onChange, tags, geoLocked, toggles 
             className="textarea pf-input"
             value={value.note}
             onChange={(e) => onChange({ note: e.target.value })}
-            maxLength={5000}
+            maxLength={PHOTO_LIMITS.noteMax}
             rows={3}
             placeholder="当时的天气、人、路线……"
             disabled={disabled}

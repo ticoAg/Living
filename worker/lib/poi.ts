@@ -1,4 +1,5 @@
 import { CATEGORY_RADIUS } from '../../shared/geo';
+import { REGION_LIMITS } from '../../shared/limits';
 import { POI_CATEGORIES, POI_LIMITS, type NewPoi, type Poi, type PoiDetail, type PoiSource, type SessionUser } from '../../shared/types';
 import { newId } from './ids';
 import { invalid } from './http';
@@ -90,7 +91,9 @@ export function parseNewPoi(v: unknown): NewPoi {
   if (lat === null || lng === null) throw invalid('请提供地点的经纬度');
   const source = optEnum<PoiSource>(v.source, '地点来源', ['custom', 'amap', 'osm']) ?? 'custom';
   const sourceId = optText(v.sourceId, '地点来源编号', 120);
-  return { name, category, lat, lng, city: optText(v.city, '城市', 60), district: optText(v.district, '区县', 60), source, sourceId };
+  const city = optText(v.city, '城市', REGION_LIMITS.nameMax);
+  const district = optText(v.district, '区县', REGION_LIMITS.nameMax);
+  return { name, category, lat, lng, city, district, source, sourceId };
 }
 
 /**

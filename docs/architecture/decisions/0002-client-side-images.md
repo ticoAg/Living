@@ -16,7 +16,7 @@ decided: 2026-11-08
 
 所有图像运算在浏览器里完成，Worker 只做校验、写 R2 和 D1：
 
-1. 浏览器逐张处理：`exifr` 读 EXIF；按方向旋正（HEIC 浏览器解不开时由 `libheif-js` 解码，见下）；缩放并重新编码为 WebP（不支持时用 JPEG）；`thumbhash` 生成占位；提取主色；`crypto.subtle` 计算 SHA-256。重新编码的图片本身不含 EXIF。（早先还用 `suncalc` 算太阳高度来建议光线和季节标签，标签建议去掉后不再需要。）
+1. 浏览器处理每张照片（同时两张，见 [上传与整理](/product/features/upload.md#处理)）：`exifr` 读 EXIF；按方向旋正（HEIC 浏览器解不开时由 `libheif-js` 解码，见下）；缩放并重新编码为 WebP（不支持时用 JPEG）；`thumbhash` 生成占位；提取主色；`crypto.subtle` 计算 SHA-256。重新编码的图片本身不含 EXIF。（早先还用 `suncalc` 算太阳高度来建议光线和季节标签，标签建议去掉后不再需要。）
 2. 一张照片一次 `multipart/form-data` 请求：`meta`（JSON）、`original`、`s`、`m`、`l`，见 [照片接口](/api/photos.md)。
 3. 原图原样存入 R2，只有所有者能读；公开展示只用生成的三种尺寸，见 [R2 媒体文件](/data/media.md)。
 
@@ -33,7 +33,7 @@ HEIC 与其他限制：
 
 - 不需要付费图像服务，也不受 Worker CPU 和内存限制；上传时 Worker 只做校验和写存储。
 - 一张照片一个请求：Worker 限制原图不超过 50 MB、每张尺寸图不超过 12 MB、整个请求不超过 88 MB，在 Cloudflare 免费和 Pro 套餐的 100 MB 请求体上限之内。Worker 要在内存里接收这些数据，所以不把多张照片打包进一个请求。
-- 处理速度取决于用户设备：手机处理几百张大图较慢、耗电，所以逐张处理并显示队列状态，见 [上传与整理](/product/features/upload.md)。
+- 处理速度取决于用户设备：手机处理几百张大图较慢、耗电。解码、编码和哈希本来就在主线程之外，所以同时处理两张（很小的设备一张），HEIC 和超过 30 MB 的文件仍一张一张来，并显示队列状态，见 [上传与整理](/product/features/upload.md#处理)。处理仍在主线程发起，没有用 Worker 加 OffscreenCanvas：同时两张时主线程不明显卡顿，而 Safari 不能把画布编码成 WebP，另起一条只在 Chromium 上验证过的路径不值得。
 - 第一次解码 HEIC 要多下载约 0.7 MB（压缩后）；之后在同一批里不再加载，空闲 15 秒后释放 WebAssembly 的内存。
 - 服务端信任客户端：Worker 无法验证尺寸图确由原图生成，也无法保证尺寸图不含 EXIF，`sha256` 同样由客户端提供。风险限于上传者自己的账号。若以后向不受信任的上传者开放，需要在 Worker 里增加检查。
 - 画质由浏览器的编码器决定，不同浏览器生成的尺寸图略有差异。

@@ -1,21 +1,20 @@
 import { Hono } from 'hono';
 import { distance } from '../../shared/geo';
+import { POI_SEARCH_LIMITS } from '../../shared/limits';
 import { POI_CATEGORIES, POI_LIMITS, type MatchCandidate, type PoiDetail } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { forbidden, invalid, listCache, notFound, paramId, readJson } from '../lib/http';
 import { canEditPoi, getPoiRow, parseNewPoi, findOrCreatePoi, poiCols, toPoi, toPoiDetail, type PoiRow } from '../lib/poi';
 import { currentUser, requireUser, viewerId } from '../lib/session';
-import { likeContains, prepQ, Sql } from '../lib/sql';
+import { prepQ, Sql } from '../lib/sql';
 import { has, optNum, optText, reqStr, strArray } from '../lib/validate';
-import { photoList, photoLocation, poiOffered } from '../lib/visibility';
-import { dedupe, fromExternal, fromPoiRow, matchPlaces, score, searchExternal, type RawPlace } from '../providers/match';
-import { settle } from '../providers/http';
+import { photoList, photoLocation } from '../lib/visibility';
+import { matchPlaces, searchPlaces } from '../providers/match';
 
 export const pois = new Hono<AppEnv>({ strict: false });
 
 const NEARBY_METERS = 5000;
 const NEARBY_LIMIT = 8;
-const SEARCH_LIMIT = 30;
 
 /** Visible-photo POIs: the viewer's own photos, or public photos whose location is not hidden. */
 function visiblePhotos(q: Sql, viewer: string | null): string {
@@ -47,68 +46,14 @@ pois.get('/search', async (c) => {
   const user = await requireUser(c);
   const q = (c.req.query('q') ?? '').trim();
   if (!q) return c.json({ results: [] as MatchCandidate[] });
-  if ([...q].length > 60) throw invalid('搜索词最多 60 个字符');
+  if ([...q].length > POI_SEARCH_LIMITS.queryMax) throw invalid(`搜索词最多 ${POI_SEARCH_LIMITS.queryMax} 个字符`);
   const lat = c.req.query('lat') !== undefined ? Number(c.req.query('lat')) : null;
   const lng = c.req.query('lng') !== undefined ? Number(c.req.query('lng')) : null;
   const at =
     lat !== null && lng !== null && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
-      ? { lat, lng, heading: null }
+      ? { lat, lng }
       : null;
-
-  const like = likeContains(q);
-  const q1 = new Sql();
-  const localRows = await prepQ(
-    c.env.DB,
-    `SELECT ${poiCols('po')} FROM pois po
-     WHERE (po.name LIKE ${q1.p(like)} ESCAPE '\\' OR po.aliases LIKE ${q1.p(like)} ESCAPE '\\') AND ${poiOffered(q1, user.id)}
-     LIMIT 50`,
-    q1
-  ).all<PoiRow>();
-  const local = localRows.results.map(fromPoiRow);
-
-  // AMap with a key in China; otherwise OpenStreetMap (Photon, Nominatim). With a point, only places around it.
-  // A provider failure just leaves the local results.
-  const external = await settle(searchExternal(c.env, q, at));
-  let remote: RawPlace[] = [];
-  if (external.ok) {
-    // Provider results carry their own city/district; no reference-point fallback (they may be anywhere).
-    remote = dedupe(
-      local,
-      external.value.map((e) => fromExternal(e, { city: null, district: null })),
-      at ?? undefined
-    );
-  } else {
-    console.warn('search: provider failed', external.error instanceof Error ? external.error.message : external.error);
-  }
-
-  const places = [...local, ...remote];
-  let results: MatchCandidate[];
-  if (at) {
-    results = places
-      .map((p) => score(p, at))
-      .sort((a, b) => a.distance - b.distance || Number(b.source === 'local') - Number(a.source === 'local'))
-      .slice(0, SEARCH_LIMIT);
-  } else {
-    // No reference point: no distance to speak of. Local places first, then provider order.
-    results = places.slice(0, SEARCH_LIMIT).map((p) => ({
-      key: p.key,
-      poiId: p.poiId,
-      name: p.name,
-      category: p.category,
-      lat: p.lat,
-      lng: p.lng,
-      distance: 0,
-      bearing: 0,
-      inView: false,
-      score: 0,
-      source: p.source,
-      sourceId: p.sourceId,
-      area: false,
-      city: p.city,
-      district: p.district
-    }));
-  }
-  return c.json({ results });
+  return c.json({ results: await searchPlaces(c.env, user.id, q, at) });
 });
 
 pois.post('/match', async (c) => {
@@ -190,13 +135,15 @@ pois.patch('/:id', async (c) => {
   }
   if (has(body, 'aliases')) {
     const raw = body.aliases;
-    const list =
+    // One string is split first; either way the list is held to the same limits and merged like an array.
+    const parts =
       typeof raw === 'string'
         ? raw
             .split(/[,，;；、\n]/)
             .map((s) => s.trim())
             .filter(Boolean)
-        : strArray(raw, '别名', POI_LIMITS.aliasCount, POI_LIMITS.aliasMax);
+        : raw;
+    const list = strArray(parts, '别名', POI_LIMITS.aliasCount, POI_LIMITS.aliasMax);
     aliases = list.length ? JSON.stringify(list.map((s) => optText(s, '别名', POI_LIMITS.aliasMax)).filter(Boolean)) : null;
   }
 

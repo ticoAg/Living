@@ -14,10 +14,11 @@
 * [theme_items](theme-items.md) - 主题的有序条目：照片、文字段落或日期分段
 * [privacy_zones](privacy-zones.md) - 隐私区域：落在其中的照片上传时强制隐藏位置
 * [settings](settings.md) - 站点级键值设置，目前只有注册方式
+* [place_cache](place-cache.md) - 地点数据源的应答缓存：周边地点、名称搜索和逆地理，带过期时间，每小时清理
 
 # KV 与 R2
 
-* [KV 会话与缓存](kv.md) - 登录会话、登录限流计数、地点与逆地理缓存
+* [KV 会话与限流](kv.md) - 登录会话和登录限流计数；KV 的写入额度只留给登录
 * [R2 媒体文件](media.md) - 原图与三种尺寸图的对象键、访问规则和生命周期
 
 # 参考数据

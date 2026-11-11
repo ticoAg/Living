@@ -12,7 +12,17 @@
 .bw-state-title { margin: 0; font: 500 18px var(--serif); letter-spacing: 0.12em; color: var(--ink-2); }
 .bw-state-hint { margin: 0; font-size: 14px; color: var(--ink-2); }
 .bw-chips { display: flex; flex-wrap: wrap; gap: 2px; }
+/* the phone-only button that unfolds a page's filters (browse/ui.tsx FilterToggle) */
+.btn.bw-filter { display: none; }
+.bw-filter[aria-expanded='true'] { background: var(--mat); }
+.bw-filter-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--ink); color: var(--paper); font-size: 12px; }
 .bw .mono { font-variant-numeric: tabular-nums; }
+/* the line saying a photo list stopped at its limit (browse/ui.tsx TruncatedNote): quiet, but outside any folded filter */
+.bw-limit { margin: 0; font: 400 12px/1.5 var(--mono); color: var(--ink-2); }
+.gal-limit { padding-top: 12px; }
+.gal-limit + .gal-masonry { padding-top: 20px; }
+.mpg-top > .mpg-limit { flex-basis: 100%; }
+.idx-totals .bw-limit { font: inherit; }
 /* the base .chip loses its pressed look to data-included when a selected chip sits inside a selected subtree */
 .chip[aria-pressed='true'][data-included='true'] { background: var(--ink); color: var(--paper); }
 
@@ -41,14 +51,21 @@
 .tagf-sep-sub { height: 14px; margin: 0 4px 0 2px; background: var(--rule-2); }
 .tagf-group { font-weight: 700; letter-spacing: 0.08em; }
 
-/* masonry (CSS columns: 4 on desktop, 2 on phones) */
-.gal-masonry { columns: 4 150px; column-gap: clamp(16px, 2vw, 28px); padding-top: 32px; }
-.gal-tile { display: flex; flex-direction: column; gap: 10px; break-inside: avoid; margin: 0 0 30px; }
+/* masonry (browse/Masonry.tsx): tiles placed by script, newest first across the top row; columns of at least 150px,
+   at most 4. The script reads the gaps from .msn and sizes tiles from the photo's ratio plus the caption heights
+   fixed here (GalleryTile.tsx, PlaceTile.tsx), so a caption is one line that never wraps. */
+.gal-masonry { padding-top: 32px; }
+.msn { position: relative; column-gap: clamp(16px, 2vw, 28px); row-gap: 30px; }
+.msn-cell { position: absolute; }
+.msn-end { height: 1px; }
+.gal-tile { display: flex; flex-direction: column; gap: 10px; }
 .gal-tile > .img { width: 100%; }
-.gal-cap { display: flex; align-items: center; gap: 6px; font: 500 14px / 1.35 var(--serif); overflow-wrap: anywhere; }
+.gal-cap { display: flex; align-items: center; gap: 6px; height: 19px; font: 500 14px / 1.35 var(--serif); white-space: nowrap; }
+.gal-cap > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .gal-cap[data-muted='true'] { color: var(--ink-2); }
 .gal-cap svg { flex: none; }
 .gal-tile:hover .gal-cap > span:last-child { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.gal-skel { columns: 4 150px; column-gap: clamp(16px, 2vw, 28px); }
 .gal-skel > div { break-inside: avoid; margin: 0 0 30px; background: var(--mat); animation: gal-pulse 1.3s ease-in-out infinite alternate; }
 @keyframes gal-pulse { from { opacity: 0.5; } to { opacity: 1; } }
 
@@ -169,10 +186,10 @@ a.pho-strip-all:hover { color: var(--ink); }
 .plc-filters > .bw-chips:first-child { margin-left: -10px; }
 .plc-shown { margin-left: auto; font-size: 13px; color: var(--ink-2); }
 .plc-masonry { padding-top: 0; margin-top: -8px; }
-.plc-cap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
-.plc-cap-title { font: 500 14px / 1.35 var(--serif); }
-.plc-cap-day { margin-left: auto; font-size: 11px; color: var(--ink-2); }
-.plc-cap-owner { flex-basis: 100%; font-size: 11px; color: var(--hydro); }
+.plc-cap { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 19px; grid-auto-rows: 18px; align-items: center; gap: 2px 12px; }
+.plc-cap-title { grid-column: 1; font: 500 14px / 1.35 var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plc-cap-day { grid-column: 2; grid-row: 1; font-size: 11px; color: var(--ink-2); }
+.plc-cap-owner { grid-column: 1 / -1; font-size: 11px; line-height: 18px; color: var(--hydro); }
 .plc-near { padding-top: 28px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 18px; }
 .plc-near .bw-h2 { padding: 0; border: 0; font-size: 18px; letter-spacing: 0.24em; }
 .plc-near ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px 28px; }
@@ -265,10 +282,16 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .gal { padding-top: 28px; }
   .gal-count-n, .prof-num, .plc-stat-n { font-size: 32px; }
   .prof-head { padding-top: 28px; }
+  .btn.bw-filter { display: inline-flex; }
+  /* filter button and Living share a row; the tag rows unfold below them, pushing the photos down */
+  .gal-head { flex-wrap: wrap; align-items: center; gap: 12px; padding-bottom: 12px; }
+  .gal-head-tags { order: 3; flex-basis: 100%; }
+  .gal-head-tags[data-open='false'] { display: none; }
+  .gal-head .tagf { padding-bottom: 0; }
+  .gal-head > .btn-living { order: 2; margin-left: auto; }
+  .gal-masonry { padding-top: 24px; }
+  .gal-limit + .gal-masonry { padding-top: 16px; }
   /* tag rows scroll sideways instead of stacking into a wall of chips */
-  .gal-head { flex-direction: column-reverse; align-items: stretch; border-bottom: 0; }
-  .gal-head .tagf { border-bottom: 1px solid var(--rule); }
-  .gal-head > .btn-living { align-self: flex-end; }
   .tagf { margin-inline: calc(var(--gutter) * -1); }
   .tagf-row { flex-wrap: nowrap; overflow-x: auto; margin-left: 0; padding: 2px var(--gutter) 2px calc(var(--gutter) - 10px); scrollbar-width: none; }
   .tagf-row::-webkit-scrollbar { display: none; }
@@ -277,7 +300,21 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .pho-side { max-width: none; }
   .pho-main { gap: 28px; }
   .plc-top { margin-top: -16px; }
-  .mpg-map { flex-basis: 100%; height: 58vh; min-height: 360px; }
+  /* title and filter button on one row, the cities scrolling sideways below, the season and light chips folded:
+     the map takes the rest of the screen (136px: the rows above it and their gaps) */
+  .mpg { gap: 12px; }
+  .mpg-top { align-items: center; gap: 8px 12px; padding-top: 12px; }
+  .mpg-title { display: contents; }
+  .mpg-h1 { order: 1; flex: 1 1 auto; }
+  .mpg-top > .bw-filter { order: 2; }
+  .mpg-cities { order: 3; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) 0 calc(var(--gutter) - 10px); scrollbar-width: none; }
+  .mpg-cities::-webkit-scrollbar { display: none; }
+  .mpg-cities > * { flex: none; }
+  .mpg-filters { order: 4; flex: 1 1 100%; }
+  .mpg-filters[data-open='false'] { display: none; }
+  .mpg-map { flex-basis: 100%; height: calc(100svh - var(--header-h) - var(--nav-foot, 0px) - 136px); min-height: 320px; }
+  .mpg-top > .mpg-limit { order: 5; }
+  .mpg:has(.mpg-limit) .mpg-map { height: calc(100svh - var(--header-h) - var(--nav-foot, 0px) - 162px); }
   .mpg-panel { flex-basis: 100%; max-width: none; }
   .idx { gap: 40px; }
   .idx-head { padding-top: 28px; }

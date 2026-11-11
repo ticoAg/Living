@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
-import { fakeKv } from '../test-utils';
-import { CACHE_TTL, PROVIDER_TIMEOUT_MS, USER_AGENT, UpstreamError, fetchJson, kvCached, settle } from './http';
+import { CACHE_TTL } from './cache';
+import { PROVIDER_TIMEOUT_MS, USER_AGENT, UpstreamError, fetchJson, settle } from './http';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -79,77 +79,6 @@ describe('fetchJson', () => {
   it('says "request failed" when the thrown value is not an Error', async () => {
     stubFetch(async () => Promise.reject('plain string'));
     await expect(fetchJson('https://x.example/a', 'x')).rejects.toThrow('x: request failed');
-  });
-});
-
-describe('kvCached', () => {
-  it('returns a cached value without loading', async () => {
-    const { kv } = fakeKv({ 'poi:near': [{ id: 1 }] });
-    const load = vi.fn(async () => [{ id: 2 }]);
-    expect(await kvCached(kv, 'poi:near', load)).toEqual([{ id: 1 }]);
-    expect(load).not.toHaveBeenCalled();
-  });
-
-  it('loads on a miss and stores the value as JSON with the seven day expiry', async () => {
-    const { kv, puts } = fakeKv();
-    const load = vi.fn(async () => ({ city: '杭州' }));
-    expect(await kvCached(kv, 'geo:rev', load)).toEqual({ city: '杭州' });
-    expect(load).toHaveBeenCalledTimes(1);
-    expect(puts).toEqual([{ key: 'geo:rev', value: '{"city":"杭州"}', options: { expirationTtl: 604_800 } }]);
-  });
-
-  it('serves the second request from the cache', async () => {
-    const { kv } = fakeKv();
-    const load = vi.fn(async () => 'fresh');
-    await kvCached(kv, 'k', load);
-    await kvCached(kv, 'k', load);
-    expect(load).toHaveBeenCalledTimes(1);
-  });
-
-  it('takes a custom lifetime', async () => {
-    const { kv, puts } = fakeKv();
-    await kvCached(kv, 'k', async () => 1, 60);
-    expect(puts[0].options).toEqual({ expirationTtl: 60 });
-  });
-
-  it('counts empty and falsy values as cached', async () => {
-    for (const value of [[], 0, '', false]) {
-      const { kv } = fakeKv({ k: value });
-      const load = vi.fn(async () => 'loaded');
-      expect(await kvCached<unknown>(kv, 'k', load), JSON.stringify(value)).toEqual(value);
-      expect(load).not.toHaveBeenCalled();
-    }
-  });
-
-  it('does not cache a failed load, and lets the error through', async () => {
-    const { kv, puts } = fakeKv();
-    await expect(
-      kvCached(kv, 'k', async () => {
-        throw new UpstreamError('overpass: HTTP 500');
-      })
-    ).rejects.toThrow('overpass: HTTP 500');
-    expect(puts).toEqual([]);
-    expect(await kvCached(kv, 'k', async () => 'second try')).toBe('second try');
-  });
-
-  it('survives a KV that cannot be read', async () => {
-    const kv = {
-      get: async () => {
-        throw new Error('KV unavailable');
-      },
-      put: async () => {}
-    } as unknown as KVNamespace;
-    expect(await kvCached(kv, 'k', async () => 'loaded')).toBe('loaded');
-  });
-
-  it('survives a KV that cannot be written', async () => {
-    const kv = {
-      get: async () => null,
-      put: async () => {
-        throw new Error('KV write limit');
-      }
-    } as unknown as KVNamespace;
-    expect(await kvCached(kv, 'k', async () => 'loaded')).toBe('loaded');
   });
 });
 

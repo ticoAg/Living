@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
+import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
+import ReLogin from './components/ReLogin';
 import { SessionProvider } from './lib/session';
 import {
   Explore,
@@ -64,10 +66,14 @@ export default function App() {
   return (
     <SessionProvider>
       {!immersive && <Header />}
-      {/* the fallback fades in late: a chunk that arrives quickly never flashes it */}
-      <Suspense fallback={<p className="loading loading-late">加载中</p>}>
-        <Routes />
-      </Suspense>
+      {/* the header stays outside: an error in a page (or its chunk) still leaves the navigation */}
+      <ErrorBoundary resetKey={path}>
+        {/* the fallback fades in late: a chunk that arrives quickly never flashes it */}
+        <Suspense fallback={<p className="loading loading-late">加载中</p>}>
+          <Routes />
+        </Suspense>
+      </ErrorBoundary>
+      <ReLogin />
     </SessionProvider>
   );
 }

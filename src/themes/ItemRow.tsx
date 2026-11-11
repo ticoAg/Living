@@ -1,4 +1,5 @@
 import { memo, useId, type DragEvent } from 'react';
+import { THEME_ITEM_LIMITS } from '../../shared/limits';
 import type { Poi, Visibility } from '../../shared/types';
 import Img from '../components/Img';
 import { CategoryIcon, Icon } from '../components/icons';
@@ -182,7 +183,7 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
                     id={`${uid}-t`}
                     className="textarea ed-ta"
                     rows={1}
-                    maxLength={5000}
+                    maxLength={THEME_ITEM_LIMITS.captionMax}
                     value={item.text}
                     placeholder="不填则显示照片笔记"
                     onChange={(e) => actions.patch(key, { text: e.target.value })}
@@ -209,7 +210,7 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
             id={`${uid}-t`}
             className="textarea ed-ta ed-ta-text"
             rows={3}
-            maxLength={20000}
+            maxLength={THEME_ITEM_LIMITS.textMax}
             value={item.text}
             placeholder="写一段文字。空一行分段，网址会自动成为链接。"
             onChange={(e) => actions.patch(key, { text: e.target.value })}
@@ -242,7 +243,7 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
               id={`${uid}-t`}
               className="textarea ed-ta"
               rows={1}
-              maxLength={5000}
+              maxLength={THEME_ITEM_LIMITS.captionMax}
               value={item.text}
               placeholder="这一天的概述，显示在日期下面"
               onChange={(e) => actions.patch(key, { text: e.target.value })}

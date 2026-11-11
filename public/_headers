@@ -1,4 +1,13 @@
 # Workers static assets: every file is served with "max-age=0, must-revalidate" unless a rule here says otherwise.
+# Rules that match the same path are combined, so /assets/* gets both the security headers and its own Cache-Control.
+
+# Security headers for every static response (pages included). Only frame-ancestors is set: a full CSP would have to
+# allow the map Worker, inline styles and data: placeholders, and a mistake there would stop the site from loading.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'none'
+
 # Vite puts a content hash in each file name under /assets/, so such a file never changes: browsers keep it for a year.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

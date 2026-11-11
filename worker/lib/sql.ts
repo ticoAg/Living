@@ -20,6 +20,26 @@ export class Sql {
   }
 }
 
+const COLUMN_RE = /^[a-z_][a-z0-9_]*$/i;
+
+/**
+ * `INSERT INTO <table> (<columns>) VALUES (<placeholders>)` from a column → value object, with the values collected in
+ * `q`. Each value sits next to its column name, so adding a column cannot shift the others. Names are interpolated
+ * into the SQL, so they must be plain identifiers (they come from code, never from input).
+ */
+export function insertSql(table: string, row: Record<string, unknown>, q: Sql): string {
+  const cols = Object.keys(row);
+  if (!cols.length) throw new Error(`insert into ${table}: no columns`);
+  for (const name of [table, ...cols]) if (!COLUMN_RE.test(name)) throw new Error(`insert into ${table}: bad identifier ${name}`);
+  return `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((col) => q.p(row[col])).join(', ')})`;
+}
+
+/** The prepared `INSERT` for one row given as a column → value object (see `insertSql`). */
+export function prepInsert(db: D1Database, table: string, row: Record<string, unknown>): D1PreparedStatement {
+  const q = new Sql();
+  return prepQ(db, insertSql(table, row, q), q);
+}
+
 export function prep(db: D1Database, sql: string, ...params: unknown[]): D1PreparedStatement {
   return db.prepare(sql).bind(...params.map(norm));
 }
@@ -35,6 +55,14 @@ export function likeContains(s: string): string {
 
 export function isUniqueViolation(e: unknown): boolean {
   return e instanceof Error && /UNIQUE constraint failed|SQLITE_CONSTRAINT_UNIQUE|SQLITE_CONSTRAINT_PRIMARYKEY/i.test(e.message);
+}
+
+/**
+ * The first `limit` of `rows`, and whether there were more. Query `limit + 1` rows for this: the extra row only tells
+ * that the list goes on, without counting the rest.
+ */
+export function capped<T>(rows: T[], limit: number): { rows: T[]; truncated: boolean } {
+  return rows.length > limit ? { rows: rows.slice(0, limit), truncated: true } : { rows, truncated: false };
 }
 
 export function parseJson<T>(s: string | null | undefined): T | null {

@@ -1,6 +1,7 @@
-import { useId, useMemo, useRef, useState, type FormEvent } from 'react';
-import { POI_CATEGORIES, type MatchCandidate, type Poi } from '../../shared/types';
+import { useCallback, useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { POI_CATEGORIES, POI_LIMITS, type MatchCandidate, type Poi } from '../../shared/types';
 import { distance as geoDistance, fmtDistance } from '../../shared/geo';
+import { POI_SEARCH_LIMITS } from '../../shared/limits';
 import { CategoryIcon, Icon } from '../components/icons';
 import { invalidate } from '../lib/useApi';
 import MatchMap, { resultMark } from './MatchMap';
@@ -23,6 +24,9 @@ import { errMsg } from './util';
 
 /** Candidates shown before "显示全部". */
 const SHORT_LIST = 8;
+// Stable empty lists, so memos that depend on them do not recompute on every render.
+const NO_CANDIDATES: MatchCandidate[] = [];
+const NO_POIS: Poi[] = [];
 /** MapLibre needs WebGL 2; without it the schematic plot stands in for the map. */
 const HAS_WEBGL2 = typeof WebGL2RenderingContext !== 'undefined';
 
@@ -77,7 +81,7 @@ export function PlaceSummary({
   );
 }
 
-interface RowData {
+export interface RowData {
   key: string;
   name: string;
   category: string;
@@ -86,9 +90,11 @@ interface RowData {
   area?: boolean;
   local?: boolean;
   far?: boolean;
+  /** how many of the selected photos list it (the batch panel) */
+  count?: number;
 }
 
-function Row({
+export function Row({
   group,
   rank,
   row,
@@ -141,6 +147,7 @@ function Row({
           )}
           {row.inView && <span className="pk-tag pk-tag-view">朝向内</span>}
           {row.local && <span className="pk-tag">站内</span>}
+          {row.count != null && <span className="pk-tag pk-tag-count">{row.count} 张</span>}
           {row.far && <span className="pk-tag pk-tag-far">超出半径</span>}
         </span>
       </span>
@@ -148,7 +155,7 @@ function Row({
   );
 }
 
-interface SearchState {
+export interface SearchState {
   loading: boolean;
   error: string | null;
   results: MatchCandidate[] | null;
@@ -156,8 +163,30 @@ interface SearchState {
 }
 const NO_SEARCH: SearchState = { loading: false, error: null, results: null, term: '' };
 
+/** A name search around `at` (anywhere without it); the last request wins. */
+export function usePlaceSearch(at: { lat: number; lng: number } | null) {
+  const [search, setSearch] = useState<SearchState>(NO_SEARCH);
+  const seq = useRef(0);
+  const lat = at?.lat;
+  const lng = at?.lng;
+  const run = useCallback(
+    async (term: string) => {
+      const mine = ++seq.current;
+      setSearch({ loading: true, error: null, results: null, term });
+      try {
+        const results = await searchPois(term, lat != null && lng != null ? { lat, lng } : null);
+        if (mine === seq.current) setSearch({ loading: false, error: null, results, term });
+      } catch (err) {
+        if (mine === seq.current) setSearch({ loading: false, error: errMsg(err, '搜索失败'), results: null, term });
+      }
+    },
+    [lat, lng]
+  );
+  return { search, runSearch: run };
+}
+
 /** The search box: one row, the label read out but not shown. */
-function SearchForm({
+export function SearchForm({
   at,
   loading,
   onSearch,
@@ -188,7 +217,7 @@ function SearchForm({
         onChange={(e) => setQ(e.target.value)}
         placeholder={at ? '搜索附近的地点，如 断桥、咖啡' : '搜索地点，如 断桥残雪'}
         disabled={disabled}
-        maxLength={60}
+        maxLength={POI_SEARCH_LIMITS.queryMax}
         enterKeyHint="search"
       />
       <button type="submit" className="btn" disabled={disabled || loading || !q.trim()}>
@@ -200,7 +229,7 @@ function SearchForm({
 }
 
 /** What the search found, lettered as on the map. */
-function SearchResults({
+export function SearchResults({
   at,
   state,
   value,
@@ -251,14 +280,17 @@ function SearchResults({
   );
 }
 
-function PlaceCustom({
+export function PlaceCustom({
   at,
   city,
   district,
   onCreated,
-  disabled
+  disabled,
+  where = '这张照片的拍摄位置'
 }: {
   at: { lat: number; lng: number } | null;
+  /** where the new place goes, in the sentence under the form */
+  where?: string;
   city: string | null;
   district: string | null;
   onCreated: (poi: Poi) => void;
@@ -305,7 +337,7 @@ function PlaceCustom({
       {open && (
         <form id={`${id}-form`} className="pk-custom" onSubmit={submit}>
           {at ? (
-            <p className="small muted">新地点会建在这张照片的拍摄位置，所有人共用。</p>
+            <p className="small muted">新地点会建在{where}，所有人共用。</p>
           ) : (
             <p className="small muted">这张照片没有坐标，新地点没法定位。请先搜索已有地点。</p>
           )}
@@ -318,7 +350,7 @@ function PlaceCustom({
               className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              maxLength={40}
+              maxLength={POI_LIMITS.nameMax}
               placeholder="如 家门口的桥"
               disabled={!at || busy}
               required
@@ -390,7 +422,7 @@ export default function PlacePicker({
   onRetry,
   value,
   onChange,
-  extras = [],
+  extras = NO_POIS,
   onCreated,
   customAt,
   privacyZone,
@@ -401,7 +433,7 @@ export default function PlacePicker({
   const [active, setActive] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const radius = match?.radius ?? DEFAULT_RADIUS;
-  const candidates = match?.res?.candidates ?? [];
+  const candidates = match?.res?.candidates ?? NO_CANDIDATES;
   // The nearest first; the rest one click away (the chosen place always stays in view).
   const chosenAt = candidates.findIndex((c) => c.key === value?.key);
   const listed = showAll || chosenAt >= SHORT_LIST ? candidates : candidates.slice(0, SHORT_LIST);
@@ -415,18 +447,7 @@ export default function PlacePicker({
   }, [candidates, extras, coords]);
 
   // the name search lives here so its results can share the map with the candidates
-  const [search, setSearch] = useState<SearchState>(NO_SEARCH);
-  const searchSeq = useRef(0);
-  async function runSearch(term: string) {
-    const mine = ++searchSeq.current;
-    setSearch({ loading: true, error: null, results: null, term });
-    try {
-      const results = await searchPois(term, coords);
-      if (mine === searchSeq.current) setSearch({ loading: false, error: null, results, term });
-    } catch (err) {
-      if (mine === searchSeq.current) setSearch({ loading: false, error: errMsg(err, '搜索失败'), results: null, term });
-    }
-  }
+  const { search, runSearch } = usePlaceSearch(coords);
   const results = search.results ?? [];
   const pick = (c: MatchCandidate) => onChange(choiceFromCandidate(c, results.some((r) => r.key === c.key) ? 'manual' : 'confirmed'));
 

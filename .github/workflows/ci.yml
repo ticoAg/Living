@@ -24,4 +24,41 @@ jobs:
       - run: npm ci
       - run: npx vp check
       - run: npx vp test
+      - run: npm run test:routes
       - run: npx vp build
+
+  # Smoke tests in a browser against the built app (e2e/). A job of its own: it needs a browser, and the deploy build
+  # (`npm run build` in Workers Builds) never runs it.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      # the browser build follows the Playwright version in the lockfile; cache it per version
+      - id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - id: browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      # the cache holds the browser, not the system libraries it needs
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            .wrangler/e2e/report
+            .wrangler/e2e/results
+          include-hidden-files: true
+          retention-days: 14

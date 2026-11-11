@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: 架构总览
-description: 单个 Cloudflare Worker 提供 SPA 静态资源、JSON API 与媒体文件；关系数据在 D1，图片在 R2，会话与缓存在 KV；图片处理在浏览器完成。
+description: 单个 Cloudflare Worker 提供 SPA 静态资源、JSON API 与媒体文件；关系数据和地点缓存在 D1，图片在 R2，会话与登录限流在 KV；图片处理在浏览器完成。
 tags: [architecture]
 ---
 # 组成
@@ -12,11 +12,11 @@ tags: [architecture]
   │  /api/*  /media/*  → 先进入 Worker（run_worker_first）
   ▼
 Worker `living` (Hono)
-  ├─ D1  `living`         用户、照片、标签、地点、主题、邀请、设置
+  ├─ D1  `living`         用户、照片、标签、地点、主题、邀请、设置；地点与逆地理缓存 place_cache
   ├─ R2  `living-photos`  原图 o/{ownerId}/{photoId}.{ext}，尺寸图 v/{photoId}/{s|m|l}.{webp|jpg}
-  ├─ KV  `living-kv`      会话 sess:*、限流 rl:*、地点与逆地理缓存 poi:* geo:*
+  ├─ KV  `living-kv`      会话 sess:*、登录限流 rl:*（KV 每天 1000 次写入只留给登录）
   ├─ 外部：高德 Web 服务（可选）、OpenStreetMap Photon / Nominatim（Overpass 作后备）
-  └─ 定时任务：每小时补全照片的省份（Cron 触发器，见 Cloudflare 资源）
+  └─ 定时任务：每小时补全照片的省份、清理过期的地点缓存（Cron 触发器，见 Cloudflare 资源）
 地图瓦片：OpenFreeMap（浏览器直连）
 ```
 
@@ -32,7 +32,7 @@ Worker `living` (Hono)
 
 # 地点匹配
 
-Worker 合并站内地点与外部候选，按距离和朝向打分；外部结果缓存在 KV。见 [地点匹配](/product/features/poi-matching.md) 和 [地点接口](/api/pois.md)。
+Worker 合并站内地点与外部候选，按距离和朝向打分；外部结果缓存在 D1 的 [place_cache](/data/place-cache.md)。见 [地点匹配](/product/features/poi-matching.md) 和 [地点接口](/api/pois.md)。
 
 # 认证
 
@@ -40,7 +40,7 @@ Worker 合并站内地点与外部候选，按距离和朝向打分；外部结�
 
 # 数据规模假设
 
-单站数千到数万张照片。图库、地图、索引一次取回可见照片的精简列表，在浏览器里筛选；照片详情、主题按需取。超过约 2 万张公开照片时再引入分页与服务端筛选。
+单站数千张照片。图库、地图、索引一次取回可见照片的精简列表，在浏览器里筛选；照片详情、主题按需取。列表一次最多 5000 张（`PHOTO_LIST_LIMIT`），超过时只返回拍摄时间最新的 5000 张，响应带 `truncated: true`，图库、地图和索引显示「只显示最近的 5000 张」，更早的照片在这些页面上看不到，见 [照片接口](/api/photos.md#get-apiphotos)。照片接近这个数量时再引入分页与服务端筛选。
 
 # 部署
 

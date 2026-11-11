@@ -20,9 +20,10 @@ sources:
 # 决定
 
 - 开发依赖 `vite-plus`（版本锁定），`vite` 通过 `overrides` 指向同版本的 `@voidzero-dev/vite-plus-core`。命令统一为 `vp dev`、`vp check`、`vp test`、`vp build`，`package.json` 的脚本只是它们的组合。
-- 配置都在 `vite.config.ts`：`fmt`（Oxfmt：单引号、无尾随逗号、行宽 140；CSS 和 `docs/` 不格式化）、`lint`（Oxlint，开启 `typeAware` 和 `typeCheck`，由 tsgolint 做类型检查）、`test`（Vitest，`*.test.ts` 与被测模块放在一起，Node 环境）。
+- 配置都在 `vite.config.ts`：`fmt`（Oxfmt：单引号、无尾随逗号、行宽 140；CSS 和 `docs/` 不格式化）、`lint`（Oxlint，开启 `typeAware` 和 `typeCheck`，由 tsgolint 做类型检查；在默认插件之外开启 `react` 与 `jsx-a11y`，`rules-of-hooks` 和 `exhaustive-deps` 为错误，与现有合理写法冲突的规则在配置里关掉，原因写在配置旁）、`test`（Vitest，`*.test.ts` 与被测模块放在一起，Node 环境）。
 - 类型检查按就近的 `tsconfig.json` 进行，所以 Worker 的配置放在 `worker/tsconfig.json`（Workers 类型），前端和 `shared/` 用根目录的配置。
 - `@cloudflare/vite-plugin` 在开发服务器里用 workerd 运行 `worker/index.ts`，绑定取自 `wrangler.jsonc`，本地数据在 `.wrangler/state/`。`vp build` 同时构建前端和 Worker，输出 `dist/client/` 与 `dist/living/`，`wrangler deploy` 和 `wrangler d1 migrations` 通过 `.wrangler/deploy/config.json` 读取构建出的配置。
+- `vp check` 保持零告警：新告警要么改代码，要么在 `lint` 里关掉该规则（或用 `overrides` 只对相关文件关掉）并写明原因，不在代码里批量加 disable 注释。
 - 部署前的构建命令是 `vp check --no-fmt && vp test && vp build`；PR 上的 GitHub Actions 跑完整的 `vp check`、`vp test`、`vp build`，见 [构建与发布](/architecture/ci-cd.md)。
 
 # 后果

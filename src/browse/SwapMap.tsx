@@ -24,14 +24,19 @@ export default function SwapMap({ viewKey, viewport, ...props }: MapProps & { vi
   const [fading, setFading] = useState(false);
   const newest = layers[layers.length - 1];
 
+  // `viewport` travels with the key: it is read when the key changes, and later changes to it must not rebuild the map.
+  const latestViewport = useRef(viewport);
+  useEffect(() => {
+    latestViewport.current = viewport;
+  }, [viewport]);
+
   // another view key: build a second map (its viewport is captured now, with the key)
   useEffect(() => {
     setLayers((ls) => {
       const last = ls[ls.length - 1];
-      return last.key === viewKey ? ls : [...ls.slice(-1), { id: last.id + 1, key: viewKey, viewport }];
+      return last.key === viewKey ? ls : [...ls.slice(-1), { id: last.id + 1, key: viewKey, viewport: latestViewport.current }];
     });
     setFading(false);
-    // `viewport` travels with the key; later changes to it must not rebuild the map
   }, [viewKey]);
 
   // when the newest map shows its markers, fade it in, then retire the older map
@@ -41,7 +46,8 @@ export default function SwapMap({ viewKey, viewport, ...props }: MapProps & { vi
     const start = Date.now();
     let fade: ReturnType<typeof setTimeout> | undefined;
     const poll = setInterval(() => {
-      const drawn = box.current?.querySelector(`[data-layer="${newest.id}"] .map-pt`);
+      // plain point markers, or the albums the map page draws (mapAlbums.ts)
+      const drawn = box.current?.querySelector(`[data-layer="${newest.id}"] :is(.map-pt, .map-album)`);
       if (!drawn && Date.now() - start < GIVE_UP_MS) return;
       clearInterval(poll);
       setFading(true);
@@ -67,7 +73,14 @@ export default function SwapMap({ viewKey, viewport, ...props }: MapProps & { vi
             data-pending={pending ? 'true' : undefined}
             inert={!top || pending ? true : undefined}
           >
-            <MapView {...props} className="swapmap-frame" fit={false} center={l.viewport?.center} zoom={l.viewport?.zoom ?? 11} />
+            <MapView
+              {...props}
+              className="swapmap-frame"
+              fit={false}
+              foldAttribution={false}
+              center={l.viewport?.center}
+              zoom={l.viewport?.zoom ?? 11}
+            />
           </div>
         );
       })}

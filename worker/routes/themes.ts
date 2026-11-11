@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { THEME_ITEM_LIMITS, THEME_LIMITS } from '../../shared/limits';
 import type { Poi, ThemeDetail, ThemeItem, ThemeKind, ThemeSummary, Visibility } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { forbidden, invalid, listCache, notFound, paramId, readJson, unauthenticated, type Ctx } from '../lib/http';
@@ -15,7 +16,7 @@ import type { SessionUser } from '../../shared/types';
 export const themes = new Hono<AppEnv>({ strict: false });
 
 const KINDS = ['trip', 'topic'] as const;
-const MAX_ITEMS = 1000;
+const MAX_ITEMS = THEME_LIMITS.itemCount;
 const LIST_LIMIT = 500;
 
 interface ThemeRow {
@@ -189,9 +190,9 @@ function parseThemeFields(body: Body, create: boolean): ThemeFields {
   const kind = optEnum<ThemeKind>(body.kind, '主题类型', KINDS);
   if (create && !kind) throw invalid('请选择主题类型：trip（旅程）或 topic（专题）');
   if (kind) f.kind = kind;
-  if (create || has(body, 'title')) f.title = reqStr(body, 'title', '标题', 1, 100);
-  if (has(body, 'subtitle')) f.subtitle = optText(body.subtitle, '副标题', 200);
-  if (has(body, 'intro')) f.intro = optText(body.intro, '导语', 20000);
+  if (create || has(body, 'title')) f.title = reqStr(body, 'title', '标题', 1, THEME_LIMITS.titleMax);
+  if (has(body, 'subtitle')) f.subtitle = optText(body.subtitle, '副标题', THEME_LIMITS.subtitleMax);
+  if (has(body, 'intro')) f.intro = optText(body.intro, '导语', THEME_LIMITS.introMax);
   if (has(body, 'startDate')) f.startDate = optDate(body.startDate, '开始日期');
   if (has(body, 'endDate')) f.endDate = optDate(body.endDate, '结束日期');
   if (f.startDate && f.endDate && f.startDate > f.endDate) throw invalid('开始日期不能晚于结束日期');
@@ -388,14 +389,14 @@ themes.put('/:id/items', async (c) => {
     if (raw.kind === 'photo') {
       if (typeof raw.photoId !== 'string' || !raw.photoId) throw invalid(`${at}缺少 photoId`);
       photoIds.push(raw.photoId);
-      items.push({ kind: 'photo', photoId: raw.photoId, text: optText(raw.text, `${at}的说明`, 5000) });
+      items.push({ kind: 'photo', photoId: raw.photoId, text: optText(raw.text, `${at}的说明`, THEME_ITEM_LIMITS.captionMax) });
     } else if (raw.kind === 'text') {
-      const text = optText(raw.text, `${at}的文字`, 20000);
+      const text = optText(raw.text, `${at}的文字`, THEME_ITEM_LIMITS.textMax);
       if (!text) throw invalid(`${at}的文字不能为空`);
       items.push({ kind: 'text', text });
     } else if (raw.kind === 'day') {
       if (typeof raw.day !== 'string' || !isDate(raw.day)) throw invalid(`${at}的日期格式应为 YYYY-MM-DD`);
-      items.push({ kind: 'day', day: raw.day, text: optText(raw.text, `${at}的说明`, 5000) });
+      items.push({ kind: 'day', day: raw.day, text: optText(raw.text, `${at}的说明`, THEME_ITEM_LIMITS.captionMax) });
     } else {
       throw invalid(`${at}的类型需要是 photo、text 或 day`);
     }

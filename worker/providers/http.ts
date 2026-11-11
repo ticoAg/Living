@@ -1,8 +1,7 @@
-// Shared plumbing for outbound provider calls: UA, 8 s timeout, KV cache.
+// Shared plumbing for outbound provider calls: UA, 8 s timeout. The answer cache is in cache.ts.
 
 export const USER_AGENT = 'Living/1.0 (+https://living.ticoag.fun)';
 export const PROVIDER_TIMEOUT_MS = 8000;
-export const CACHE_TTL = 7 * 24 * 60 * 60; // seconds
 
 export class UpstreamError extends Error {}
 
@@ -24,23 +23,6 @@ export async function fetchJson<T>(url: string, label: string, init: RequestInit
   } catch {
     throw new UpstreamError(`${label}: invalid JSON`);
   }
-}
-
-/** Reads a JSON value from KV, or loads and stores it. Failed loads are not cached; KV errors never fail the request. */
-export async function kvCached<T>(kv: KVNamespace, key: string, load: () => Promise<T>, ttl = CACHE_TTL): Promise<T> {
-  try {
-    const hit = await kv.get<T>(key, 'json');
-    if (hit !== null) return hit;
-  } catch {
-    // unreadable entry: fall through and reload
-  }
-  const value = await load();
-  try {
-    await kv.put(key, JSON.stringify(value), { expirationTtl: ttl });
-  } catch {
-    // cache write failures are not worth failing the request for
-  }
-  return value;
 }
 
 export type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
