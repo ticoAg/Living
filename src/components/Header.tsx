@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'wouter';
 import { useSession } from '../lib/session';
+import CaptureButton from './CaptureButton';
 import { Icon } from './icons';
 
 const NAV = [
@@ -9,9 +10,18 @@ const NAV = [
   { href: '/index', label: '索引', match: (p: string) => p.startsWith('/index') }
 ];
 
+/** On phones the camera button sits in the middle of the bar, between these two halves of NAV. */
+const HALF = NAV.length / 2;
+
 export default function Header() {
   const [path, navigate] = useLocation();
   const { user, expired, askLogin, logout } = useSession();
+  const signedIn = !!user && !expired;
+  const link = (n: (typeof NAV)[number]) => (
+    <Link key={n.href} href={n.href} className="nav-link" aria-current={n.match(path) ? 'page' : undefined}>
+      {n.label}
+    </Link>
+  );
   return (
     <header className="site-header">
       <div className="site-header-inner">
@@ -21,13 +31,11 @@ export default function Header() {
         {/* on phones the nav becomes a bar fixed to the foot of the screen; the account actions stay up here */}
         <div className="site-bar">
           <nav aria-label="主导航" className="site-nav">
-            {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className="nav-link" aria-current={n.match(path) ? 'page' : undefined}>
-                {n.label}
-              </Link>
-            ))}
+            {NAV.slice(0, HALF).map(link)}
+            {signedIn && <CaptureButton />}
+            {NAV.slice(HALF).map(link)}
           </nav>
-          {user && !expired ? (
+          {signedIn ? (
             <>
               <Link href="/upload" className="btn btn-quiet btn-icon site-upload" aria-label="上传">
                 <Icon name="upload" size={18} />

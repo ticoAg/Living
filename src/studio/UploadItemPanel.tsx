@@ -71,6 +71,14 @@ export default function UploadItemPanel({ item, all, extras, onCreated, onPlace,
               .join(' · ')}，不含 EXIF`}
           />
 
+          {item.capture && (item.deviceFix || !coords) && (
+            <p className="small muted up-fix">
+              {item.deviceFix
+                ? `照片文件里没有位置，用的是手机定位，精度约 ${item.deviceFix.accuracy} 米。`
+                : '照片文件里没有位置，也没拿到手机定位（没有授权，或信号不好）。可以在下面手动选地点。'}
+            </p>
+          )}
+
           <section className="up-section" aria-label="地点">
             <PlacePicker
               key={item.id}

@@ -50,6 +50,9 @@ const UI = {
   play: { d: 'M8 5v14l11-7z', fill: true },
   pause: { d: 'M7 5h3.5v14H7zM13.5 5H17v14h-3.5z', fill: true },
   upload: { d: 'M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4' },
+  camera: {
+    d: 'M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z'
+  },
   close: { d: 'M6 6l12 12M18 6 6 18' },
   left: { d: 'M15 5l-7 7 7 7' },
   right: { d: 'M9 5l7 7-7 7' },

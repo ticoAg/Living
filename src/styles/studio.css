@@ -81,6 +81,7 @@ textarea.pf-input { min-height: 0; padding: 8px 12px; line-height: 1.6; }
 .up-photo { display: flex; flex-direction: column; gap: 12px; }
 .up-section { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--rule); }
 .up-wait { margin: 0; }
+.up-fix { margin: 0; }
 .up-fail { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 .up-fail p { margin: 0; }
 .up-variants { margin: 0; }

@@ -1,4 +1,5 @@
 import type { CreatePhotoMeta, GeoPrivacy, Visibility } from '../../shared/types';
+import type { Capture, DeviceFix } from './capture';
 import { initialMatch, placeFields, shouldAutoMatch, choiceFromCandidate, type MatchState, type PlaceChoice } from './match';
 import type { ProcessPhase, Processed } from './process';
 import { uid } from './util';
@@ -9,10 +10,14 @@ import type { MatchResponse } from '../../shared/types';
 
 export type Stage = 'queued' | 'processing' | 'ready' | 'error';
 
+/** A step of `processing` worth naming: the HEIC decoder's, or waiting for the phone's position after a photo taken through the site. */
+export type Phase = ProcessPhase | 'locating';
+
 /** What a photo that is `processing` is waiting on when it is more than "reading and resizing": short for the queue row, long for the panel. */
-export const PHASE_TEXT: Record<ProcessPhase, { short: string; long: string }> = {
+export const PHASE_TEXT: Record<Phase, { short: string; long: string }> = {
   'heic-load': { short: '加载 HEIC 解码器…', long: '这个浏览器不能直接打开 HEIC，正在加载解码器（只在第一张 HEIC 时加载）…' },
-  'heic-decode': { short: '解码 HEIC…', long: '正在解码 HEIC，大尺寸的照片需要几秒…' }
+  'heic-decode': { short: '解码 HEIC…', long: '正在解码 HEIC，大尺寸的照片需要几秒…' },
+  locating: { short: '定位中…', long: '照片文件里没有位置，正在等手机定位，最多几秒…' }
 };
 export interface PublishInfo {
   state: 'idle' | 'sending' | 'done' | 'duplicate' | 'failed';
@@ -26,8 +31,8 @@ export interface Item {
   id: string;
   file: File;
   stage: Stage;
-  /** while `processing`: the HEIC decoder step in progress, if any */
-  phase: ProcessPhase | null;
+  /** while `processing`: the named step in progress, if any */
+  phase: Phase | null;
   error: string | null;
   p: Processed | null;
   /** object URL of the 480 px variant */
@@ -51,9 +56,13 @@ export interface Item {
   favorite: boolean;
   themeIds: string[];
   publish: PublishInfo;
+  /** taken with the site's camera button: when, and the phone's position on its way */
+  capture: Capture | null;
+  /** the phone's position, when it stands in for one the file does not carry */
+  deviceFix: DeviceFix | null;
 }
 
-export function newItem(file: File): Item {
+export function newItem(file: File, capture: Capture | null = null): Item {
   return {
     id: uid(),
     file,
@@ -75,7 +84,9 @@ export function newItem(file: File): Item {
     inLiving: true,
     favorite: false,
     themeIds: [],
-    publish: { state: 'idle', progress: 0 }
+    publish: { state: 'idle', progress: 0 },
+    capture,
+    deviceFix: null
   };
 }
 
