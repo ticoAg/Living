@@ -153,6 +153,82 @@ test.describe('a link pressed the moment the page is up', () => {
   });
 });
 
+const fixture = (name: string) => fileURLToPath(new URL(`fixtures/${name}`, import.meta.url));
+
+/** Tap the camera button in the bottom bar and answer the camera with a file, as the system camera would. */
+async function shoot(page: Page, file: string) {
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('.nav-capture').tap()]);
+  await chooser.setFiles(file);
+}
+
+test.describe('the camera button in the phone bar', () => {
+  // where the phone says it is: by the lake, some way from where the sample photos say they were taken
+  const HERE = { latitude: 30.2431, longitude: 120.1505, accuracy: 12 };
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, geolocation: HERE });
+
+  test("queues the photo with the phone's position when its file has none", async ({ page, context }) => {
+    await context.grantPermissions(['geolocation']);
+    await page.goto('/themes');
+    const bar = page.getByRole('navigation', { name: '主导航' });
+    await expect(bar.getByLabel('拍照')).toBeAttached();
+    // in the middle of the bar: two sections on each side
+    const order = await bar.locator('a.nav-link, .nav-capture').evaluateAll((els) => els.map((el) => el.className));
+    expect(order).toEqual(['nav-link', 'nav-link', 'nav-capture', 'nav-link', 'nav-link']);
+
+    await shoot(page, fixture('no-position.jpg'));
+    await expect(page).toHaveURL(/\/upload$/);
+    await expect(page.locator('.up-fix')).toContainText('用的是手机定位，精度约 12 米');
+    const facts = page.locator('.exl');
+    await expect(facts).toContainText('30°14′35″N');
+    await expect(facts).toContainText('120°09′02″E');
+    // the file has no time either: the moment it came back stands in
+    await expect(facts).not.toContainText('无拍摄时间');
+    await noOverflow(page);
+  });
+
+  test("keeps the file's own position", async ({ page, context }) => {
+    await context.grantPermissions(['geolocation']);
+    await page.goto('/upload');
+    await shoot(page, fixture('1-west-lake-1.jpg'));
+    await expect(page).toHaveURL(/\/upload$/);
+    await expect(page.locator('.exl')).toContainText('N');
+    await expect(page.locator('.exl')).not.toContainText('30°14′35″N');
+    await expect(page.locator('.up-fix')).toHaveCount(0);
+  });
+
+  test('says so when the phone gives no position', async ({ page, context }) => {
+    // not granted: the request is refused or left unanswered, and the page stops waiting a few seconds after the shot
+    await context.clearPermissions();
+    await page.goto('/');
+    await shoot(page, fixture('no-position.jpg'));
+    await expect(page).toHaveURL(/\/upload$/);
+    await expect(page.locator('.up-fix')).toContainText('也没拿到手机定位', { timeout: 15_000 });
+    await expect(page.locator('.exl')).toContainText('无坐标');
+  });
+});
+
+test.describe('the camera button elsewhere', () => {
+  test('is not shown at desktop width', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '图库' })).toBeVisible();
+    await expect(page.locator('.nav-capture')).toBeHidden();
+  });
+
+  test('is not there for a visitor', async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      storageState: undefined
+    });
+    const page = await context.newPage();
+    await page.goto('/');
+    await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '图库' })).toBeVisible();
+    await expect(page.locator('.nav-capture')).toHaveCount(0);
+    await context.close();
+  });
+});
+
 test.describe('phone width', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 

@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { Poi, Tag } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { invalidate, useApi } from '../lib/useApi';
 import { ensureSaved, planPlace } from '../studio/batch-place';
 import type { ApplyResult } from '../studio/BatchPlace';
+import { isAndroid, onCaptured, pickerAccept, takeCaptured, type Capture } from '../studio/capture';
 import { createPoi, type PlaceChoice } from '../studio/match';
 import { fileKey } from '../studio/upload-drafts';
 import { PageHead } from '../studio/ui';
@@ -12,7 +13,7 @@ import UploadDetails from '../studio/UploadDetails';
 import UploadItemPanel from '../studio/UploadItemPanel';
 import UploadQueue from '../studio/UploadQueue';
 import UploadQueueHead from '../studio/UploadQueueHead';
-import { inBulk, isEditable, newItem, placeOf, statusOf, type Item } from '../studio/upload-model';
+import { hasGps, inBulk, isEditable, newItem, placeOf, statusOf, type Item } from '../studio/upload-model';
 import { useFileDrop } from '../studio/useFileDrop';
 import { usePlaceMatching } from '../studio/usePlaceMatching';
 import { useProcessQueue } from '../studio/useProcessQueue';
@@ -29,6 +30,9 @@ import '../styles/studio.css';
 
 const IMAGE_EXT = /\.(jpe?g|png|webp|avif|heic|heif|gif|bmp|tiff?)$/i;
 const isImage = (f: File) => f.type.startsWith('image/') || IMAGE_EXT.test(f.name);
+const UA = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+const ACCEPT = pickerAccept(UA);
+const ANDROID = isAndroid(UA);
 
 export default function Upload() {
   useTitle('上传');
@@ -47,7 +51,7 @@ export default function Upload() {
   /* ------------------------------------------------------------ adding files */
 
   const addFiles = useCallback(
-    (files: File[]) => {
+    (files: File[], captures?: Map<File, Capture>) => {
       const images = files.filter(isImage);
       const known = new Set(itemsRef.current.map((i) => fileKey(i.file)));
       const fresh: File[] = [];
@@ -65,7 +69,8 @@ export default function Upload() {
       const added = fresh.map((f) => {
         const kept = drafts.take(f);
         if (kept) restored++;
-        return kept ? { ...newItem(f), ...kept } : newItem(f);
+        const item = newItem(f, captures?.get(f));
+        return kept ? { ...item, ...kept } : item;
       });
       if (restored) parts.push(`已恢复 ${restored} 张之前填的内容`);
       setNotice(parts.length ? `${parts.join('，')}。` : null);
@@ -81,6 +86,20 @@ export default function Upload() {
     addFiles(Array.from(e.target.files ?? []));
     e.target.value = '';
   };
+
+  // Photos taken with the camera button in the phone's bottom bar: left for this page before it opened, or while it is open.
+  useEffect(() => {
+    const take = () => {
+      const shots = takeCaptured();
+      if (shots.length)
+        addFiles(
+          shots.map((s) => s.file),
+          new Map(shots.map((s) => [s.file, s]))
+        );
+    };
+    take();
+    return onCaptured(take);
+  }, [addFiles]);
 
   /* ------------------------------------------------------------ item actions */
 
@@ -180,6 +199,8 @@ export default function Upload() {
     [items, tagNames]
   );
   const batch = picked.length > 1;
+  // Android's photo picker removes the position before the browser sees the file; the file browser does not.
+  const stripped = ANDROID && items.some((i) => i.stage === 'ready' && !i.capture && !hasGps(i));
 
   // Unpublished photos live only in this tab; what was typed for them is kept as a draft (useUploadDrafts).
   const unsaved = items.some((i) => i.stage !== 'error' && i.publish.state !== 'done' && i.publish.state !== 'duplicate');
@@ -207,7 +228,7 @@ export default function Upload() {
       <div className="up-top">
         {filled && <h1 className="display up-title">上传</h1>}
         <label className="up-drop" data-active={dragging} data-compact={filled}>
-          <input type="file" multiple accept="image/*,.heic,.heif,.avif" className="visually-hidden" onChange={onPick} />
+          <input type="file" multiple accept={ACCEPT} className="visually-hidden" onChange={onPick} />
           <Icon name="upload" size={filled ? 20 : 30} />
           <span className="up-drop-text">
             <span className="up-drop-title serif">{dragging ? '松开以添加' : filled ? '添加照片' : '拖入照片，或点击选择'}</span>
@@ -221,6 +242,13 @@ export default function Upload() {
         {notice && (
           <p className="notice up-notice small" role="status">
             {notice}
+          </p>
+        )}
+        {ANDROID && (!filled || stripped) && (
+          <p className="up-notice small muted" role={stripped ? 'status' : undefined}>
+            {stripped
+              ? '有照片没有位置。安卓的照片选择器会去掉位置：点选择后请进「文件」里选，照片才是带位置的原图。'
+              : '安卓上点选择后请进「文件」里选：系统的照片选择器会去掉照片的位置。'}
           </p>
         )}
       </div>

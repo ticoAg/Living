@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { hasPosition, withCapture, type DeviceFix } from './capture';
 import { processFile } from './process';
 import { deviceHints, nextToProcess, processLimit } from './process-queue';
 import { freshMatch, type Item } from './upload-model';
@@ -7,8 +8,9 @@ import { errMsg } from './util';
 
 /**
  * Reads and resizes the queued photos in the browser, a few at a time (process-queue.ts sets how many and which
- * next). A file identical to one already in the queue is skipped. A photo with a position goes on to `onLocated`
- * (place matching). Nothing starts before `ready` (signed in).
+ * next). A file identical to one already in the queue is skipped. A photo taken with the site's camera button whose
+ * file has no position waits for the phone's (capture.ts). A photo with a position goes on to `onLocated` (place
+ * matching). Nothing starts before `ready` (signed in).
  */
 export function useProcessQueue(
   { items, itemsRef, alive, patch }: Pick<UploadQueue, 'items' | 'itemsRef' | 'alive' | 'patch'>,
@@ -26,18 +28,33 @@ export function useProcessQueue(
       running.current.add(next.id);
       patch(next.id, { stage: 'processing', error: null });
       try {
-        const p = await processFile(next.file, (phase) => {
+        let p = await processFile(next.file, (phase) => {
           if (alive.current) patch(next.id, { phase });
         });
+        let deviceFix: DeviceFix | null = null;
+        if (next.capture) {
+          if (!hasPosition(p)) {
+            if (alive.current) patch(next.id, { phase: 'locating' });
+            deviceFix = await next.capture.fix;
+          }
+          p = withCapture(p, next.capture.at, deviceFix);
+        }
         if (!alive.current) return;
         if (!itemsRef.current.some((i) => i.id === next.id)) return; // removed while processing
         const twin = p.sha256 ? itemsRef.current.find((o) => o.id !== next.id && o.p?.sha256 === p.sha256) : undefined;
         if (twin) {
-          patch(next.id, { stage: 'error', error: `和「${twin.file.name}」是同一个文件，已跳过。` });
+          patch(next.id, { stage: 'error', phase: null, error: `和「${twin.file.name}」是同一个文件，已跳过。` });
           return;
         }
         const positioned = p.exif.lat != null && p.exif.lng != null;
-        patch(next.id, { stage: 'ready', p, thumbUrl: URL.createObjectURL(p.variants.s.blob), match: positioned ? freshMatch() : null });
+        patch(next.id, {
+          stage: 'ready',
+          phase: null,
+          p,
+          deviceFix,
+          thumbUrl: URL.createObjectURL(p.variants.s.blob),
+          match: positioned ? freshMatch() : null
+        });
         if (positioned) onLocated(next.id);
       } catch (e) {
         if (alive.current) patch(next.id, { stage: 'error', phase: null, error: errMsg(e, '处理失败') });

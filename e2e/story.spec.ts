@@ -41,7 +41,7 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
   await test.step('upload three photos and publish them', async () => {
     await follow(page.getByRole('link', { name: '上传', exact: true }));
     await expect(page).toHaveURL(/\/upload$/);
-    await page.locator('input[type=file]').setInputFiles(FIXTURES);
+    await page.locator('.up-drop input[type=file]').setInputFiles(FIXTURES);
     await expect(page.getByRole('heading', { name: /队列\s*3/ })).toBeVisible();
     // processed and matched (or matching failed): all three are ready to go
     const publishAll = page.getByRole('button', { name: '全部发布（3）' });

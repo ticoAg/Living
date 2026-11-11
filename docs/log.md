@@ -1,5 +1,9 @@
 # Directory Update Log
 
+## 2026-11-11
+* **Update**: 手机底栏正中新增拍照按钮：打开系统相机，拍完进入上传队列；照片文件没有位置时用手机定位补上并注明精度，见 [拍照](/product/features/upload.md#拍照)。
+* **Update**: 安卓上选照片不再经过会去掉位置的系统照片选择器，改为弹出「相机 / 文件」，经「文件」选的是带位置的原图；页面上有提示，见 [安卓上的位置](/product/features/upload.md#安卓上的位置)。
+
 ## 2026-11-10
 * **Update**: 主题编辑、Living、上传三个页面组件拆成分区目录里的 Hook 与纯函数模块，页面只做编排，行为与 DOM 不变，见 [前端分区](/architecture/frontend.md)。
 * **Update**: 提交前钩子对暂存文件跑格式化和 lint（能修的自动修），`npm install` / `npm ci` 后自动就位，CI 和没有 `.git` 的环境跳过，见 [提交前检查](/runbooks/local-dev.md#提交前检查)；新增浏览器冒烟测试 `npm run test:e2e`（构建后在独立的本地库上走一遍上传、发布和各页面，外加分块失效、会话过期、图库顺序、手机溢出、快速点击几条回归），PR 检查有单独的 e2e job，见 [冒烟测试](/runbooks/local-dev.md#冒烟测试)。
