@@ -118,12 +118,12 @@ export default function Gallery({ owner }: { owner?: string }) {
           {hasFilter && <TagFilter tree={tree} selected={selected} counts={counts} onToggle={toggleTag} />}
         </div>
         {total > 0 ? (
-          <Link href={livingHref} className="btn btn-primary btn-living" aria-label={livingLabel}>
+          <Link href={livingHref} className="btn btn-quiet btn-living" aria-label={livingLabel}>
             <Icon name="play" size={16} />
             Living
           </Link>
         ) : (
-          <button type="button" className="btn btn-primary btn-living" disabled>
+          <button type="button" className="btn btn-quiet btn-living" disabled>
             <Icon name="play" size={16} />
             Living
           </button>

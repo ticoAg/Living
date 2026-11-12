@@ -293,4 +293,19 @@ test.describe('phone width', () => {
       await noOverflow(page);
     });
   }
+
+  // The bar is a fixed child of the header. A backdrop-filter on the header itself made the header its containing
+  // block, and the bar hung under the header instead of at the foot of the screen.
+  test('the section bar stays at the foot of the screen while the page scrolls', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('a.gal-tile').first()).toBeVisible();
+    const bar = page.getByRole('navigation', { name: '主导航' });
+    const foot = () => bar.evaluate((el) => Math.round(window.innerHeight - el.getBoundingClientRect().bottom));
+    expect(await foot()).toBe(0);
+    await page.evaluate(() => window.scrollTo(0, 300));
+    expect(await foot()).toBe(0);
+    // and the upload button in the header still shows its symbol at this width
+    const icon = page.locator('header.site-header a[aria-label="上传"] svg');
+    expect((await icon.boundingBox())?.width).toBeGreaterThan(10);
+  });
 });

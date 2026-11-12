@@ -13,10 +13,10 @@
 .cam-top > :first-child { justify-self: start; }
 .cam-top > :last-child { justify-self: end; }
 .cam-status { margin: 0; font-size: 13px; text-align: center; color: rgba(236, 237, 232, 0.86); }
-.cam-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 3px; background: rgba(14, 15, 14, 0.45); color: #ECEDE8; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.cam-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: rgba(14, 15, 14, 0.5); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #ECEDE8; font-size: 14px; cursor: pointer; white-space: nowrap; }
 .cam-btn:disabled { opacity: 0.4; cursor: default; }
 .cam-btn:focus-visible, .cam-shutter:focus-visible { outline: 2px solid #ECEDE8; outline-offset: 3px; }
-.cam-btn-line { border: 1px solid rgba(236, 237, 232, 0.6); background: transparent; }
+.cam-btn-line { background: rgba(236, 237, 232, 0.16); }
 .cam-flip { padding: 0; border-radius: 50%; }
 
 .cam-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; margin: 0; padding: 0 32px; text-align: center; font-size: 15px; line-height: 1.7; color: rgba(236, 237, 232, 0.9); }
@@ -25,7 +25,7 @@
 
 .cam-bottom { position: absolute; z-index: 1; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 28px 20px calc(24px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, rgba(14, 15, 14, 0.7), rgba(14, 15, 14, 0)); }
 .cam-last { justify-self: start; width: 48px; height: 48px; }
-.cam-last img { display: block; width: 48px; height: 48px; border: 1px solid rgba(236, 237, 232, 0.7); border-radius: 3px; object-fit: cover; }
+.cam-last img { display: block; width: 48px; height: 48px; border: 1.5px solid rgba(236, 237, 232, 0.8); border-radius: 10px; object-fit: cover; }
 .cam-system { justify-self: end; }
 .cam-shutter { width: 76px; height: 76px; padding: 5px; border: 3px solid #ECEDE8; border-radius: 50%; background: transparent; cursor: pointer; }
 .cam-shutter::before { content: ''; display: block; width: 100%; height: 100%; border-radius: 50%; background: #ECEDE8; transition: transform 0.1s ease; }

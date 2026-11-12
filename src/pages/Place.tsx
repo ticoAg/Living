@@ -174,7 +174,7 @@ export default function Place() {
             </p>
             <Link
               href={livingPlace(poi.id)}
-              className="btn btn-primary btn-living plc-living"
+              className="btn btn-quiet btn-living plc-living"
               aria-label={`Living，播放${poi.name}的 ${rows.length} 张照片`}
             >
               <Icon name="play" size={16} />

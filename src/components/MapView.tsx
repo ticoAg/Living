@@ -65,13 +65,13 @@ const loadLib = () =>
 function restyle(map: MLMap) {
   for (const l of map.getStyle().layers ?? []) {
     try {
-      if (l.type === 'background') map.setPaintProperty(l.id, 'background-color', '#E9EBE5');
+      if (l.type === 'background') map.setPaintProperty(l.id, 'background-color', '#ECEBE6');
       else if (l.type === 'fill' && /water/.test(l.id)) map.setPaintProperty(l.id, 'fill-color', '#CFDDE3');
       else if (l.type === 'fill' && /park|wood|grass|landcover|forest/.test(l.id)) map.setPaintProperty(l.id, 'fill-color', '#DDE4D5');
       else if (l.type === 'line' && /water|river|stream/.test(l.id)) map.setPaintProperty(l.id, 'line-color', '#BCD0D8');
       else if (l.type === 'symbol') {
-        map.setPaintProperty(l.id, 'text-color', /water/.test(l.id) ? '#2B5F86' : '#5A605C');
-        map.setPaintProperty(l.id, 'text-halo-color', '#F1F2EE');
+        map.setPaintProperty(l.id, 'text-color', /water/.test(l.id) ? '#2B5F86' : '#54585B');
+        map.setPaintProperty(l.id, 'text-halo-color', '#F7F6F3');
       }
     } catch {
       /* layer without that paint property */
@@ -154,33 +154,33 @@ export default function MapView({
             id: 'lv-circles-fill',
             type: 'fill',
             source: 'lv-circles',
-            paint: { 'fill-color': '#8F5530', 'fill-opacity': 0.06 }
+            paint: { 'fill-color': '#96562E', 'fill-opacity': 0.06 }
           });
           map.addLayer({
             id: 'lv-circles-line',
             type: 'line',
             source: 'lv-circles',
-            paint: { 'line-color': '#8F5530', 'line-width': 1.2, 'line-dasharray': [3, 2] }
+            paint: { 'line-color': '#96562E', 'line-width': 1.2, 'line-dasharray': [3, 2] }
           });
           map.addLayer({
             id: 'lv-cones-fill',
             type: 'fill',
             source: 'lv-cones',
-            paint: { 'fill-color': '#8F5530', 'fill-opacity': ['case', ['get', 'muted'], 0.08, 0.28] }
+            paint: { 'fill-color': '#96562E', 'fill-opacity': ['case', ['get', 'muted'], 0.08, 0.28] }
           });
           map.addLayer({
             id: 'lv-lines-solid',
             type: 'line',
             source: 'lv-lines',
             filter: ['!', ['get', 'dashed']],
-            paint: { 'line-color': '#1C201E', 'line-width': 2 }
+            paint: { 'line-color': '#18191B', 'line-width': 2 }
           });
           map.addLayer({
             id: 'lv-lines-dashed',
             type: 'line',
             source: 'lv-lines',
             filter: ['get', 'dashed'],
-            paint: { 'line-color': '#1C201E', 'line-width': 1.2, 'line-dasharray': [2, 2] }
+            paint: { 'line-color': '#18191B', 'line-width': 1.2, 'line-dasharray': [2, 2] }
           });
           if (albumSource.current) albumLayer.current = createAlbumLayer(m, map, albumSource.current);
           setReady(true);

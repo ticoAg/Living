@@ -244,6 +244,16 @@ export function pickRows(
   return { checked: list, current: keep && set.has(keep) ? keep : list[list.length - 1] };
 }
 
+/**
+ * The photo ↑ or ↓ moves to from `current` (the first photo when nothing is on screen yet): its neighbour in the
+ * queue, stopping at either end; null when there is nowhere to go.
+ */
+export function stepRow(order: readonly string[], current: string | null, step: 1 | -1): string | null {
+  const at = Math.max(0, order.indexOf(current ?? ''));
+  const next = order[at + step];
+  return next ?? null;
+}
+
 /** What happens when a match response arrives: record it and make the automatic decision once. */
 export function applyMatch(cur: Item, res: MatchResponse, radius: number): Partial<Item> {
   const patch: Partial<Item> = { match: { radius, loading: false, error: null, res } };

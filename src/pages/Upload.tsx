@@ -9,6 +9,7 @@ import { createPoi, type PlaceChoice } from '../studio/match';
 import { fileKey } from '../studio/upload-drafts';
 import { PageHead } from '../studio/ui';
 import UploadBatch from '../studio/UploadBatch';
+import UploadBulk from '../studio/UploadBulk';
 import UploadDetails from '../studio/UploadDetails';
 import UploadItemPanel from '../studio/UploadItemPanel';
 import UploadQueue from '../studio/UploadQueue';
@@ -224,21 +225,33 @@ export default function Upload() {
     >
       {!filled && <PageHead title="上传" caption="照片在浏览器里处理，确认后才会发到站点。关掉页面，没发布的照片不会入库。" />}
 
-      {/* with photos queued, the heading and the drop zone shrink to one bar so the workspace below fits the window */}
+      {/* with photos queued, the heading and the drop zone shrink to one bar so the workspace below fits the window:
+          the title, a button to add more (the whole page takes a drop), and publishing everything at the right */}
       <div className="up-top">
         {filled && <h1 className="display up-title">上传</h1>}
         <label className="up-drop" data-active={dragging} data-compact={filled}>
           <input type="file" multiple accept={ACCEPT} className="visually-hidden" onChange={onPick} />
-          <Icon name="upload" size={filled ? 20 : 30} />
-          <span className="up-drop-text">
-            <span className="up-drop-title serif">{dragging ? '松开以添加' : filled ? '添加照片' : '拖入照片，或点击选择'}</span>
-            <span className="small muted">
-              {filled
-                ? '拖入或点击 · JPEG、PNG、WebP、AVIF、HEIC，单张不超过 50 MB'
-                : 'JPEG、PNG、WebP、AVIF、HEIC（iPhone 照片）。单张不超过 50 MB。Safari 以外的浏览器会先在本地解码 HEIC，比 JPEG 慢一些。'}
+          <span className="up-drop-btn">
+            <span className="up-drop-icon" aria-hidden="true">
+              <Icon name={filled ? 'plus' : 'upload'} size={filled ? 16 : 26} />
             </span>
+            <span className="up-drop-title">{dragging ? '松开以添加' : filled ? '添加照片' : '拖入照片，或点击选择'}</span>
+          </span>
+          <span className="small muted up-drop-hint">
+            {filled
+              ? '也可以把照片拖进页面 · 单张不超过 50 MB'
+              : 'JPEG、PNG、WebP、AVIF、HEIC（iPhone 照片）。单张不超过 50 MB。Safari 以外的浏览器会先在本地解码 HEIC，比 JPEG 慢一些。'}
           </span>
         </label>
+        {filled && (
+          <UploadBulk
+            items={items}
+            bulk={bulk}
+            onPublishAll={(ids) => void publishMany(ids)}
+            onStop={stopPublishing}
+            onClearPublished={clearPublished}
+          />
+        )}
         {notice && (
           <p className="notice up-notice small" role="status">
             {notice}
@@ -262,11 +275,7 @@ export default function Upload() {
               selected={selected}
               pickedIds={pickedIds}
               pickedCount={picked.length}
-              bulk={bulk}
               onCheck={setChecked}
-              onPublishAll={(ids) => void publishMany(ids)}
-              onStop={stopPublishing}
-              onClearPublished={clearPublished}
             />
             <UploadQueue
               items={items}
