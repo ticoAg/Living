@@ -2,11 +2,19 @@
 // All JSON keys are camelCase; D1 columns are snake_case.
 
 export type Role = 'owner' | 'admin' | 'member';
-export type Visibility = 'public' | 'unlisted' | 'private';
+export const VISIBILITIES = ['public', 'unlisted', 'private'] as const;
+export type Visibility = (typeof VISIBILITIES)[number];
 export type GeoPrivacy = 'exact' | 'fuzzy' | 'hidden';
 export type PoiMethod = 'auto' | 'confirmed' | 'inferred' | 'manual';
 export type PoiSource = 'custom' | 'amap' | 'osm';
 export type ThemeKind = 'trip' | 'topic';
+
+/** What an entry records. The list may grow (the column has no CHECK); labels in shared/entries.ts. docs/data/entries.md */
+export const ENTRY_TYPES = ['note', 'article', 'reading', 'practice', 'creation', 'trip'] as const;
+export type EntryType = (typeof ENTRY_TYPES)[number];
+/** draft: unfinished, only its author sees it; published: finished, in the timeline; archived: put away. Not visibility. */
+export const ENTRY_STATUSES = ['draft', 'published', 'archived'] as const;
+export type EntryStatus = (typeof ENTRY_STATUSES)[number];
 
 /** POI categories double as map-legend symbols. */
 export const POI_CATEGORIES = [
@@ -43,6 +51,8 @@ export interface SessionUser extends UserPublic {
 export interface UserProfile extends UserPublic {
   photoCount: number;
   themeCount: number;
+  /** Entries the requester may see in lists: finished public ones, or all of one's own. */
+  entryCount: number;
   createdAt: string;
 }
 
@@ -121,8 +131,18 @@ export interface PhotoDetail extends PhotoSummary {
   shutter: string | null;
   iso: number | null;
   themes: { id: string; title: string }[];
+  /** Entries showing this photo that the requester may see in lists (the owner: all of theirs), latest first. */
+  entries: PhotoEntryRef[];
   uploadedAt: string;
   updatedAt: string | null;
+}
+
+/** An entry as a photo page links to it. */
+export interface PhotoEntryRef {
+  id: string;
+  /** The title, else the body's first line as plain text, else the type's name. */
+  label: string;
+  occurredAt: string;
 }
 
 export interface Tag {
@@ -136,6 +156,8 @@ export interface Tag {
   sort: number;
   /** Photos tagged directly with this tag, visible to the requester. Inclusive counts are computed client-side. */
   count: number;
+  /** Entries tagged directly with this tag that the requester may see in lists (the owner: all of theirs). */
+  entryCount: number;
 }
 
 export interface Poi {
@@ -347,6 +369,91 @@ export interface PutThemeItemsBody {
   )[];
 }
 
+// ---- entries (docs/api/entries.md) ----------------------------------------------------------------------------------
+
+/** Code points of the body an entry summary carries (`excerpt`). */
+export const ENTRY_EXCERPT_MAX = 300;
+
+/**
+ * The most entries `GET /api/entries` returns, latest first. There is no paging: past it the oldest are left out and
+ * the response says `truncated`, as with photos.
+ */
+export const ENTRY_LIST_LIMIT = 5000;
+
+export interface EntrySummary {
+  id: string;
+  ownerId: string;
+  ownerHandle: string;
+  type: EntryType;
+  title: string | null;
+  /** The start of the body as written (Markdown), at most ENTRY_EXCERPT_MAX code points, cut at a line break if it can. */
+  excerpt: string | null;
+  /** The body goes on past `excerpt`. */
+  hasMore: boolean;
+  /**
+   * When it happened, local wall-clock time like a photo's `takenAt`: `YYYY-MM-DD` when only the day is known,
+   * else `YYYY-MM-DDTHH:mm:ss`. When it was written down is `createdAt`.
+   */
+  occurredAt: string;
+  visibility: Visibility;
+  status: EntryStatus;
+  /** Its photos the requester may see, in order. */
+  photoIds: string[];
+  /** Direct tags. */
+  tagIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `GET /api/entries`. */
+export interface EntryListResponse {
+  entries: EntrySummary[];
+  /** More entries matched than ENTRY_LIST_LIMIT; the oldest were left out. */
+  truncated: boolean;
+}
+
+export interface EntryMedia {
+  photoId: string;
+  caption: string | null;
+  photo: PhotoSummary;
+}
+
+export interface EntryDetail extends EntrySummary {
+  body: string | null;
+  /** Its photos the requester may see, in order, with their captions; the others are left out. */
+  media: EntryMedia[];
+  /** One more with every change. Send it back with `PATCH` to hear (409) about a change made elsewhere meanwhile. */
+  revision: number;
+}
+
+export interface EntryMediaInput {
+  photoId: string;
+  caption?: string | null;
+}
+
+/** `POST /api/entries`. Only `occurredAt` is required: the browser knows the local time, the Worker does not. */
+export interface CreateEntryBody {
+  /** default `note` */
+  type?: EntryType;
+  title?: string | null;
+  /** Markdown */
+  body?: string | null;
+  occurredAt: string;
+  /** default `private` */
+  visibility?: Visibility;
+  /** default `published` */
+  status?: EntryStatus;
+  /** One's own photos, in order. */
+  media?: EntryMediaInput[];
+  tagIds?: string[];
+}
+
+/** `PATCH /api/entries/:id`: what is given changes; `media` and `tagIds` replace the whole list. */
+export interface UpdateEntryBody extends Partial<CreateEntryBody> {
+  /** The revision this edit started from; when the entry has moved on, the answer is 409 and nothing changes. */
+  revision?: number;
+}
+
 export interface PrivacyZone {
   id: string;
   name: string;
@@ -389,4 +496,6 @@ export interface ApiErrorBody {
   message: string;
   /** Present on 409 `duplicate` from POST /api/photos: the photo that already has these bytes. */
   photoId?: string;
+  /** Present on 409 `conflict` from PATCH /api/entries/:id: the entry's current revision. */
+  revision?: number;
 }

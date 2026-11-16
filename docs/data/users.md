@@ -24,7 +24,7 @@ sources:
 
 # 关系
 
-- 一个用户拥有多张 [照片](/data/photos.md)、多个 [主题](/data/themes.md)、自己的 [标签](/data/tags.md) 和 [隐私区域](/data/privacy-zones.md)，删除用户时一并级联删除。
+- 一个用户拥有多张 [照片](/data/photos.md)、多个 [主题](/data/themes.md)、多条 [记录](/data/entries.md)、自己的 [标签](/data/tags.md) 和 [隐私区域](/data/privacy-zones.md)，删除用户时一并级联删除。
 - [邀请码](/data/invites.md) 记录创建者和使用者；用户被删除后这两列置空。
 - [地点](/data/pois.md) 的 `created_by` 指向创建者；用户被删除后置空，地点保留。
 - 功能说明：[账号](/product/features/accounts.md)、[站点管理](/product/features/admin.md)。接口：[认证与站点](/api/auth.md)、[用户与管理](/api/users-admin.md)。

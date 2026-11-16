@@ -80,6 +80,11 @@ export function prefetch(path: string) {
   revalidate(path);
 }
 
+/** Drop a cached path, read or not: what it held is gone (a deleted entry), and nothing should show it again. */
+export function forget(path: string) {
+  cache.delete(path);
+}
+
 /** Seed or replace a cached value without a request (e.g. after a mutation returns the new object). */
 export function setCached<T>(path: string, data: T) {
   cache.set(path, { data, at: Date.now() });

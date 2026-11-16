@@ -93,7 +93,9 @@
 .prof-theme-title { font: 600 16px / 1.4 var(--serif); letter-spacing: 0.04em; }
 .prof-theme-meta { display: flex; flex-wrap: wrap; gap: 0 10px; font: 12px var(--mono); color: var(--ink-2); }
 .prof-theme-meta em { font-style: normal; color: var(--sienna); }
-.prof-head ~ .gal, .prof-themes ~ .gal { padding-top: 20px; }
+.prof-entries { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; max-width: 880px; padding-top: 32px; }
+.prof-entries > .bw-h2, .prof-entries > .en-list { align-self: stretch; }
+.prof-head ~ .gal, .prof-themes ~ .gal, .prof-entries ~ .gal { padding-top: 20px; }
 
 /* ---------- photo ---------- */
 .pho { display: flex; flex-direction: column; gap: 12px; padding-bottom: 88px; }
@@ -155,6 +157,7 @@
 .pho-themes a { display: flex; align-items: center; gap: 10px; min-height: 44px; font: 500 15px var(--serif); letter-spacing: 0.04em; }
 .pho-themes a svg { color: var(--ink-3); }
 .pho-themes a:hover { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.pho-themes a > .pho-entry-day { margin-left: auto; color: var(--ink-3); font: 12px var(--mono); letter-spacing: 0; }
 
 .pho-strip { margin-top: 28px; padding-top: 28px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 10px; }
 .pho-strip-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -331,3 +334,10 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .idx { gap: 40px; }
   .idx-head { padding-top: 28px; }
 }
+
+/* ---- the library's own tabs, for someone signed in (LibraryTabs.tsx) ------------------------------ */
+
+.lib-tabs { display: flex; gap: 2px; margin: 16px 0 -8px -12px; }
+.lib-tab { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: var(--r-pill); color: var(--ink-2); font-size: 14px; text-decoration: none; }
+.lib-tab:hover { color: var(--ink); background: var(--mat); }
+.lib-tab[aria-current='page'] { color: var(--ink); font-weight: 500; background: var(--mat); }

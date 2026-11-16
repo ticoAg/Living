@@ -48,6 +48,18 @@ export const THEME_ITEM_LIMITS = {
   textMax: 20000
 } as const;
 
+/** `POST /api/entries`, `PATCH /api/entries/:id`. */
+export const ENTRY_LIMITS = {
+  titleMax: 200,
+  /** Markdown, as written */
+  bodyMax: 50000,
+  /** photos one entry shows */
+  mediaCount: 200,
+  /** under one photo of an entry */
+  captionMax: 2000,
+  tagCount: 200
+} as const;
+
 export const TAG_LIMITS = {
   nameMax: 24
 } as const;

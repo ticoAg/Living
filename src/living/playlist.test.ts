@@ -215,9 +215,9 @@ describe('buildPlaylist', () => {
 
   describe('tags', () => {
     const tags: Tag[] = [
-      { id: 'nature', name: '自然', parentId: null, ownerId: null, color: null, sort: 1, count: 0 },
-      { id: 'lake', name: '湖', parentId: 'nature', ownerId: null, color: null, sort: 1, count: 0 },
-      { id: 'sunset', name: '夕阳', parentId: null, ownerId: null, color: null, sort: 2, count: 0 }
+      { id: 'nature', name: '自然', parentId: null, ownerId: null, color: null, sort: 1, count: 0, entryCount: 0 },
+      { id: 'lake', name: '湖', parentId: 'nature', ownerId: null, color: null, sort: 1, count: 0, entryCount: 0 },
+      { id: 'sunset', name: '夕阳', parentId: null, ownerId: null, color: null, sort: 2, count: 0, entryCount: 0 }
     ];
     const tree = buildTagTree(tags);
     const photos = [

@@ -29,6 +29,10 @@ area: themes
 - `/themes`：所有公开主题，按更新时间倒序；`?mine=1` 显示自己的全部主题。
 - 个人主页列出该用户的公开主题。
 
+# 以后
+
+专题会原地演进为合集：同一个地址，条目里可以放 [记录](/product/features/entries.md)；旅程单独评估。旧链接、游记内容和顺序保留，见 [数据演进](/data/evolution.md#主题)。
+
 # 相关
 
 - [游记](/product/features/travelogue.md)、[照片笔记](/product/features/photo-notes.md)、[Living 模式](/product/features/living-mode.md)（可按主题播放）

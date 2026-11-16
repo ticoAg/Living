@@ -12,7 +12,7 @@ tags: [architecture]
   │  /api/*  /media/*  → 先进入 Worker（run_worker_first）
   ▼
 Worker `living` (Hono)
-  ├─ D1  `living`         用户、照片、标签、地点、主题、邀请、设置；地点与逆地理缓存 place_cache
+  ├─ D1  `living`         用户、记录、照片、标签、地点、主题、邀请、设置；地点与逆地理缓存 place_cache
   ├─ R2  `living-photos`  原图 o/{ownerId}/{photoId}.{ext}，尺寸图 v/{photoId}/{s|m|l}.{webp|jpg}
   ├─ KV  `living-kv`      会话 sess:*、登录限流 rl:*（KV 每天 1000 次写入只留给登录）
   ├─ 外部：高德 Web 服务（可选）、OpenStreetMap Photon / Nominatim（Overpass 作后备）
@@ -40,7 +40,7 @@ Worker 合并站内地点与外部候选，按距离和朝向打分；外部结�
 
 # 数据规模假设
 
-单站数千张照片。图库、地图、索引一次取回可见照片的精简列表，在浏览器里筛选；照片详情、主题按需取。列表一次最多 5000 张（`PHOTO_LIST_LIMIT`），超过时只返回拍摄时间最新的 5000 张，响应带 `truncated: true`，图库、地图和索引显示「只显示最近的 5000 张」，更早的照片在这些页面上看不到，见 [照片接口](/api/photos.md#get-apiphotos)。照片接近这个数量时再引入分页与服务端筛选。
+单站数千张照片。图库、地图、索引一次取回可见照片的精简列表，在浏览器里筛选；照片详情、主题按需取。列表一次最多 5000 张（`PHOTO_LIST_LIMIT`），超过时只返回拍摄时间最新的 5000 张，响应带 `truncated: true`，图库、地图和索引显示「只显示最近的 5000 张」，更早的照片在这些页面上看不到，见 [照片接口](/api/photos.md#get-apiphotos)。照片接近这个数量时再引入分页与服务端筛选。记录同理：今天和档案一次取回自己的全部记录（最多 5000 条，`ENTRY_LIST_LIMIT`），与照片在浏览器里合成时间线。
 
 # 部署
 

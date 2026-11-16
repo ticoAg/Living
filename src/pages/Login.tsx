@@ -5,7 +5,7 @@ import LoginForm from '../studio/LoginForm';
 import { encodeNext, safeNext, useTitle } from '../studio/util';
 import '../styles/studio.css';
 
-// /login — handle and password. After success go to ?next, else the account's own page.
+// /login — handle and password. After success go to ?next, else Today.
 // Docs: /docs/api/auth.md
 
 export default function Login() {
@@ -17,7 +17,7 @@ export default function Login() {
 
   // Already signed in (or just signed in): leave. An expired session counts as signed out.
   useEffect(() => {
-    if (user && !expired) navigate(next ?? `/@${user.handle}`, { replace: true });
+    if (user && !expired) navigate(next ?? '/today', { replace: true });
   }, [user, expired, next, navigate]);
 
   const registerHref = next ? `/register?next=${encodeNext(next)}` : '/register';
@@ -26,7 +26,7 @@ export default function Login() {
     <main className="page-narrow au">
       <div className="au-card">
         <h1 className="display display-m au-title">登录</h1>
-        <LoginForm autoFocus onSignedIn={(u) => navigate(next ?? `/@${u.handle}`, { replace: true })} />
+        <LoginForm autoFocus onSignedIn={() => navigate(next ?? '/today', { replace: true })} />
 
         <p className="au-alt small muted">
           {site?.needsSetup ? (

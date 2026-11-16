@@ -22,6 +22,7 @@ import ChipGroup from '../browse/ChipGroup';
 import { setBrowseList } from '../browse/context';
 import { lightTags, SEASONS, seasonOf } from '../browse/facets';
 import { useBoxSize, useDocTitle, useScrollTop } from '../browse/hooks';
+import LibraryTabs from '../browse/LibraryTabs';
 import { livingForFilter, livingPlace } from '../browse/links';
 import { fitViewport } from '../browse/mapfit';
 import { shortCity, shortProvince } from '../browse/regions';
@@ -278,6 +279,7 @@ export default function MapPage() {
 
   return (
     <main className="page bw mpg">
+      <LibraryTabs />
       <div className="mpg-top">
         <div className="mpg-title">
           <h1 className="display mpg-h1">地图</h1>

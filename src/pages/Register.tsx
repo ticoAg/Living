@@ -28,7 +28,7 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && !busy) navigate(next ?? `/@${user.handle}`, { replace: true });
+    if (user && !busy) navigate(next ?? '/today', { replace: true });
   }, [user, busy, next, navigate]);
 
   const setup = !!site?.needsSetup;
@@ -56,11 +56,11 @@ export default function Register() {
     setBusy(true);
     setError(null);
     try {
-      const res = await api<{ user: SessionUser }>('/api/auth/register', {
+      await api<{ user: SessionUser }>('/api/auth/register', {
         json: { invite: invite.trim() || undefined, handle: handle.trim(), displayName: displayName.trim(), password }
       });
       await refresh();
-      navigate(next ?? `/@${res.user.handle}`, { replace: true });
+      navigate(next ?? '/today', { replace: true });
     } catch (err) {
       setError(errMsg(err, '注册失败，请稍后再试'));
       setBusy(false);

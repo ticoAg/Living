@@ -6,7 +6,7 @@ tags: [api, account, admin]
 ---
 # GET /api/users/:handle
 
-`UserProfile`：公开资料，`photoCount`、`themeCount` 只计对请求者可见的内容。不存在 → 404。
+`UserProfile`：公开资料，`photoCount`、`themeCount` 只计对请求者可见的内容；`entryCount` 只计请求者能在列表里看到的记录（他人：公开且已完成；本人：全部）。不存在 → 404。
 
 # 隐私区域（登录）
 

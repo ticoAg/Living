@@ -95,14 +95,32 @@ export function optDate(v: unknown, label: string): string | null {
   return v;
 }
 
+/** `YYYY-MM-DDTHH:mm:ss` from a local date-time, tolerating a missing seconds part or a fractional/zone suffix; else null. */
+function wallClock(v: string): string | null {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/.exec(v.trim());
+  return m && isDate(m[1]) && +m[2] < 24 && +m[3] < 60 && +(m[4] ?? 0) < 60 ? `${m[1]}T${m[2]}:${m[3]}:${m[4] ?? '00'}` : null;
+}
+
 /** Local capture time `YYYY-MM-DDTHH:mm:ss`; tolerates a missing seconds part or a fractional/zone suffix. */
 export function optTakenAt(v: unknown): string | null {
   if (v === null || v === undefined || v === '') return null;
-  if (typeof v === 'string') {
-    const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/.exec(v.trim());
-    if (m && isDate(m[1]) && +m[2] < 24 && +m[3] < 60 && +(m[4] ?? 0) < 60) return `${m[1]}T${m[2]}:${m[3]}:${m[4] ?? '00'}`;
-  }
+  const t = typeof v === 'string' ? wallClock(v) : null;
+  if (t) return t;
   throw invalid('拍摄时间格式应为 YYYY-MM-DDTHH:mm:ss');
+}
+
+/**
+ * When an entry happened, local wall-clock time: `YYYY-MM-DD` when only the day is known, else `YYYY-MM-DDTHH:mm:ss`
+ * (read like a capture time). Null when not given.
+ */
+export function optOccurredAt(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    const t = isDate(s) ? s : wallClock(s);
+    if (t) return t;
+  }
+  throw invalid('发生时间格式应为 YYYY-MM-DD 或 YYYY-MM-DDTHH:mm:ss');
 }
 
 /** UTC offset such as `+08:00`. With `lenient`, anything else is dropped instead of rejected (it is only descriptive). */

@@ -12,9 +12,9 @@ sources:
 # 格式
 
 - JSON，键名 camelCase；数据库列为 snake_case，由 Worker 转换。
-- 读取单个资源（`GET /api/photos/:id`、`/api/themes/:id`、`/api/users/:handle`、`/api/site`）直接返回对象本身；列表包在复数键里（`{ "photos": [...] }`）；写操作返回包装后的对象（`{ "photo": ... }`、`{ "theme": ... }`、`{ "tag": ... }`）。
-- 时间：拍摄时间 `takenAt` 为本地时间 `YYYY-MM-DDTHH:mm:ss`（不带时区，时区另存 `tz`，如 `+08:00`）；其他时间为 UTC ISO 8601。
-- ID：带前缀的 ULID：`u_` 用户、`ph_` 照片、`poi_` 地点、`th_` 主题、`it_` 主题条目、`t_` 用户标签、`pz_` 隐私区域；预置标签用可读的英文 id（如 `lake`）。
+- 读取单个资源（`GET /api/photos/:id`、`/api/themes/:id`、`/api/entries/:id`、`/api/users/:handle`、`/api/site`）直接返回对象本身；列表包在复数键里（`{ "photos": [...] }`）；写操作返回包装后的对象（`{ "photo": ... }`、`{ "theme": ... }`、`{ "entry": ... }`、`{ "tag": ... }`）。
+- 时间：拍摄时间 `takenAt` 为本地时间 `YYYY-MM-DDTHH:mm:ss`（不带时区，时区另存 `tz`，如 `+08:00`）；记录的发生时间 `occurredAt` 也是本地时间，可以只有日期 `YYYY-MM-DD`；其他时间为 UTC ISO 8601。
+- ID：带前缀的 ULID：`u_` 用户、`ph_` 照片、`poi_` 地点、`th_` 主题、`it_` 主题条目、`en_` 记录、`t_` 用户标签、`pz_` 隐私区域；预置标签用可读的英文 id（如 `lake`）。
 
 # 认证
 
@@ -34,7 +34,7 @@ sources:
 | 401 | `unauthenticated` | 未登录 |
 | 403 | `forbidden` | 无权限、跨站写请求 |
 | 404 | `not_found` | 不存在或无权查看 |
-| 409 | `conflict` / `duplicate` | 重名、重复上传（附 `photoId`） |
+| 409 | `conflict` / `duplicate` | 重名、重复上传（附 `photoId`）、记录在别处改过（附当前 `revision`） |
 | 413 | `too_large` | 原图超过 50 MB |
 | 429 | `rate_limited` | 登录尝试过多 |
 | 502 | `upstream_failed` | 高德 / OSM 不可用（地点匹配仍返回站内候选） |
@@ -45,11 +45,13 @@ sources:
 
 # 可见性
 
-请求者为照片或主题的所有者时看到全部内容。对其他人：
+请求者为照片、主题或记录的所有者时看到全部内容。对其他人：
 
 - `public`：列表和详情都可见。
 - `unlisted`：只在按 id 取详情时可见，不进入任何列表、计数和 Living。
 - `private`：不可见，按 404 处理。
+
+记录另有状态：草稿和已归档的记录对他人一律按 404 处理，公开范围只对已完成的记录生效。容器不传染：公开的记录或主题里，他人看不到的照片直接略去。SQL 条件集中在 `worker/lib/visibility.ts`。
 
 # 位置精度（对非所有者）
 

@@ -4,7 +4,7 @@ import type { Poi, Visibility } from '../../shared/types';
 import Img from '../components/Img';
 import { CategoryIcon, Icon } from '../components/icons';
 import { fmtDay, fmtTime } from '../lib/format';
-import AutoTextarea from './AutoTextarea';
+import AutoTextarea from '../components/AutoTextarea';
 import type { DraftItem } from './draft';
 import { fmtDayHeading } from './util';
 

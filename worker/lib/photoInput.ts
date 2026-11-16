@@ -1,7 +1,7 @@
 // Validation of the JSON `meta` part of POST /api/photos (CreatePhotoMeta).
 
 import { PHOTO_LIMITS, REGION_LIMITS } from '../../shared/limits';
-import type { GeoPrivacy, NewPoi, PoiMethod, Visibility } from '../../shared/types';
+import { VISIBILITIES, type GeoPrivacy, type NewPoi, type PoiMethod, type Visibility } from '../../shared/types';
 import { invalid } from './http';
 import { parseNewPoi } from './poi';
 import {
@@ -19,7 +19,7 @@ import {
   type Body
 } from './validate';
 
-export const VISIBILITIES = ['public', 'unlisted', 'private'] as const;
+export { VISIBILITIES };
 export const GEO_PRIVACIES = ['exact', 'fuzzy', 'hidden'] as const;
 export const POI_METHODS = ['auto', 'confirmed', 'inferred', 'manual'] as const;
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import type { PhotoDetail } from '../../shared/types';
 import { ApiError } from '../lib/api';
-import { fmtLongDay } from '../lib/format';
+import { fmtLongDay, localDay } from '../lib/format';
 import { inclusiveCounts } from '../lib/tags';
 import { useApi } from '../lib/useApi';
 import Caption from '../living/Caption';
@@ -25,8 +25,6 @@ import '../styles/living.css';
 // Living mode: the fullscreen slideshow. Spec: docs/product/features/living-mode.md.
 // Parameters, storage, the playlist and the page's state live in src/living/ (data, playback, bar, drawer, keys);
 // this page wires them to the screen.
-
-const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function Living() {
   const [, navigate] = useLocation();
@@ -51,7 +49,7 @@ export default function Living() {
   useWakeLock(settings.awake);
   const drawer = useDrawer();
 
-  const today = localDate(now);
+  const today = localDay(now);
   const data = useLivingData({ source, settings, drawerEverOpened: drawer.everOpened, startId, seed, today });
   const { photos, status, activeRes, tagsRes, tree, poiById } = data;
   const play = usePlayback({ playlist: data.playlist, firstId: init.start, everySec: settings.every, hidden });

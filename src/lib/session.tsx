@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SessionUser, SiteInfo } from '../../shared/types';
 import { api, onSessionLost } from './api';
+import { clearDeviceDrafts } from './deviceDrafts';
 import { invalidate } from './useApi';
 
 interface SessionState {
@@ -66,6 +67,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    clearDeviceDrafts();
     userId.current = null;
     setUser(null);
     markExpired(false);

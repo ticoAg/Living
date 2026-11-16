@@ -1,5 +1,13 @@
 # Directory Update Log
 
+## 2026-11-16
+* **Creation**: 方向调整为以记录为中心的个人数字档案（[Issue #47](https://github.com/ticoAg/Living/issues/47)）。第零阶段：[内容模型](/product/content-model.md)（记录、媒体、项目、合集的边界与关系，类型、时间、状态与可见性）、[数据演进](/data/evolution.md)（项目与合集的表、旧主题的兼容、迁移规则、照片默认可见性的评估）、[决策：以记录为中心](/architecture/decisions/0007-entry-first.md)；[产品愿景](/product/vision.md)、[用户与场景](/product/personas.md)、[路线图](/product/roadmap.md) 随之改写。
+* **Creation**: 第一阶段：记录成为一等公民。迁移 `0005_entries.sql` 新增 [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md)，[记录接口](/api/entries.md) 支持列表、详情、创建、修改（带 `revision`，过期返回 409）和删除；新记录默认仅自己可见，草稿和已归档的对他人不可见。
+* **Creation**: 新页面 [今天](/product/features/today.md)（随手记、今天的记录与照片、草稿、往年今天）、[档案](/product/features/archive.md)（记录与照片按天排成一条时间线，按类型、标签筛选，按年份跳转）、[记录](/product/features/entries.md) 的阅读页与编辑器（Markdown、自动保存、本机备份、冲突提示、关联自己的照片并写说明、标签、公开范围与状态）。
+* **Update**: 登录后的导航改为 今天、档案、图库、主题，图库、地图、索引合为一处并在页面顶部切换；访客的导航不变；登录和注册后来到今天，见 [导航](/architecture/frontend.md#导航)。
+* **Update**: 照片详情列出所属记录，个人主页列出已完成的记录和记录数，标签带 `entryCount`，都只算请求者能看到的；删除照片会从记录里移除并让记录的 `revision` 加一，删除标签一并移除记录上的标签，见 [照片接口](/api/photos.md)、[标签接口](/api/tags.md)、[数据模型总览](/data/overview.md)。
+* **Update**: 隐私规则加入记录：公开范围只对已完成的记录生效，记录不改变其中照片的公开范围，计数和照片页的所属记录按同一套规则过滤；照片上传默认公开暂不改，见 [隐私](/product/features/privacy.md#记录)。保留用户名加入 today、archive、entries、e。
+
 ## 2026-11-11
 * **Update**: 整站换成「画廊」视觉：暖白底、白色浮起的卡片、大圆角和柔和阴影；按钮和标签片是填充的胶囊，分段是带滑块的轨道，不再用描边方框、黑色硬块和虚线框；宋体只留给地名和标题，不再加宽字距。页眉改为字标、居中的分区、上传按钮三段，手机底栏每项带图标，见 [设计令牌](/architecture/frontend.md#设计令牌)。
 * **Update**: 上传页重排：「全部发布」移到顶栏右端，照片排在中栏最上面，右栏表单的名字放到控件上方，标签板排成每个分组一行的两列表；拖文件到页面上时整窗提示，三栏版面里 ↑ ↓ 换张，见 [版面](/product/features/upload.md#版面) 和 [打标签](/product/features/hierarchical-tags.md#打标签)。

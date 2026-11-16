@@ -3,22 +3,46 @@ import { useSession } from '../lib/session';
 import CaptureButton from './CaptureButton';
 import { Icon, type IconName } from './icons';
 
-// `icon` shows on phones only, where the sections are a tab bar at the foot of the screen (base.css)
-const NAV: { href: string; label: string; icon: IconName; match: (p: string) => boolean }[] = [
+interface NavItem {
+  href: string;
+  label: string;
+  /** shows on phones only, where the sections are a tab bar at the foot of the screen (base.css) */
+  icon: IconName;
+  match: (p: string) => boolean;
+}
+
+const themes: NavItem = { href: '/themes', label: '主题', icon: 'book', match: (p) => p.startsWith('/themes') || p.startsWith('/t/') };
+
+// A visitor browses the public photos.
+const GUEST_NAV: NavItem[] = [
   { href: '/', label: '图库', icon: 'grid', match: (p) => p === '/' || p.startsWith('/p/') },
-  { href: '/themes', label: '主题', icon: 'book', match: (p) => p.startsWith('/themes') || p.startsWith('/t/') },
+  themes,
   { href: '/map', label: '地图', icon: 'map', match: (p) => p.startsWith('/map') || p.startsWith('/place/') },
   { href: '/index', label: '索引', icon: 'list', match: (p) => p.startsWith('/index') }
 ];
 
-/** On phones the camera button sits in the middle of the bar, between these two halves of NAV. */
-const HALF = NAV.length / 2;
+// Someone signed in keeps an archive: the day, then everything kept; the photos, map and index are one library
+// (browse/LibraryTabs.tsx). Docs: /docs/architecture/frontend.md#导航
+const MEMBER_NAV: NavItem[] = [
+  { href: '/today', label: '今天', icon: 'today', match: (p) => p.startsWith('/today') || p.startsWith('/entries/') },
+  { href: '/archive', label: '档案', icon: 'archive', match: (p) => p.startsWith('/archive') || p.startsWith('/e/') },
+  {
+    href: '/',
+    label: '图库',
+    icon: 'grid',
+    match: (p) => p === '/' || ['/p/', '/map', '/place/', '/index'].some((s) => p.startsWith(s))
+  },
+  themes
+];
 
 export default function Header() {
   const [path, navigate] = useLocation();
   const { user, expired, askLogin, logout } = useSession();
   const signedIn = !!user && !expired;
-  const link = (n: (typeof NAV)[number]) => (
+  const nav = signedIn ? MEMBER_NAV : GUEST_NAV;
+  // on phones the camera button sits in the middle of the bar, between the two halves
+  const half = nav.length / 2;
+  const link = (n: NavItem) => (
     <Link key={n.href} href={n.href} className="nav-link" aria-current={n.match(path) ? 'page' : undefined}>
       <Icon name={n.icon} size={22} />
       {n.label}
@@ -32,9 +56,9 @@ export default function Header() {
         </Link>
         {/* on phones the nav becomes a bar fixed to the foot of the screen; the account actions stay up here */}
         <nav aria-label="主导航" className="site-nav">
-          {NAV.slice(0, HALF).map(link)}
+          {nav.slice(0, half).map(link)}
           {signedIn && <CaptureButton />}
-          {NAV.slice(HALF).map(link)}
+          {nav.slice(half).map(link)}
         </nav>
         <div className="site-bar">
           {signedIn ? (

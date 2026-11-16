@@ -27,7 +27,7 @@ sources:
 # 关系
 
 - 自引用：`parent_id` 组成树，层级不限；删除一个标签会级联删除它的全部子孙。
-- [photo_tags](/data/photo-tags.md) 通过 `tag_id` 关联到 [photos](/data/photos.md)；标签被删除时关联行一并删除。
+- [photo_tags](/data/photo-tags.md) 通过 `tag_id` 关联到 [photos](/data/photos.md)，[entry_tags](/data/entry-tags.md) 关联到 [entries](/data/entries.md)：同一棵树，两边分开挂；标签被删除时两处的关联行一并删除。
 - `owner_id` 指向 [users](/data/users.md)；用户被删除时，其标签（以及挂在这些标签下的子孙）一并删除。
 - 功能说明：[多层级标签](/product/features/hierarchical-tags.md)。接口：[标签接口](/api/tags.md)。
 

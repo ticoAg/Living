@@ -5,6 +5,12 @@ export const fmtDay = (t: string | null | undefined) => (t ? t.slice(0, 10).repl
 export const fmtTime = (t: string | null | undefined) => (t && t.length >= 16 ? t.slice(11, 16) : '');
 export const fmtMonth = (t: string | null | undefined) => (t ? t.slice(0, 7).replace('-', '.') : '');
 
+const pad = (n: number) => String(n).padStart(2, '0');
+/** This device's calendar day, `YYYY-MM-DD`. */
+export const localDay = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** This device's wall-clock time, `YYYY-MM-DDTHH:mm:ss`, the form capture and entry times take. */
+export const localDateTime = (d = new Date()) => `${localDay(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 /** 11月8日 星期日 */
 export function fmtLongDay(t: string): string {

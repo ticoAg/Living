@@ -225,6 +225,14 @@ photos.delete('/:id', async (c) => {
     prep(db, 'UPDATE themes SET updated_at = ?1 WHERE id IN (SELECT theme_id FROM theme_items WHERE photo_id = ?2)', now, row.id),
     prep(db, 'UPDATE themes SET cover_photo_id = NULL WHERE cover_photo_id = ?1', row.id),
     prep(db, 'UPDATE users SET avatar_photo_id = NULL WHERE avatar_photo_id = ?1', row.id),
+    // the entries that showed it have changed: an open editor hears of it (revision) instead of saving the photo back
+    prep(
+      db,
+      'UPDATE entries SET updated_at = ?1, revision = revision + 1 WHERE id IN (SELECT entry_id FROM entry_media WHERE photo_id = ?2)',
+      now,
+      row.id
+    ),
+    prep(db, 'DELETE FROM entry_media WHERE photo_id = ?1', row.id),
     prep(db, 'DELETE FROM theme_items WHERE photo_id = ?1', row.id),
     prep(db, 'DELETE FROM photo_tags WHERE photo_id = ?1', row.id),
     prep(db, 'DELETE FROM photos WHERE id = ?1', row.id)

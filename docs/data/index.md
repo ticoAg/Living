@@ -12,9 +12,16 @@
 * [photo_tags](photo-tags.md) - 照片与标签的多对多关联，记录标签来源
 * [themes](themes.md) - 主题：一次旅程或一个专题的标题、导语、封面、日期范围和公开范围
 * [theme_items](theme-items.md) - 主题的有序条目：照片、文字段落或日期分段
+* [entries](entries.md) - 记录：发生时间、Markdown 正文、类型、状态和公开范围，可以只有文字
+* [entry_media](entry-media.md) - 记录与照片的多对多关联，带顺序和记录内的说明
+* [entry_tags](entry-tags.md) - 记录与标签的多对多关联，与照片共用标签树但分开挂
 * [privacy_zones](privacy-zones.md) - 隐私区域：落在其中的照片上传时强制隐藏位置
 * [settings](settings.md) - 站点级键值设置，目前只有注册方式
 * [place_cache](place-cache.md) - 地点数据源的应答缓存：周边地点、名称搜索和逆地理，带过期时间，每小时清理
+
+# 演进
+
+* [数据演进](evolution.md) - 走向以记录为中心的数据计划：项目、合集、旧主题的兼容、照片的默认可见性和迁移规则
 
 # KV 与 R2
 

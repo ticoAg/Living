@@ -427,6 +427,20 @@ export default function PhotoPage() {
               ))}
             </ul>
           )}
+
+          {photo.entries.length > 0 && (
+            <ul className="pho-themes" aria-label="所属记录">
+              {photo.entries.map((e) => (
+                <li key={e.id}>
+                  <Link href={`/e/${e.id}`}>
+                    <Icon name="note" size={16} />
+                    <span>{e.label}</span>
+                    <span className="pho-entry-day mono">{fmtDay(e.occurredAt)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </aside>
       </div>
 

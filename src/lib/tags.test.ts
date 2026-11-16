@@ -9,7 +9,8 @@ const tag = (id: string, name: string, parentId: string | null = null, sort = 0,
   ownerId: null,
   color,
   sort,
-  count: 0
+  count: 0,
+  entryCount: 0
 });
 
 // 题材 ─ 自然 ─ 湖, 山

@@ -11,10 +11,11 @@ area: studio
 - 字段：邀请码、用户名（3–24 位，字母数字下划线连字符，不区分大小写，唯一）、显示名、密码（至少 8 位）。
 - 注册方式由站点设置决定：`invite`（默认，需要邀请码）、`open`（任何人）、`closed`（不开放）。
 - 站点还没有任何用户时，只有角色为 `owner` 的邀请码能注册，注册者成为站长。
-- 保留用户名：admin、api、media、living、login、register、settings、studio、themes、upload、map、index 等。
+- 保留用户名：admin、api、media、living、login、register、settings、studio、themes、upload、map、index、today、archive、entries 等。
 
 # 登录与会话
 
+- 登录或注册后来到 [今天](/product/features/today.md)；从某个页面被要求登录的，回到那个页面。
 - 用户名 + 密码；密码用 PBKDF2-SHA256（2 万次迭代、16 字节盐）存储，迭代次数随哈希保存，以后可以提高。
 - 会话令牌放在 HttpOnly、Secure、SameSite=Lax 的 Cookie 里，服务端存于 KV，30 天有效。
 - 同一 IP 对同一用户名每分钟最多 5 次登录尝试。
@@ -29,7 +30,7 @@ area: studio
 
 # 个人主页 `/@handle`
 
-显示名、简介、头像（取自己的一张照片）、照片数、主题数；下面是该用户的照片图库（可筛选、可 Living）和公开主题。
+显示名、简介、头像（取自己的一张照片）、照片数、主题数，有记录时还有记录数；下面是该用户的公开主题、已完成的 [记录](/product/features/entries.md)（他人只看到公开的，草稿和已归档的不在这里）和照片图库（可筛选、可 Living）。
 
 # 设置 `/settings`
 

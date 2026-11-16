@@ -1,13 +1,18 @@
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'wouter';
-import type { ThemeSummary, UserProfile } from '../../shared/types';
+import type { PhotoSummary, ThemeSummary, UserProfile } from '../../shared/types';
 import { enc, unwrap, usePhotoList } from '../browse/api';
 import Gallery from '../browse/Gallery';
 import { useDocTitle, useScrollTop } from '../browse/hooks';
 import { LoadError, Loading } from '../browse/ui';
 import Img from '../components/Img';
+import { useEntryList, useTagMap } from '../entries/api';
+import EntryCard from '../entries/EntryCard';
 import { useApi } from '../lib/useApi';
 import { fmtDay } from '../lib/format';
+import { useSession } from '../lib/session';
 import '../styles/browse.css';
+import '../styles/entries.css';
 
 const VISIBILITY: Record<string, string> = { unlisted: '仅链接可见', private: '仅自己可见' };
 
@@ -20,7 +25,42 @@ function themeMeta(t: ThemeSummary): string {
   return `${range} · ${t.photoCount} 张`;
 }
 
-/** /@handle — the user's header, public themes and gallery. */
+/** Entries shown at first, and added with each 更多. */
+const ENTRY_STEP = 6;
+
+/** The person's finished entries the viewer may see, latest first; the author's own marked with who can see them. */
+function ProfileEntries({ handle, photos }: { handle: string; photos: readonly PhotoSummary[] | undefined }) {
+  const { user } = useSession();
+  const own = !!user && user.handle.toLowerCase() === handle.toLowerCase();
+  const { entries } = useEntryList(`/api/entries?owner=${enc(handle)}`);
+  const tags = useTagMap(`/api/tags?owner=${enc(handle)}`);
+  const byId = useMemo(() => new Map((photos ?? []).map((p) => [p.id, p])), [photos]);
+  const [limit, setLimit] = useState(ENTRY_STEP);
+  // drafts and archived entries stay in the author's archive
+  const finished = useMemo(() => (entries ?? []).filter((e) => e.status === 'published'), [entries]);
+  if (!finished.length) return null;
+  return (
+    <section className="prof-entries" aria-labelledby="prof-entries">
+      <h2 id="prof-entries" className="bw-h2">
+        记录
+      </h2>
+      <ul className="en-list">
+        {finished.slice(0, limit).map((e) => (
+          <li key={e.id}>
+            <EntryCard entry={e} photos={byId} tags={tags.byId} withDay own={own} />
+          </li>
+        ))}
+      </ul>
+      {finished.length > limit && (
+        <button type="button" className="btn btn-quiet" onClick={() => setLimit((n) => n + ENTRY_STEP * 2)}>
+          更多
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** /@handle — the user's header, entries, public themes and gallery. */
 export default function Profile() {
   // The route is declared as "/@:handle"; accept the handle with or without its "@"
   const params = useParams() as Record<string, string | undefined>;
@@ -76,6 +116,12 @@ export default function Profile() {
             <span className="prof-num">{profile.themeCount}</span>
             <span className="prof-unit">个主题</span>
           </span>
+          {profile.entryCount > 0 && (
+            <span>
+              <span className="prof-num">{profile.entryCount}</span>
+              <span className="prof-unit">条记录</span>
+            </span>
+          )}
         </p>
       </header>
 
@@ -101,6 +147,8 @@ export default function Profile() {
           </ul>
         </section>
       )}
+
+      <ProfileEntries handle={profile.handle} photos={photos} />
 
       <Gallery owner={profile.handle} />
     </main>

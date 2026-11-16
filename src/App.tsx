@@ -5,6 +5,9 @@ import Header from './components/Header';
 import ReLogin from './components/ReLogin';
 import { SessionProvider } from './lib/session';
 import {
+  Archive,
+  EntryEditor,
+  EntryReader,
   Explore,
   IndexPage,
   Living,
@@ -22,10 +25,12 @@ import {
   ThemeEditor,
   ThemeReader,
   Themes,
+  Today,
   Upload
 } from './routes';
 
 // Route table. Each page module is owned by one area (see /docs/architecture/frontend.md):
+// entries — Today, Archive, EntryReader, EntryEditor
 // browse — Explore, Profile, Photo, Place, MapPage, IndexPage
 // living — Living
 // studio — Upload, PhotoEdit, PlaceEdit, TagsManager, Login, Register, Settings
@@ -36,6 +41,12 @@ function Routes() {
   return (
     <Switch>
       <Route path="/" component={Explore} />
+      <Route path="/today" component={Today} />
+      <Route path="/archive" component={Archive} />
+      {/* one route for both, so the editor of a new entry stays as it is when the entry's first save moves it to
+          the entry's own address */}
+      <Route path={/^\/(?:entries\/new|e\/(?<id>[^/]+)\/edit)$/} component={EntryEditor} />
+      <Route path="/e/:id" component={EntryReader} />
       {/* wouter reads "@:handle" as a literal segment, and static assets redirect /@x to /%40x;
           a RegExp route captures the handle in either form */}
       <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/?$/i} component={Profile} />

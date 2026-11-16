@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Redirect, useLocation, useParams } from 'wouter';
 import type { PhotoSummary, Poi, SessionUser, ThemeDetail } from '../../shared/types';
 import { Icon } from '../components/icons';
+import PhotoPicker from '../components/PhotoPicker';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
 import { setCached, useApi } from '../lib/useApi';
 import DeleteSection from '../themes/DeleteSection';
 import ItemRow, { type RowActions } from '../themes/ItemRow';
 import MetaFields from '../themes/MetaFields';
-import PhotoPicker from '../themes/PhotoPicker';
 import {
   dayItem,
   draftFromTheme,
@@ -298,6 +298,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
         open={picker.open}
         onClose={picker.close}
         existing={photoIds}
+        noun="主题"
         from={trip ? draft.startDate : ''}
         to={trip ? draft.endDate : ''}
         onAdd={addPhotos}

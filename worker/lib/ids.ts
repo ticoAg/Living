@@ -50,6 +50,7 @@ export const newId = {
   poi: () => `poi_${ulid()}`,
   theme: () => `th_${ulid()}`,
   item: () => `it_${ulid()}`,
+  entry: () => `en_${ulid()}`,
   tag: () => `t_${ulid()}`,
   zone: () => `pz_${ulid()}`
 };

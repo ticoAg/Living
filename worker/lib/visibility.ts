@@ -6,6 +6,9 @@
 //  - poi:   places offered in matching and search → provider places, the viewer's own custom places, and custom
 //           places used by a public photo whose location may be shown
 //
+// Entries add a status to the visibility: others only ever see finished (`published`) entries. Drafts and archived
+// entries are their author's alone, whatever their visibility says.
+//
 // Each helper registers its parameter on `q` and returns SQL text; `a` is the table alias.
 
 import type { Sql } from './sql';
@@ -24,6 +27,18 @@ export function photoLocation(q: Sql, viewer: string | null, a = 'p'): string {
 
 export function themeList(q: Sql, viewer: string | null, a = 'th'): string {
   return viewer ? `(${a}.visibility = 'public' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility = 'public'`;
+}
+
+/** Entries in lists and counts: finished public ones, plus every entry of the viewer's own. */
+export function entryList(q: Sql, viewer: string | null, a = 'e'): string {
+  const shown = `(${a}.visibility = 'public' AND ${a}.status = 'published')`;
+  return viewer ? `(${shown} OR ${a}.owner_id = ${q.p(viewer)})` : shown;
+}
+
+/** Entries that open by id or link: finished public and unlisted ones, plus every entry of the viewer's own. */
+export function entryById(q: Sql, viewer: string | null, a = 'e'): string {
+  const shown = `(${a}.visibility != 'private' AND ${a}.status = 'published')`;
+  return viewer ? `(${shown} OR ${a}.owner_id = ${q.p(viewer)})` : shown;
 }
 
 /**

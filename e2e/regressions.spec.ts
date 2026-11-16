@@ -284,7 +284,9 @@ test.describe('phone width', () => {
   for (const [name, path, heading] of [
     ['gallery', '/', '图库'],
     ['map', '/map', '地图'],
-    ['tag manager', '/studio/tags', '标签']
+    ['tag manager', '/studio/tags', '标签'],
+    ['today', '/today', '今天'],
+    ['archive', '/archive', '档案']
   ] as const) {
     test(`${name} does not scroll sideways`, async ({ page }) => {
       await page.goto(path);
@@ -307,5 +309,28 @@ test.describe('phone width', () => {
     // and the upload button in the header still shows its symbol at this width
     const icon = page.locator('header.site-header a[aria-label="上传"] svg');
     expect((await icon.boundingBox())?.width).toBeGreaterThan(10);
+  });
+});
+
+test.describe('entries a visitor sees', () => {
+  test('only the finished public ones: a private entry is not found, and the profile lists the rest', async ({ page, browser }) => {
+    const api = apiOf(page.request);
+    const { entries } = await api.get<{ entries: { id: string; title: string | null; visibility: string }[] }>('/api/entries?mine=1');
+    const shared = entries.find((e) => e.visibility === 'public');
+    const kept = entries.find((e) => e.visibility === 'private');
+    expect(shared, 'the story keeps a public entry').toBeTruthy();
+    expect(kept, 'and a private one').toBeTruthy();
+
+    const context = await browser.newContext({ storageState: undefined });
+    const guest = await context.newPage();
+    await guest.goto(`/e/${shared?.id}`);
+    await expect(guest.getByRole('heading', { level: 1, name: shared?.title ?? '' })).toBeVisible();
+    await guest.goto(`/e/${kept?.id}`);
+    await expect(guest.getByText('记录不存在，或你没有权限查看')).toBeVisible();
+    await guest.goto(`/@${OWNER.handle}`);
+    await expect(guest.getByRole('region', { name: '记录' }).locator('a.en-card')).toHaveCount(1);
+    // a visitor keeps the guest's navigation
+    await expect(guest.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '今天' })).toHaveCount(0);
+    await context.close();
   });
 });

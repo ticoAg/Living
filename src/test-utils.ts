@@ -1,6 +1,6 @@
 // Fixtures shared by the front end's unit tests. Nothing in the app imports this file.
 
-import type { PhotoDetail, PhotoSummary, Poi, ThemeDetail } from '../shared/types';
+import type { EntryDetail, EntrySummary, PhotoDetail, PhotoSummary, Poi, ThemeDetail } from '../shared/types';
 
 export const VARIANTS: PhotoSummary['variants'] = {
   s: { key: 'v/x/s.webp', w: 480, h: 320 },
@@ -56,6 +56,7 @@ export function photoDetail(id: string, over: Partial<PhotoDetail> = {}): PhotoD
     shutter: null,
     iso: null,
     themes: [],
+    entries: [],
     uploadedAt: '2026-11-08T08:00:00Z',
     updatedAt: null,
     ...over
@@ -100,4 +101,29 @@ export function themeDetail(over: Partial<ThemeDetail> = {}): ThemeDetail {
     pois: [],
     ...over
   };
+}
+
+/** A finished private note of ada's, written when it happened; override what a test cares about. */
+export function entry(id: string, over: Partial<EntrySummary> = {}): EntrySummary {
+  return {
+    id,
+    ownerId: 'u_1',
+    ownerHandle: 'ada',
+    type: 'note',
+    title: null,
+    excerpt: '今天',
+    hasMore: false,
+    occurredAt: '2026-11-16T09:00:00',
+    visibility: 'private',
+    status: 'published',
+    photoIds: [],
+    tagIds: [],
+    createdAt: '2026-11-16T01:00:00Z',
+    updatedAt: '2026-11-16T01:00:00Z',
+    ...over
+  };
+}
+
+export function entryDetail(id: string, over: Partial<EntryDetail> = {}): EntryDetail {
+  return { ...entry(id), body: '今天', media: [], revision: 1, ...over };
 }

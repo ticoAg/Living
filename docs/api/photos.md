@@ -23,7 +23,7 @@ tags: [api, photos]
 
 # GET /api/photos/:id
 
-`PhotoDetail`。`private` 且非本人 → 404；`unlisted` 可按 id 访问。`themes` 只列请求者可见的主题。
+`PhotoDetail`。`private` 且非本人 → 404；`unlisted` 可按 id 访问。`themes` 只列请求者可见的主题；`entries` 只列引用这张照片、请求者能在列表里看到的 [记录](/api/entries.md)（本人：全部），按发生时间倒序，每条带 `id`、`label`（标题，或正文第一行的纯文本，或类型名）和 `occurredAt`。
 
 # POST /api/photos（登录）
 
@@ -58,4 +58,4 @@ tags: [api, photos]
 
 # DELETE /api/photos/:id（本人）
 
-删除 R2 中原图和三种尺寸、D1 行（标签关联与主题条目级联删除；用作封面或头像的引用置空）→ `{ "ok": true }`。
+删除 R2 中原图和三种尺寸、D1 行（标签关联、主题条目和记录里的这张照片一并删除；用作封面或头像的引用置空；引用它的记录 `revision` 加一，打开着的编辑器因此会得到 409 而不是把照片存回去）→ `{ "ok": true }`。

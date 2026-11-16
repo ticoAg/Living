@@ -11,6 +11,7 @@ const tag = (id: string, name: string, parentId: string | null, sort = 0, over: 
   color: null,
   sort,
   count: 0,
+  entryCount: 0,
   ...over
 });
 

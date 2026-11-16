@@ -140,7 +140,7 @@ export default defineConfig(({ mode }) => ({
       // Pointer-only conveniences with a keyboard path elsewhere: the user menu closes after a pick (a link's own click
       // bubbles up), a click on Living's stage shows the bar (keys and focus do too), the picker's backdrop closes it (Esc).
       {
-        files: ['src/components/Header.tsx', 'src/pages/Living.tsx', 'src/themes/PhotoPicker.tsx'],
+        files: ['src/components/Header.tsx', 'src/pages/Living.tsx', 'src/components/PhotoPicker.tsx'],
         rules: { 'jsx-a11y/click-events-have-key-events': 'off', 'jsx-a11y/no-static-element-interactions': 'off' }
       }
     ],

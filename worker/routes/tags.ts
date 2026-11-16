@@ -6,9 +6,9 @@ import { conflict, forbidden, invalid, listCache, notFound, paramId, readJson } 
 import { newId } from '../lib/ids';
 import { isStaff, requireUser, viewerId } from '../lib/session';
 import { nowIso, prep, prepQ, Sql } from '../lib/sql';
-import { tagCount, toTag, type TagRow } from '../lib/tags';
+import { tagCount, tagEntryCount, toTag, type TagRow } from '../lib/tags';
 import { has, optColor, optNum, reqStr } from '../lib/validate';
-import { photoList } from '../lib/visibility';
+import { entryList, photoList } from '../lib/visibility';
 
 export const tags = new Hono<AppEnv>({ strict: false });
 
@@ -32,11 +32,15 @@ tags.get('/', async (c) => {
   const q = new Sql();
   const vis = photoList(q, viewer, 'p');
   const ownerCond = countOwner ? ` AND p.owner_id = ${q.p(countOwner)}` : '';
+  const entryVis = entryList(q, viewer, 'e');
+  const entryOwnerCond = countOwner ? ` AND e.owner_id = ${q.p(countOwner)}` : '';
   const scope = scopeUser ? `t.owner_id IS NULL OR t.owner_id = ${q.p(scopeUser)}` : 't.owner_id IS NULL';
   const res = await prepQ(
     c.env.DB,
     `SELECT t.id, t.name, t.parent_id, t.owner_id, t.color, t.sort,
-        (SELECT COUNT(*) FROM photo_tags pt JOIN photos p ON p.id = pt.photo_id WHERE pt.tag_id = t.id AND ${vis}${ownerCond}) AS count
+        (SELECT COUNT(*) FROM photo_tags pt JOIN photos p ON p.id = pt.photo_id WHERE pt.tag_id = t.id AND ${vis}${ownerCond}) AS count,
+        (SELECT COUNT(*) FROM entry_tags et JOIN entries e ON e.id = et.entry_id
+           WHERE et.tag_id = t.id AND ${entryVis}${entryOwnerCond}) AS entry_count
      FROM tags t WHERE ${scope} ORDER BY t.sort, t.name, t.id`,
     q
   ).all<TagRow>();
@@ -106,7 +110,7 @@ tags.post('/', async (c) => {
     sort,
     nowIso()
   ).run();
-  return c.json({ tag: toTag({ id, name, parent_id: parentId, owner_id: user.id, color, sort }, 0) }, 201);
+  return c.json({ tag: toTag({ id, name, parent_id: parentId, owner_id: user.id, color, sort }, 0, 0) }, 201);
 });
 
 tags.patch('/:id', async (c) => {
@@ -161,7 +165,8 @@ tags.patch('/:id', async (c) => {
     tag.id
   ).run();
   const viewer = user.id;
-  return c.json({ tag: toTag({ ...tag, name, parent_id: parentId, color, sort }, await tagCount(db, viewer, tag.id)) });
+  const [count, entryCount] = await Promise.all([tagCount(db, viewer, tag.id), tagEntryCount(db, viewer, tag.id)]);
+  return c.json({ tag: toTag({ ...tag, name, parent_id: parentId, color, sort }, count, entryCount) });
 });
 
 tags.delete('/:id', async (c) => {
@@ -172,6 +177,7 @@ tags.delete('/:id', async (c) => {
   const [counted] = await db.batch([
     prep(db, `${subtree} SELECT COUNT(*) AS n FROM sub`, tag.id),
     prep(db, `${subtree} DELETE FROM photo_tags WHERE tag_id IN (SELECT id FROM sub)`, tag.id),
+    prep(db, `${subtree} DELETE FROM entry_tags WHERE tag_id IN (SELECT id FROM sub)`, tag.id),
     prep(db, `${subtree} DELETE FROM tags WHERE id IN (SELECT id FROM sub)`, tag.id)
   ]);
   const deleted = (counted.results[0] as { n: number } | undefined)?.n ?? 0;

@@ -122,7 +122,7 @@ describe('ulid', () => {
 });
 
 describe('newId', () => {
-  const prefixes = { user: 'u_', photo: 'ph_', poi: 'poi_', theme: 'th_', item: 'it_', tag: 't_', zone: 'pz_' } as const;
+  const prefixes = { user: 'u_', photo: 'ph_', poi: 'poi_', theme: 'th_', item: 'it_', entry: 'en_', tag: 't_', zone: 'pz_' } as const;
 
   it('has a generator for every kind of record', () => {
     expect(Object.keys(newId).sort()).toEqual(Object.keys(prefixes).sort());

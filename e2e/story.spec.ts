@@ -1,6 +1,7 @@
 // One continuous story on a fresh site: the owner registers with the owner invite, uploads and publishes the three
-// sample photos, gives them a place, then opens every page. Each step checks the page's key elements and that
-// nothing reached the console as an error. The session it ends with is saved for regressions.spec.ts.
+// sample photos, gives them a place, keeps a few entries, then opens every page. Each step checks the page's key
+// elements and that nothing reached the console as an error. The session it ends with is saved for
+// regressions.spec.ts.
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,8 +34,9 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     await page.locator('#au-name').fill(OWNER.name);
     await page.locator('#au-password').fill(OWNER.password);
     await page.locator('form button[type=submit]').click();
-    await expect(page).toHaveURL(new RegExp(`/@${OWNER.handle}$`));
-    await expect(page.getByRole('heading', { level: 1, name: OWNER.name })).toBeVisible();
+    // a new account starts on its own day
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.getByRole('heading', { level: 1, name: '今天' })).toBeVisible();
     clean('register');
   });
 
@@ -95,15 +97,18 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     clean('place page');
   });
 
+  // signed in, the photos, the map and the index are one section with tabs of its own
+  const library = page.getByRole('navigation', { name: '图库' });
   await test.step('map', async () => {
-    await follow(nav.getByRole('link', { name: '地图' }));
+    await follow(nav.getByRole('link', { name: '图库' }));
+    await follow(library.getByRole('link', { name: '地图' }));
     await expect(page.getByRole('heading', { level: 1, name: '地图' })).toBeVisible();
     await expect(page.locator('.maplibregl-map').first()).toBeVisible();
     clean('map');
   });
 
   await test.step('index', async () => {
-    await follow(nav.getByRole('link', { name: '索引' }));
+    await follow(library.getByRole('link', { name: '索引' }));
     await expect(page.getByRole('heading', { level: 1, name: '索引' })).toBeVisible();
     await expect(page.locator('main')).toContainText('断桥');
     clean('index');
@@ -135,6 +140,76 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     await follow(nav.getByRole('link', { name: '主题' }));
     await expect(page.getByRole('link', { name: /西湖两日/ }).first()).toBeVisible();
     clean('trip reader');
+  });
+
+  await test.step('today: a quick note', async () => {
+    await follow(nav.getByRole('link', { name: '今天' }));
+    await expect(page.getByRole('heading', { level: 1, name: '今天' })).toBeVisible();
+    await page.getByLabel('记一笔').fill('湖边的风很大，*柳树*都在往东倒。');
+    await page.getByRole('button', { name: '记下', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: '记下了' })).toBeVisible();
+    await expect(page.getByLabel('记一笔')).toHaveValue('');
+    const card = page.locator('a.en-card').filter({ hasText: '湖边的风很大' });
+    await expect(card).toBeVisible();
+    // Markdown, rendered, and private by default
+    await expect(card.locator('em')).toHaveText('柳树');
+    await expect(card).toContainText('仅自己可见');
+    clean('today');
+  });
+
+  let entryId = '';
+  await test.step('entry: write, add photos, finish', async () => {
+    await page.getByLabel('记一笔').fill('断桥残雪，其实是断桥残阳。');
+    await page.getByRole('button', { name: '写长文' }).click();
+    await expect(page).toHaveURL(/\/entries\/new$/);
+    // the quick note came along
+    await expect(page.getByLabel('正文', { exact: true })).toHaveValue('断桥残雪，其实是断桥残阳。');
+    await page.getByLabel('标题', { exact: true }).fill('西湖边的一个下午');
+    // the first save makes it a draft under its own address, without leaving the editor
+    await expect(page).toHaveURL(/\/e\/en_[^/]+\/edit$/, { timeout: 15_000 });
+    entryId = page.url().split('/e/')[1].split('/')[0];
+    await page.getByLabel('正文', { exact: true }).fill('# 午后\n\n断桥残雪，其实是断桥残阳。\n\n- [x] 看荷花\n- [ ] 坐船');
+    await page.getByLabel('日期', { exact: true }).fill('2026-05-02');
+    // the picker starts at the entry's day: the two photos of that afternoon, not the next day's
+    await page.getByRole('button', { name: '添加', exact: true }).click();
+    await page.getByRole('button', { name: '全选' }).click();
+    await page.getByRole('button', { name: '添加 2 张' }).click();
+    await page.getByLabel('第 1 张照片的说明').fill('桥上的人');
+    await page.getByRole('group', { name: '公开范围' }).getByRole('button', { name: '公开', exact: true }).click();
+    await page.getByRole('button', { name: '完成', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/e/${entryId}$`));
+    await expect(page.getByRole('heading', { level: 1, name: '西湖边的一个下午' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: '午后' })).toBeVisible();
+    await expect(page.locator('.er-figure')).toHaveCount(2);
+    await expect(page.locator('figcaption').first()).toHaveText('桥上的人');
+    clean('entry editor and reader');
+  });
+
+  await test.step('archive: entries and photos on one timeline', async () => {
+    await follow(nav.getByRole('link', { name: '档案' }));
+    await expect(page.getByRole('heading', { level: 1, name: '档案' })).toBeVisible();
+    const day = page.getByRole('region', { name: /5月2日/ });
+    await expect(day.locator('a.en-card').filter({ hasText: '西湖边的一个下午' })).toBeVisible();
+    // the entry's photos are not shown again beside it; the next day's photo has a day of its own
+    await expect(day.locator('.en-run')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: /5月3日/ }).locator('.en-run a')).toHaveCount(1);
+    await expect(page.locator('a.en-card').filter({ hasText: '湖边的风很大' })).toBeVisible();
+    await page.getByRole('group', { name: '类型' }).getByRole('button', { name: '照片' }).click();
+    await expect(page).toHaveURL(/type=photos/);
+    await expect(page.locator('a.en-card')).toHaveCount(0);
+    await expect(page.locator('.en-run a')).toHaveCount(3);
+    clean('archive');
+  });
+
+  await test.step('a photo lists its entries, a profile its public ones', async () => {
+    const inEntry = photos.find((p) => p.takenAt?.startsWith('2026-05-02'));
+    await page.goto(`/p/${inEntry?.id}`);
+    await follow(page.getByRole('list', { name: '所属记录' }).getByRole('link', { name: /西湖边的一个下午/ }));
+    await expect(page).toHaveURL(new RegExp(`/e/${entryId}$`));
+    await page.goto(`/@${OWNER.handle}`);
+    const entries = page.getByRole('region', { name: '记录' });
+    await expect(entries.locator('a.en-card')).toHaveCount(2);
+    clean('photo page and profile with entries');
   });
 
   await test.step('Living', async () => {

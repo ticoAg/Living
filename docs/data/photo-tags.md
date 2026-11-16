@@ -22,6 +22,7 @@ sources:
 # 关系
 
 - 连接 [photos](/data/photos.md) 和 [tags](/data/tags.md)；任一端删除，关联行级联删除。
+- 记录的标签另存在 [entry_tags](/data/entry-tags.md)：照片放进记录不会带上记录的标签，反之亦然。
 - 功能说明：[多层级标签](/product/features/hierarchical-tags.md)、[上传与整理](/product/features/upload.md)。接口：[照片接口](/api/photos.md)、[标签接口](/api/tags.md)。
 
 # 规则

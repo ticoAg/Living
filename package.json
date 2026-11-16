@@ -2,7 +2,7 @@
   "name": "living",
   "version": "0.1.0",
   "private": true,
-  "description": "Living：旅行与生活的影像图库，部署在 Cloudflare Workers。",
+  "description": "Living：以记录为中心的私人数字档案，部署在 Cloudflare Workers。",
   "homepage": "https://github.com/ticoAg/Living#readme",
   "bugs": {
     "url": "https://github.com/ticoAg/Living/issues"
