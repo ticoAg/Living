@@ -27,7 +27,7 @@ export default function Themes() {
   const wantMine = params.get('mine') === '1';
   const path = wantMine ? (user ? '/api/themes?mine=1' : null) : '/api/themes';
   const { data, error, reload } = useApi<{ themes: ThemeSummary[] }>(path);
-  useDocumentTitle('主题');
+  useDocumentTitle('合集');
   useScrollTop();
 
   const waiting = wantMine && sessionLoading;
@@ -38,7 +38,7 @@ export default function Themes() {
   if (needLogin) {
     body = (
       <div className="th-empty">
-        <p className="th-empty-title">登录后查看自己的主题</p>
+        <p className="th-empty-title">登录后查看自己的合集</p>
         <Link href="/login" className="btn btn-primary">
           登录
         </Link>
@@ -49,7 +49,7 @@ export default function Themes() {
   } else if (error || !themes) {
     body = (
       <div className="th-empty" role="alert">
-        <p className="th-empty-title">主题加载失败</p>
+        <p className="th-empty-title">合集加载失败</p>
         <p className="muted">请检查网络后重试。</p>
         <button type="button" className="btn" onClick={reload}>
           重试
@@ -59,14 +59,14 @@ export default function Themes() {
   } else if (themes.length === 0) {
     body = (
       <div className="th-empty">
-        <p className="th-empty-title">{wantMine ? '你还没有主题' : '还没有公开的主题'}</p>
+        <p className="th-empty-title">{wantMine ? '你还没有合集' : '还没有公开的合集'}</p>
         <p className="muted">
-          {wantMine ? '把照片编成一次旅程或一个专题。' : user ? '把你的照片编成第一个主题。' : '登录后可以创建自己的主题。'}
+          {wantMine ? '把照片和记录编成一次旅程或一个专题。' : user ? '把你的照片和记录编成第一个合集。' : '登录后可以创建自己的合集。'}
         </p>
         {user && (
           <Link href="/themes/new" className="btn btn-primary">
             <Icon name="plus" size={18} />
-            新建主题
+            新建合集
           </Link>
         )}
       </div>
@@ -86,16 +86,16 @@ export default function Themes() {
   return (
     <main className="th-page">
       <div className="th-head">
-        <h1 className="display display-l">主题</h1>
+        <h1 className="display display-l">合集</h1>
         {user && (
           <Link href="/themes/new" className="btn btn-primary">
             <Icon name="plus" size={18} />
-            新建主题
+            新建合集
           </Link>
         )}
       </div>
       <div className="th-tabs-row">
-        <nav className="th-tabs" aria-label="主题范围">
+        <nav className="th-tabs" aria-label="合集范围">
           <Link href="/themes" className="th-tab" aria-current={!wantMine ? 'page' : undefined}>
             全部
           </Link>

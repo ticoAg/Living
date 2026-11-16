@@ -15,7 +15,8 @@ import { VISIBILITY_LABEL } from '../themes/util';
 import '../styles/browse.css';
 import '../styles/entries.css';
 
-// /e/:id — an entry to read: the projects it is in, its text as Markdown, its photos with their captions, its tags. Others see it only once it
+// /e/:id — an entry to read: the projects it is in, its text as Markdown, its photos with their captions, the
+// collections holding it and its tags. Others see it only once it
 // is finished and not private; its photos are each shown or left out by their own visibility. Docs: /docs/product/features/entries.md
 
 function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
@@ -86,14 +87,30 @@ function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
         </div>
       )}
 
-      {(tagNames.length > 0 || own) && (
+      {(tagNames.length > 0 || e.themes.length > 0 || own) && (
         <footer className="er-foot">
-          {tagNames.length > 0 && (
-            <p className="er-tags">
-              {tagNames.map((n) => (
-                <span key={n}>#{n}</span>
-              ))}
-            </p>
+          {(tagNames.length > 0 || e.themes.length > 0) && (
+            <div className="er-foot-main">
+              {e.themes.length > 0 && (
+                <ul className="er-themes" aria-label="所属合集">
+                  {e.themes.map((t) => (
+                    <li key={t.id}>
+                      <Link href={`/t/${t.id}`}>
+                        <Icon name="book" size={16} />
+                        {t.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {tagNames.length > 0 && (
+                <p className="er-tags">
+                  {tagNames.map((n) => (
+                    <span key={n}>#{n}</span>
+                  ))}
+                </p>
+              )}
+            </div>
           )}
           {own && (
             <Link href={`/e/${e.id}/edit`} className="btn btn-quiet">

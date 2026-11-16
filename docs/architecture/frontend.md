@@ -33,8 +33,8 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `/studio/place/:id` | `src/pages/PlaceEdit.tsx` | studio |
 | `/studio/tags` | `src/pages/TagsManager.tsx` | studio |
 | `/login` `/register` `/settings` | `src/pages/Login.tsx` 等 | studio |
-| `/themes` `/themes/new` | `src/pages/Themes.tsx`、`ThemeEditor.tsx` | themes |
-| `/t/:id` `/t/:id/edit` | `src/pages/ThemeReader.tsx`、`ThemeEditor.tsx` | themes |
+| `/themes` `/themes/new` | `src/pages/Themes.tsx`、`ThemeEditor.tsx` | themes（合集） |
+| `/t/:id` `/t/:id/edit` | `src/pages/ThemeReader.tsx`、`ThemeEditor.tsx` | themes（合集） |
 
 页面模块按路由拆分，统一在 `src/routes.ts` 声明。首屏之后浏览器空闲时依次预取 browse、themes、living 以及今天、档案、记录阅读页、项目列表和项目页的分块（省流量模式与 2G 下跳过）；鼠标停在站内链接上约 80ms、按下或键盘聚焦时，预取目标路由的分块和它挂载时要发的 GET 请求（进入共享缓存），所以切页通常不再出现「加载中」。分块确实没到时，「加载中」在 400ms 后才显示。`src/lib/scroll.ts` 按历史记录保存滚动位置：前进、后退回到离开时的位置，新跳转从顶部开始。瀑布流（`src/browse/Masonry.tsx`）和档案的时间线分段渲染（`src/lib/usePaged.ts`），已渲染的数量记在当前历史记录的 `history.state` 里，返回时先渲染出同样多的内容，滚动位置才能恢复。
 
@@ -50,7 +50,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 - 其他渲染错误显示「出错了」和「刷新」按钮。
 - `React.lazy` 一旦失败会一直抛同一个错误，所以恢复靠整页跳转，不在页面内重试；预取失败不会让 `lazy` 失败，渲染时会重新请求。
 
-分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；主题编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品和列表顺序在 `src/projects/stages.ts`。
+分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品和列表顺序在 `src/projects/stages.ts`。
 
 # 共享模块（改动需要协调）
 
@@ -60,7 +60,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `shared/geo.ts` | 距离、方位角、坐标转换、扇形与圆、度分秒格式 |
 | `shared/entries.ts` | 记录类型与状态的名字、列表摘要的截取、记录的纯文本名字（照片页的所属记录、浏览器标签页的标题用） |
 | `shared/projects.ts` | 项目类型与状态的名字、从项目新写的记录的类型（`entryTypeFor`）、两个本地日期之间的天数 |
-| `shared/limits.ts` | 输入上限：照片、主题、主题条目、记录、标签、账号（含用户名格式 `HANDLE_RE`）、隐私区域、邀请码、地点搜索与地区名；地点编辑的 `POI_LIMITS` 留在 `shared/types.ts`，在这里再导出。Worker 的校验和表单的 `maxLength`、提示文案、发送前检查都引用它，不另写数字 |
+| `shared/limits.ts` | 输入上限：照片、合集、合集条目、记录、标签、账号（含用户名格式 `HANDLE_RE`）、隐私区域、邀请码、地点搜索与地区名；地点编辑的 `POI_LIMITS` 留在 `shared/types.ts`，在这里再导出。Worker 的校验和表单的 `maxLength`、提示文案、发送前检查都引用它，不另写数字 |
 | `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()`；`/api/auth/*` 以外的 401 经 `onSessionLost` 通知会话层 |
 | `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`、`forget(path)`（删除后丢掉，不再显示也不重取）。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢 |
 | `src/lib/chunks.ts` | 分块失效的识别与一次性整页重新加载，见 [分块失效与错误](#分块失效与错误) |
@@ -73,7 +73,8 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/components/Img.tsx` | 响应式图片 + ThumbHash 占位 |
 | `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放；署名在地图加载后收成 ⓘ（地图页 `/map` 保持 MapLibre 默认） |
 | `src/components/icons.tsx` | 地点类别符号 `CategoryIcon`、界面图标 `Icon` |
-| `src/components/PhotoPicker.tsx` | 从自己的照片里挑选（按日期范围、可多选），主题编辑器和记录编辑器共用 |
+| `src/components/PhotoPicker.tsx` | 从自己的照片里挑选（按日期范围、标签，可多选），合集编辑器和记录编辑器共用 |
+| `src/components/PickerDialog.tsx` | 挑选器的对话框：照片挑选器和合集编辑器的记录挑选器（`src/themes/EntryPicker.tsx`）共用，Esc 或点背景关闭 |
 | `src/components/AutoTextarea.tsx` | 随内容长高的文本框 |
 | `src/components/SectionTabs.tsx` | 一个分区内几页之间的标签（图库的照片 / 地图 / 索引、档案的时间线 / 项目），只对登录的人显示 |
 | `src/components/Header.tsx` | 站点页眉与导航（见 [导航](#导航)）：字标在左，四个分区居中（当前分区是一枚衬底色的胶囊），上传按钮和账户菜单在右；手机上（≤640px）页眉一行（字标、上传、账户），四个分区移到底部固定栏，每项是图标加名字，登录后栏的正中是拍照按钮 |
@@ -85,8 +86,8 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 
 | 身份 | 分区 |
 |---|---|
-| 访客 | 图库、主题、地图、索引 |
-| 登录后 | 今天、档案、图库、主题 |
+| 访客 | 图库、合集、地图、索引 |
+| 登录后 | 今天、档案、图库、合集 |
 
 登录后图库、地图、索引合为「图库」一个分区，三个页面顶部用 `src/browse/LibraryTabs.tsx` 的「照片 / 地图 / 索引」切换；照片页和地点页也算在图库里。档案的时间线和项目同样是一个分区，顶部用 `src/entries/ArchiveTabs.tsx` 的「时间线 / 项目」切换；项目页、项目的新建与编辑，已有记录的阅读和编辑页都算在档案里，新建记录算在今天里。分区数不变，手机底栏的拍照按钮仍在正中。
 
@@ -110,12 +111,12 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 - **标签片** `.chip` 平时只是文字，悬停出现底色，选中是墨色胶囊；所在子树被选中时（`data-included`）是衬底色。
 - **分段** `.seg` 是一条衬底色的轨道，选中的那一项是浮起的白色滑块。
 - **输入框** `.input` `.textarea` `.select` 白底细边、12px 圆角，聚焦时边变湖蓝并带一圈焦点环。
-- 「部分选中」（一起整理多张照片时只有一部分有的标签、主题）画成墨色描边、不填充；全部都有的是墨色填充。
-- 状态（上传队列、主题类型、可见性提示）用「色点 + 文字 + 该状态颜色的浅底」，不用描边框。
+- 「部分选中」（一起整理多张照片时只有一部分有的标签、合集）画成墨色描边、不填充；全部都有的是墨色填充。
+- 状态（上传队列、合集类型、可见性提示）用「色点 + 文字 + 该状态颜色的浅底」，不用描边框。
 - 页眉、吸底的操作栏和手机底栏是半透明的纸面加背景模糊。页眉的模糊画在 `::before` 上：带 `backdrop-filter` 的元素会成为它里面 `position: fixed` 元素的定位容器，而手机底栏正是页眉里的固定元素。
 - 地图 `.map-frame` 圆角、无边框，边缘的细线由 `::after` 画在瓦片上面；缩放按钮是白色圆角块。
 
-字体（`--serif`、`--sans`、`--mono`、`--latin`）：宋体 Noto Serif SC 只用于名字和标题（地点名、照片标题、主题标题、页面标题、游记正文；字重 500/600/700，写 400 的地方显示为 500），字距 0.04–0.1em；界面上的一切（按钮、标签片、表单、表头、文件名）用系统黑体；DM Mono 用于坐标与数字（400/500）；Spectral 用于 LIVING 字标和大号数字（300/500，无斜体）。样式里要用新的字重或斜体，先在 `vite.config.ts` 的 `FONTS` 里加上，否则浏览器会用相近字重或合成粗体。Living 模式和相机使用深色（`--night*` 令牌）。
+字体（`--serif`、`--sans`、`--mono`、`--latin`）：宋体 Noto Serif SC 只用于名字和标题（地点名、照片标题、合集与记录的标题、页面标题、游记正文；字重 500/600/700，写 400 的地方显示为 500），字距 0.04–0.1em；界面上的一切（按钮、标签片、表单、表头、文件名）用系统黑体；DM Mono 用于坐标与数字（400/500）；Spectral 用于 LIVING 字标和大号数字（300/500，无斜体）。样式里要用新的字重或斜体，先在 `vite.config.ts` 的 `FONTS` 里加上，否则浏览器会用相近字重或合成粗体。Living 模式和相机使用深色（`--night*` 令牌）。
 
 # 约定
 

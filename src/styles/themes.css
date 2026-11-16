@@ -1,4 +1,5 @@
-/* Themes area: theme lists, the travelogue reader and the editor (the photo picker is in picker.css).
+/* Collections (themes in the code): their lists, the reader (a travelogue for a trip) and the editor (the pickers are
+   in picker.css).
    Prefixes: th- shared and list, rd- reader, ed- editor. Tokens come from base.css. */
 
 /* ---- shared ------------------------------------------------------------------------------------- */
@@ -110,6 +111,21 @@
 .rd-cap-line svg { flex: none; color: var(--sienna); }
 .rd-cap-line a { display: inline-flex; align-items: center; min-height: 32px; font-weight: 500; }
 
+/* an entry in a collection: the collection's own words before it, then the entry as a card with its photos */
+.rd-entry { display: flex; flex-direction: column; gap: 20px; width: min(100% - 2 * var(--gutter), var(--measure)); outline: none; scroll-margin-top: calc(var(--header-h) + 24px); }
+.rd-entry-card { display: flex; flex-direction: column; gap: 12px; padding: 22px 26px 24px; border-radius: var(--r-card); background: var(--sheet); box-shadow: var(--lift-1); }
+.rd-entry-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 0; color: var(--ink-2); font-size: 13px; }
+.rd-entry-title { margin: 0; font: 600 clamp(19px, 2vw, 23px) / 1.5 var(--serif); letter-spacing: 0.04em; overflow-wrap: anywhere; }
+.rd-entry-title a { color: var(--ink); text-decoration: none; }
+.rd-entry-title a:hover { text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 0.25em; }
+.rd-entry-text.md { font: 500 17px / 1.95 var(--serif); letter-spacing: 0.02em; }
+.rd-entry-photos { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.rd-entry-photo { display: block; overflow: hidden; border-radius: 8px; }
+.rd-entry-photo:focus-visible, .rd-entry-photos-more:focus-visible { outline: 2px solid var(--hydro); outline-offset: 2px; }
+.rd-entry-photos-more { display: grid; place-items: center; aspect-ratio: 1 / 1; border-radius: 8px; background: var(--mat); color: var(--ink-2); font-size: 17px; text-decoration: none; }
+.rd-entry-photos-more:hover { background: var(--mat-2); color: var(--ink); }
+.rd-entry-more { display: inline-flex; align-self: flex-start; align-items: center; gap: 2px; min-height: 36px; font-size: 14px; }
+
 .rd-foot { display: flex; flex-direction: column; gap: 40px; width: min(100% - 2 * var(--gutter), var(--wide)); margin: 96px auto 0; padding-top: 40px; border-top: 1px solid var(--rule); }
 .rd-foot-h { margin: 0 0 16px; color: var(--ink-2); font: 600 17px / 1.5 var(--serif); letter-spacing: 0.06em; }
 .rd-foot-h .handle { font: 500 15px var(--sans); letter-spacing: 0.02em; }
@@ -125,6 +141,8 @@
   .rd-head { padding-top: 40px; }
   .rd-body { gap: 56px; padding-top: 48px; }
   .rd-prose, .rd-intro, .rd-text, .rd-cap { font-size: 17px; }
+  .rd-entry-card { padding: 18px 18px 20px; }
+  .rd-entry-photos { gap: 4px; }
   .rd-day-title { gap: 14px; letter-spacing: 0.06em; }
   .rd-foot { margin-top: 72px; }
 }
@@ -191,6 +209,7 @@
 .ed-poi { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font: 600 14px var(--serif); letter-spacing: 0.04em; }
 .ed-poi svg { color: var(--sienna); }
 .ed-flag { padding: 0 9px; border-radius: var(--r-pill); background: var(--sienna-wash); color: var(--sienna); font-size: 12px; line-height: 22px; }
+.ed-entry-title { margin: 0; color: var(--ink); font: 600 16px/1.5 var(--serif); letter-spacing: 0.03em; overflow-wrap: anywhere; }
 .ed-note { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; margin: 0; color: var(--ink-2); font-size: 13px; }
 .ed-note a { display: inline-flex; align-items: center; min-height: 36px; }
 .ed-ta { min-height: 48px; overflow: hidden; resize: none; }

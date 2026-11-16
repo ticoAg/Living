@@ -10,8 +10,8 @@
 * [pois](pois.md) - 地点：名称、类别、中心点和匹配半径，全站共享
 * [photos](photos.md) - 照片：位置、拍摄参数、文件键、尺寸图信息、可见性和位置精度
 * [photo_tags](photo-tags.md) - 照片与标签的多对多关联，记录标签来源
-* [themes](themes.md) - 主题：一次旅程或一个专题的标题、导语、封面、日期范围和公开范围
-* [theme_items](theme-items.md) - 主题的有序条目：照片、文字段落或日期分段
+* [themes](themes.md) - 合集：一次旅程或一个专题的标题、导语、封面、日期范围和公开范围
+* [theme_items](theme-items.md) - 合集的有序条目：照片、记录、文字段落或日期分段
 * [entries](entries.md) - 记录：发生时间、Markdown 正文、类型、状态和公开范围，可以只有文字
 * [entry_media](entry-media.md) - 记录与照片的多对多关联，带顺序和记录内的说明
 * [entry_tags](entry-tags.md) - 记录与标签的多对多关联，与照片共用标签树但分开挂
@@ -24,7 +24,7 @@
 
 # 演进
 
-* [数据演进](evolution.md) - 走向以记录为中心的数据计划：各阶段的表、合集、旧主题的兼容、照片的默认可见性和迁移规则
+* [数据演进](evolution.md) - 走向以记录为中心的数据计划：各阶段的表、主题如何成为合集、照片的默认可见性和迁移规则
 
 # KV 与 R2
 

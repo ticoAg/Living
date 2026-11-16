@@ -4,7 +4,7 @@
 
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, beforeEach, expect } from 'vite-plus/test';
-import type { PhotoDetail, Role, SessionUser } from '../shared/types';
+import type { PhotoDetail, Role, SessionUser, Visibility } from '../shared/types';
 import type { Env } from './env';
 import { app } from './index';
 import { hashPassword, randomToken } from './lib/crypto';
@@ -395,14 +395,23 @@ let passwordHash: Promise<string> | undefined;
 /**
  * A signed-in user with `role` (password `PASSWORD`), written straight to D1 and KV the way registration does.
  * Registration itself is covered in auth.routes.test.ts; this saves most of its round trips in every other test.
+ * Its photos upload as `public` unless they say otherwise, as an account from before the setting existed does: most
+ * tests are about who sees a public photo. A new account's own default (`private`) is tested where it matters.
  */
-export async function newUser(platform: Platform, handle: string, role: Role = 'member'): Promise<Client> {
+export async function newUser(
+  platform: Platform,
+  handle: string,
+  role: Role = 'member',
+  { photoVisibility = 'public' }: { photoVisibility?: Visibility } = {}
+): Promise<Client> {
   passwordHash ??= hashPassword(PASSWORD);
-  const user: SessionUser = { id: newId.user(), handle, displayName: handle, bio: null, avatarPhotoId: null, role };
+  const user: SessionUser = { id: newId.user(), handle, displayName: handle, bio: null, avatarPhotoId: null, role, photoVisibility };
   const token = randomToken(32);
   await Promise.all([
-    platform.env.DB.prepare('INSERT INTO users (id, handle, display_name, role, password_hash) VALUES (?1, ?2, ?3, ?4, ?5)')
-      .bind(user.id, handle, handle, role, await passwordHash)
+    platform.env.DB.prepare(
+      'INSERT INTO users (id, handle, display_name, role, password_hash, photo_visibility) VALUES (?1, ?2, ?3, ?4, ?5, ?6)'
+    )
+      .bind(user.id, handle, handle, role, await passwordHash, photoVisibility)
       .run(),
     platform.env.KV.put(`sess:${token}`, JSON.stringify({ userId: user.id, createdAt: new Date().toISOString() }))
   ]);

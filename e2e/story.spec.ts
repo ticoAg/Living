@@ -40,9 +40,26 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     clean('register');
   });
 
+  await test.step('a new account keeps new photos to itself until told otherwise', async () => {
+    await follow(page.getByRole('link', { name: '上传', exact: true }));
+    await expect(page.getByText('新照片默认仅自己可见')).toBeVisible();
+    await follow(page.getByRole('link', { name: '更改', exact: true }));
+    await expect(page).toHaveURL(/\/settings#photos$/);
+    const section = page.getByRole('region', { name: '新照片' });
+    await expect(section).toBeInViewport();
+    const choice = section.getByRole('group', { name: '默认公开范围' });
+    await expect(choice.getByRole('button', { name: '仅自己' })).toHaveAttribute('aria-pressed', 'true');
+    // the story shares its photos with visitors
+    await choice.getByRole('button', { name: '公开', exact: true }).click();
+    await expect(section.getByRole('status')).toHaveText('已保存');
+    await expect(choice.getByRole('button', { name: '公开', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    clean('new photo default');
+  });
+
   await test.step('upload three photos and publish them', async () => {
     await follow(page.getByRole('link', { name: '上传', exact: true }));
     await expect(page).toHaveURL(/\/upload$/);
+    await expect(page.getByText('新照片默认公开')).toBeVisible();
     await page.locator('.up-drop input[type=file]').setInputFiles(FIXTURES);
     await expect(page.getByRole('heading', { name: /队列\s*3/ })).toBeVisible();
     // processed and matched (or matching failed): all three are ready to go
@@ -114,11 +131,12 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     clean('index');
   });
 
-  await test.step('themes: create a trip', async () => {
-    await follow(nav.getByRole('link', { name: '主题' }));
-    await expect(page.getByRole('heading', { level: 1, name: '主题' })).toBeVisible();
-    await follow(page.getByRole('link', { name: '新建主题' }).first());
-    await expect(page.getByRole('heading', { level: 1, name: '新建主题' })).toBeVisible();
+  let tripPath = '';
+  await test.step('collections: create a trip', async () => {
+    await follow(nav.getByRole('link', { name: '合集' }));
+    await expect(page.getByRole('heading', { level: 1, name: '合集' })).toBeVisible();
+    await follow(page.getByRole('link', { name: '新建合集' }).first());
+    await expect(page.getByRole('heading', { level: 1, name: '新建合集' })).toBeVisible();
     await page.getByRole('group', { name: '类型' }).getByRole('button', { name: '旅程' }).click();
     await page.getByLabel('标题', { exact: true }).fill('西湖两日');
     await page.getByRole('group', { name: '公开范围' }).getByRole('button', { name: '公开', exact: true }).click();
@@ -126,10 +144,11 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     await page.getByRole('button', { name: '全选' }).click();
     await page.getByRole('button', { name: '添加 3 张' }).click();
     await page.getByRole('button', { name: '保存', exact: true }).click();
-    // a new theme stays in the editor, now under its own address
+    // a new collection stays in the editor, now under its own address
     await expect(page).toHaveURL(/\/t\/[^/]+\/edit$/);
-    await expect(page.getByRole('heading', { level: 1, name: '编辑主题' })).toBeVisible();
-    clean('theme editor');
+    tripPath = new URL(page.url()).pathname.replace(/\/edit$/, '');
+    await expect(page.getByRole('heading', { level: 1, name: '编辑合集' })).toBeVisible();
+    clean('collection editor');
   });
 
   await test.step('trip reader', async () => {
@@ -137,7 +156,7 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     await expect(page).toHaveURL(/\/t\/[^/]+$/);
     await expect(page.getByRole('heading', { level: 1, name: '西湖两日' })).toBeVisible();
     await expect(page.getByRole('region', { name: '路线图' })).toBeVisible();
-    await follow(nav.getByRole('link', { name: '主题' }));
+    await follow(nav.getByRole('link', { name: '合集' }));
     await expect(page.getByRole('link', { name: /西湖两日/ }).first()).toBeVisible();
     clean('trip reader');
   });
@@ -210,6 +229,32 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     const entries = page.getByRole('region', { name: '记录' });
     await expect(entries.locator('a.en-card')).toHaveCount(2);
     clean('photo page and profile with entries');
+  });
+
+  await test.step('collections hold entries: the trip takes in the afternoon and the quick note', async () => {
+    await page.goto(`${tripPath}/edit`);
+    await expect(page.getByRole('heading', { level: 1, name: '编辑合集' })).toBeVisible();
+    await page.getByRole('button', { name: '添加记录', exact: true }).click();
+    const picker = page.getByRole('dialog', { name: '添加记录' });
+    await picker.getByRole('button', { name: /^西湖边的一个下午/ }).click();
+    await picker.getByRole('button', { name: /^湖边的风很大/ }).click();
+    await picker.getByRole('button', { name: '添加 2 条' }).click();
+    await expect(picker).toBeHidden();
+    // the trip is public and the quick note is not: the editor says so before it is saved
+    await expect(page.getByRole('note')).toHaveText('有 1 条记录读者看不到。');
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: '已保存' })).toBeVisible();
+    await follow(page.getByRole('link', { name: '返回' }));
+    await expect(page.getByRole('heading', { level: 1, name: '西湖两日' })).toBeVisible();
+    await expect(page.locator('.rd-by')).toContainText('2 条记录');
+    const afternoon = page.getByRole('region', { name: '西湖边的一个下午' });
+    await expect(afternoon.locator('.rd-entry-photos li')).toHaveCount(2);
+    await follow(afternoon.getByRole('link', { name: '西湖边的一个下午' }));
+    await expect(page).toHaveURL(new RegExp(`/e/${entryId}$`));
+    // and the entry names the collections it is in
+    await follow(page.getByRole('list', { name: '所属合集' }).getByRole('link', { name: '西湖两日' }));
+    await expect(page).toHaveURL(new RegExp(`${tripPath}$`));
+    clean('collections with entries');
   });
 
   await test.step('projects: start one, keep each practice in it, mark a milestone', async () => {

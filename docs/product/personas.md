@@ -9,7 +9,7 @@ tags: [product]
 一年出门几次，每次回来手机里多出几百张照片。
 
 - 回来当晚批量上传，地点自动匹配好，只确认几张拿不准的。
-- 把这次旅行建成一个 [主题](/product/features/themes.md)，按天排好，给几张照片写笔记，生成 [游记](/product/features/travelogue.md) 发给朋友。
+- 把这次旅行建成一个 [合集](/product/features/themes.md)，按天排好，给几张照片写笔记，生成 [游记](/product/features/travelogue.md) 发给朋友。
 - 几年后在 [地图](/product/features/map.md) 上看自己去过哪里。
 
 # 日常记录者
@@ -33,7 +33,7 @@ tags: [product]
 
 朋友或陌生人，通过分享链接进来，不需要注册。
 
-- 浏览公开的图库、主题、游记和作者公开的记录。
+- 浏览公开的图库、合集、游记和作者公开的记录。
 - 在地图上找到某个地点的照片。
 - 看不到任何非公开内容和被隐藏的坐标。
 

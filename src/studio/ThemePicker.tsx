@@ -20,11 +20,11 @@ export default function ThemePicker({
   const { data, error, reload } = useApi<{ themes: ThemeSummary[] }>('/api/themes?mine=1');
   const kept = useKeep(data);
   const themes = kept?.themes ?? [];
-  if (!kept && !error) return <p className="small muted">主题加载中…</p>;
+  if (!kept && !error) return <p className="small muted">合集加载中…</p>;
   if (!kept && error) {
     return (
       <p className="small error-text">
-        主题加载失败。
+        合集加载失败。
         <button type="button" className="btn btn-quiet" onClick={reload}>
           重试
         </button>
@@ -34,7 +34,7 @@ export default function ThemePicker({
   if (!themes.length) {
     return (
       <p className="small muted up-themes-none">
-        还没有主题，
+        还没有合集，
         <Link href="/themes/new" target="_blank" rel="noopener">
           新建一个
         </Link>
@@ -42,7 +42,7 @@ export default function ThemePicker({
     );
   }
   return (
-    <div className="up-themes" role="group" aria-label="加入主题">
+    <div className="up-themes" role="group" aria-label="加入合集">
       {themes.map((t) => {
         const on = value.includes(t.id);
         return (

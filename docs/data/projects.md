@@ -39,7 +39,7 @@ sources:
 
 # 可见性
 
-与主题相同：他人看到 `public` 的列表与详情、凭链接打开 `unlisted` 的，`private` 的按 404 处理。SQL 条件在 `worker/lib/visibility.ts` 的 `projectList`（列表与计数）和 `projectById`（详情）。
+与合集相同：他人看到 `public` 的列表与详情、凭链接打开 `unlisted` 的，`private` 的按 404 处理。SQL 条件在 `worker/lib/visibility.ts` 的 `projectList`（列表与计数）和 `projectById`（详情）。
 
 项目的公开范围不改变其中记录和照片的公开范围：项目页和项目的统计只用请求者凭 id 能打开的记录（已完成、公开或仅链接）和照片，其余直接略去，见 [可见性](/api/conventions.md#可见性)。状态不影响可见性。
 

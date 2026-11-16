@@ -35,7 +35,7 @@ sources:
 # 关系
 
 - 作者 [users](/data/users.md)，删除用户时记录级联删除。
-- 照片在 [entry_media](/data/entry-media.md)，标签在 [entry_tags](/data/entry-tags.md)，所属的项目在 [entry_projects](/data/entry-projects.md)；删除记录时这三处的行级联删除，照片、标签和项目本身不受影响。
+- 照片在 [entry_media](/data/entry-media.md)，标签在 [entry_tags](/data/entry-tags.md)，所属的项目在 [entry_projects](/data/entry-projects.md)，收录它的合集在 [theme_items](/data/theme-items.md)（`entry_id`）；删除记录时这四处的行级联删除，照片、标签、项目和合集本身不受影响。
 - 功能说明：[记录](/product/features/entries.md)、[今天](/product/features/today.md)、[档案](/product/features/archive.md)、[项目](/product/features/projects.md)；在内容模型里的位置见 [内容模型](/product/content-model.md)。接口：[记录接口](/api/entries.md)。
 
 # 可见性
@@ -52,6 +52,8 @@ sources:
 SQL 条件在 `worker/lib/visibility.ts` 的 `entryList`（列表与计数）和 `entryById`（详情）。
 
 记录的公开范围不改变其中照片的公开范围：他人只看到自己有权打开的照片，其余的从 `photoIds` 和 `media` 中略去，见 [entry_media](/data/entry-media.md#可见性)。
+
+反过来，放进公开的项目或合集也不会让记录被看到：容器里只显示读者按上表能打开的记录。
 
 # 规则
 

@@ -15,7 +15,7 @@ import {
 import { invalid } from './http';
 import { summariesByIds } from './photos';
 import { prepQ, Sql } from './sql';
-import { entryById, photoById, projectList } from './visibility';
+import { entryById, photoById, projectList, themeList } from './visibility';
 
 export interface EntryRow {
   id: string;
@@ -88,10 +88,21 @@ export async function loadEntryDetail(db: D1Database, id: string, viewer: string
     q
   ).first<EntryRow>();
   if (!row) return null;
-  const media = await db
-    .prepare('SELECT photo_id, caption FROM entry_media WHERE entry_id = ?1 ORDER BY position')
-    .bind(id)
-    .all<{ photo_id: string; caption: string | null }>();
+  // Themes holding it, as a photo page lists its themes: those the viewer may see in lists, latest first. An unlisted
+  // theme is not advertised from its entries.
+  const qt = new Sql();
+  const [media, themes] = await Promise.all([
+    db
+      .prepare('SELECT photo_id, caption FROM entry_media WHERE entry_id = ?1 ORDER BY position')
+      .bind(id)
+      .all<{ photo_id: string; caption: string | null }>(),
+    prepQ(
+      db,
+      `SELECT DISTINCT th.id, th.title, th.updated_at FROM theme_items ti JOIN themes th ON th.id = ti.theme_id
+       WHERE ti.entry_id = ${qt.p(id)} AND ${themeList(qt, viewer)} ORDER BY th.updated_at DESC, th.id DESC`,
+      qt
+    ).all<{ id: string; title: string }>()
+  ]);
   const photos = await summariesByIds(
     db,
     viewer,
@@ -104,7 +115,13 @@ export async function loadEntryDetail(db: D1Database, id: string, viewer: string
     const { note: _note, ...photo } = p;
     shown.push({ photoId: m.photo_id, caption: m.caption, photo });
   }
-  return { ...toEntrySummary(row), body: row.body ?? null, media: shown, revision: row.revision ?? 1 };
+  return {
+    ...toEntrySummary(row),
+    body: row.body ?? null,
+    media: shown,
+    revision: row.revision ?? 1,
+    themes: themes.results.map((t) => ({ id: t.id, title: t.title }))
+  };
 }
 
 /** The given photos must all belong to `ownerId` (400 otherwise): an entry only shows its author's photos. */

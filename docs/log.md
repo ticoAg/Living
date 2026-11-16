@@ -1,6 +1,10 @@
 # Directory Update Log
 
 ## 2026-11-16
+* **Update**: 第三阶段：主题原地成为 [合集](/product/features/themes.md)，界面改称合集，`/themes`、`/t/:id`、已有内容、顺序和公开范围不变。迁移 `0007_collections.sql` 重建 [theme_items](/data/theme-items.md)（逐行照搬），加入记录条目（`kind = 'entry'`、`entry_id`）；旅程仍是旅程，没有变成项目，理由见 [数据演进](/data/evolution.md#合集)。
+* **Update**: [合集接口](/api/themes.md) 的条目可以是自己的记录；读者只看到能打开的记录和照片，`photoCount`、新的 `entryCount`、封面、路线和地点都只算这些，也算上记录里的照片。记录详情带上收录它的合集（`themes`，列表规则），删除记录时从合集里移除，见 [记录接口](/api/entries.md)。
+* **Update**: 合集编辑器能「添加记录」（按字和日期找，草稿、已归档的也列出并标明），每一行的「+」也能插入记录；公开或仅链接时提醒读者看不到的照片和记录。阅读页把记录排成卡片（合集写在前面的话、标题、开头一段、照片），Living 按合集播放时也放记录里的照片，记录页列出所属合集，见 [游记](/product/features/travelogue.md)。
+* **Update**: 新照片的默认公开范围可以在设置里选（[users](/data/users.md#新照片的默认公开范围) 的 `photo_visibility`，`PATCH /api/me`）。新账号是仅自己；已有账号设为公开、上传行为不变，直到自己修改；迁移不改任何照片的公开范围。上传页按它预先选好每张照片的公开范围，顶部写着当前默认值；接口收到没指定公开范围的上传也按它保存，见 [隐私](/product/features/privacy.md#新照片)。
 * **Creation**: 第二阶段：项目与成长档案。迁移 `0006_projects.sql` 新增 [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md)；[项目接口](/api/projects.md) 支持项目的列表、详情、创建、修改、删除和里程碑，记录接口加上 `project=` 和 `projectIds`。新项目默认仅自己可见；项目里只显示和统计读者凭链接能打开的记录和照片，记录上只列出读者能在列表里看到的项目。
 * **Creation**: 新页面 [项目](/product/features/projects.md)：项目列表（档案下与时间线并列）、项目页（天数与统计、最初与最近的作品、按里程碑分出的阶段、项目里的记录）、项目的新建与编辑；从项目页记一笔时记录预先放进项目，类型按项目定。「今天」列出进行中的项目，记录页列出所属项目，个人主页列出项目和项目数，见 [导航](/architecture/frontend.md#导航)。
 * **Update**: [接口约定](/api/conventions.md#可见性) 写明容器的规则：主题、记录、项目里显示并计入仅链接的内容，从内容找容器时按列表规则。保留用户名加入 projects，[认证接口](/api/auth.md) 的保留名单补上第一阶段加入的 today、archive、entries、e。

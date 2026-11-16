@@ -103,7 +103,14 @@ photos.post('/', async (c) => {
   const form = await readUploadForm(c.req.raw);
   const refs = await resolveUpload(db, user.id, form.meta);
   const photoId = newId.photo();
-  const upload: Upload = { photoId, ownerId: user.id, form, refs, files: uploadFiles(user.id, photoId, form) };
+  const upload: Upload = {
+    photoId,
+    ownerId: user.id,
+    defaultVisibility: user.photoVisibility,
+    form,
+    refs,
+    files: uploadFiles(user.id, photoId, form)
+  };
   // R2 first: if storage fails nothing is written to D1; if D1 fails the files are deleted again.
   await storeFiles(c.env.MEDIA, upload);
   await savePhoto(db, c.env.MEDIA, upload);

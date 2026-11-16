@@ -11,7 +11,7 @@ interface NavItem {
   match: (p: string) => boolean;
 }
 
-const themes: NavItem = { href: '/themes', label: '主题', icon: 'book', match: (p) => p.startsWith('/themes') || p.startsWith('/t/') };
+const themes: NavItem = { href: '/themes', label: '合集', icon: 'book', match: (p) => p.startsWith('/themes') || p.startsWith('/t/') };
 
 // A visitor browses the public photos.
 const GUEST_NAV: NavItem[] = [
@@ -76,7 +76,7 @@ export default function Header() {
                   onClick={(e) => (e.currentTarget.parentElement as HTMLDetailsElement).removeAttribute('open')}
                 >
                   <Link href={`/@${user.handle}`}>我的主页</Link>
-                  <Link href="/themes?mine=1">我的主题</Link>
+                  <Link href="/themes?mine=1">我的合集</Link>
                   <Link href="/studio/tags">标签</Link>
                   <Link href="/settings">设置</Link>
                   <button

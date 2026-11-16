@@ -239,8 +239,10 @@ entries.delete('/:id', async (c) => {
   const user = await requireUser(c);
   const db = c.env.DB;
   const row = await ownedEntry(c, user, paramId(c));
-  // the photos stay: an entry only points at them
+  // the photos stay: an entry only points at them; the themes holding it lose that item and count as changed
   await db.batch([
+    prep(db, 'UPDATE themes SET updated_at = ?1 WHERE id IN (SELECT theme_id FROM theme_items WHERE entry_id = ?2)', nowIso(), row.id),
+    prep(db, 'DELETE FROM theme_items WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_media WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_tags WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_projects WHERE entry_id = ?1', row.id),

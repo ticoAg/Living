@@ -142,7 +142,7 @@ export default function Profile() {
           </span>
           <span>
             <span className="prof-num">{profile.themeCount}</span>
-            <span className="prof-unit">个主题</span>
+            <span className="prof-unit">个合集</span>
           </span>
           {profile.entryCount > 0 && (
             <span>
@@ -160,7 +160,7 @@ export default function Profile() {
       </header>
 
       {themeList.length > 0 && (
-        <section className="prof-themes" aria-label="主题">
+        <section className="prof-themes" aria-label="合集">
           <ul>
             {themeList.map((t) => (
               <li key={t.id}>

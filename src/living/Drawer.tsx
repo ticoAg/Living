@@ -228,7 +228,7 @@ export default function Drawer({
 
   const orderOptions: (readonly [Order, string])[] = [
     ['shuffle', '随机'],
-    ['time', s.src === 'theme' ? '主题顺序' : '按时间']
+    ['time', s.src === 'theme' ? '合集顺序' : '按时间']
   ];
 
   return (

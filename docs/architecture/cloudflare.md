@@ -61,7 +61,7 @@ sources:
 | `/assets/*`（文件名带内容哈希的 JS、CSS、Worker） | 同上 | `public/_headers` 设为一年、`immutable`，不再回源确认 |
 | `/media/` 下的公开尺寸图 | Worker 用 Cache API 存一份，命中时不读 D1 和 R2；照片改为私密或删除时清除当前机房的副本 | 一年、`immutable`：尺寸图只在上传时写入，之后不再改写 |
 | 原图、私密照片的尺寸图 | 不缓存 | `private, no-store` |
-| 列表接口（照片、标签、地点、主题） | 不缓存 | 未登录 `public, max-age=30`，登录后 `private, no-store`，都带 `Vary: Cookie` |
+| 列表接口（照片、标签、地点、合集） | 不缓存 | 未登录 `public, max-age=30`，登录后 `private, no-store`，都带 `Vary: Cookie` |
 | 其他接口 | 不缓存 | `no-store` |
 
 静态资源请求不调用 Worker，不占请求额度。构建缓存另见 [构建与发布](/architecture/ci-cd.md)。

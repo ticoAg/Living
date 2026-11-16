@@ -416,7 +416,7 @@ export default function PhotoPage() {
           )}
 
           {photo.themes.length > 0 && (
-            <ul className="pho-themes" aria-label="所属主题">
+            <ul className="pho-themes" aria-label="所属合集">
               {photo.themes.map((t) => (
                 <li key={t.id}>
                   <Link href={`/t/${t.id}`}>

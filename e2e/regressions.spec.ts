@@ -335,6 +335,29 @@ test.describe('entries a visitor sees', () => {
   });
 });
 
+test.describe('a collection a visitor sees', () => {
+  test('the public trip shows the public entry in it and leaves out the private one', async ({ page, browser }) => {
+    const api = apiOf(page.request);
+    const { themes } = await api.get<{ themes: { id: string; title: string; entryCount: number }[] }>('/api/themes?mine=1');
+    const trip = themes.find((t) => t.title === '西湖两日');
+    expect(trip?.entryCount, 'the story puts two entries in its trip').toBe(2);
+
+    const context = await browser.newContext({ storageState: undefined });
+    const guest = await context.newPage();
+    await guest.goto(`/t/${trip?.id}`);
+    await expect(guest.getByRole('heading', { level: 1, name: '西湖两日' })).toBeVisible();
+    await expect(guest.locator('.rd-by')).toContainText('1 条记录');
+    await expect(guest.locator('.rd-entry')).toHaveCount(1);
+    await expect(guest.getByRole('region', { name: '西湖边的一个下午' })).toBeVisible();
+    await expect(guest.getByText('湖边的风很大')).toHaveCount(0);
+    // the visitor's /themes is the 合集 list, with the trip on it
+    await guest.goto('/themes');
+    await expect(guest.getByRole('heading', { level: 1, name: '合集' })).toBeVisible();
+    await expect(guest.getByRole('link', { name: /西湖两日/ }).first()).toBeVisible();
+    await context.close();
+  });
+});
+
 test.describe('a project a visitor sees', () => {
   test('a public one with the entries shared by link in it; a private one is not found', async ({ page, browser }) => {
     const api = apiOf(page.request);

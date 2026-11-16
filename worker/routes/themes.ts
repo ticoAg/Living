@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import { THEME_ITEM_LIMITS, THEME_LIMITS } from '../../shared/limits';
-import type { Poi, ThemeDetail, ThemeItem, ThemeKind, ThemeSummary, Visibility } from '../../shared/types';
+import type { Poi, ThemeDetail, ThemeEntry, ThemeItem, ThemeItemKind, ThemeKind, ThemeSummary, Visibility } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { forbidden, invalid, listCache, notFound, paramId, readJson, unauthenticated, type Ctx } from '../lib/http';
+import { ENTRY_FROM, entryCols, toEntrySummary, type EntryRow } from '../lib/entries';
 import { newId } from '../lib/ids';
 import { VISIBILITIES } from '../lib/photoInput';
 import { summariesByIds } from '../lib/photos';
@@ -10,7 +11,7 @@ import { poiCols, toPoi, type PoiRow } from '../lib/poi';
 import { requireUser, viewerId } from '../lib/session';
 import { nowIso, prep, prepQ, Sql } from '../lib/sql';
 import { has, isDate, isPlainObject, optDate, optEnum, optText, reqStr, strArray, type Body } from '../lib/validate';
-import { photoById, photoLocation, themeList } from '../lib/visibility';
+import { entryById, photoById, photoLocation, themeList } from '../lib/visibility';
 import type { SessionUser } from '../../shared/types';
 
 export const themes = new Hono<AppEnv>({ strict: false });
@@ -35,13 +36,21 @@ interface ThemeRow {
   updated_at: string;
   published_at: string | null;
   photo_count: number;
+  entry_count: number;
   cover_id: string | null;
   first_id: string | null;
 }
 
 // ---- reading ----------------------------------------------------------------------------------------------------
 
-/** Theme summaries matching `where` (already bound on `q`). Counts and covers only involve photos `viewer` can open. */
+/** Photos of a theme's entry items (alias `ti`) that `viewer` may open, through entries they may open: `e`, `em`, `p`. */
+const ENTRY_PHOTOS = `theme_items ti JOIN entries e ON e.id = ti.entry_id JOIN entry_media em ON em.entry_id = e.id
+  JOIN photos p ON p.id = em.photo_id`;
+
+/**
+ * Theme summaries matching `where` (already bound on `q`). Counts and covers only involve what `viewer` can open: an
+ * entry item counts when they may open the entry, and its photos when they may open those too.
+ */
 async function selectThemes(
   db: D1Database,
   viewer: string | null,
@@ -50,20 +59,27 @@ async function selectThemes(
   limit = LIST_LIMIT
 ): Promise<{ row: ThemeRow; summary: ThemeSummary }[]> {
   const vis = photoById(q, viewer, 'p');
+  const evis = entryById(q, viewer, 'e');
   const res = await prepQ(
     db,
     `SELECT th.id, th.owner_id, u.handle AS owner_handle, th.kind, th.title, th.subtitle, th.intro, th.cover_photo_id, th.start_date,
         th.end_date, th.visibility, th.created_at, th.updated_at, th.published_at,
-        (SELECT COUNT(*) FROM theme_items ti JOIN photos p ON p.id = ti.photo_id WHERE ti.theme_id = th.id AND ${vis}) AS photo_count,
+        (SELECT COUNT(*) FROM theme_items ti JOIN photos p ON p.id = ti.photo_id WHERE ti.theme_id = th.id AND ${vis})
+          + (SELECT COUNT(*) FROM ${ENTRY_PHOTOS} WHERE ti.theme_id = th.id AND ${evis} AND ${vis}) AS photo_count,
+        (SELECT COUNT(*) FROM theme_items ti JOIN entries e ON e.id = ti.entry_id WHERE ti.theme_id = th.id AND ${evis}) AS entry_count,
         (SELECT p.id FROM photos p WHERE p.id = th.cover_photo_id AND ${vis}) AS cover_id,
-        (SELECT p.id FROM theme_items ti JOIN photos p ON p.id = ti.photo_id WHERE ti.theme_id = th.id AND ${vis}
-           ORDER BY ti.position LIMIT 1) AS first_id
+        (SELECT x.pid FROM (
+           SELECT p.id AS pid, ti.position AS pos, ti.id AS iid, -1 AS sub FROM theme_items ti JOIN photos p ON p.id = ti.photo_id
+             WHERE ti.theme_id = th.id AND ${vis}
+           UNION ALL
+           SELECT p.id, ti.position, ti.id, em.position FROM ${ENTRY_PHOTOS} WHERE ti.theme_id = th.id AND ${evis} AND ${vis}
+         ) x ORDER BY x.pos, x.iid, x.sub LIMIT 1) AS first_id
      FROM themes th JOIN users u ON u.id = th.owner_id
      WHERE ${where} ORDER BY th.updated_at DESC, th.id DESC LIMIT ${limit}`,
     q
   ).all<ThemeRow>();
 
-  // Cover = the chosen photo when the viewer can see it, else the first photo they can see.
+  // Cover = the chosen photo when the viewer can see it, else the first photo they can see, an entry's included.
   const covers = await summariesByIds(
     db,
     viewer,
@@ -84,6 +100,7 @@ async function selectThemes(
       endDate: row.end_date,
       visibility: row.visibility,
       photoCount: row.photo_count,
+      entryCount: row.entry_count,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       publishedAt: row.published_at
@@ -99,8 +116,9 @@ function stripNote<T extends { note: string | null }>(p: T): Omit<T, 'note'> {
 
 interface ItemRow {
   id: string;
-  kind: 'photo' | 'text' | 'day';
+  kind: ThemeItemKind;
   photo_id: string | null;
+  entry_id: string | null;
   text: string | null;
   day: string | null;
 }
@@ -111,31 +129,61 @@ export async function loadThemeDetail(db: D1Database, id: string, viewer: string
   const found = (await selectThemes(db, viewer, q, `th.id = ${q.p(id)}`, 1))[0];
   if (!found || (found.row.visibility === 'private' && found.row.owner_id !== viewer)) return null;
 
+  // places in item order: of the photo items, and of the photos of entry items, where the viewer may see them
   const qp = new Sql();
+  const tid = qp.p(id);
   const poiVis = photoById(qp, viewer, 'p');
   const poiLoc = photoLocation(qp, viewer, 'p');
-  const [itemsRes, poisRes] = await Promise.all([
-    db.prepare('SELECT id, kind, photo_id, text, day FROM theme_items WHERE theme_id = ?1 ORDER BY position, id').bind(id).all<ItemRow>(),
+  const poiEntry = entryById(qp, viewer, 'e');
+  const qe = new Sql();
+  const [itemsRes, poisRes, entriesRes] = await Promise.all([
+    db
+      .prepare('SELECT id, kind, photo_id, entry_id, text, day FROM theme_items WHERE theme_id = ?1 ORDER BY position, id')
+      .bind(id)
+      .all<ItemRow>(),
     prepQ(
       db,
-      `SELECT ${poiCols('po')}, MIN(ti.position) AS pos FROM theme_items ti
-         JOIN photos p ON p.id = ti.photo_id JOIN pois po ON po.id = p.poi_id
-       WHERE ti.theme_id = ${qp.p(id)} AND ${poiVis} AND ${poiLoc}
+      `SELECT ${poiCols('po')}, MIN(x.pos) AS pos FROM (
+         SELECT p.poi_id AS poi_id, ti.position AS pos FROM theme_items ti JOIN photos p ON p.id = ti.photo_id
+           WHERE ti.theme_id = ${tid} AND ${poiVis} AND ${poiLoc}
+         UNION ALL
+         SELECT p.poi_id, ti.position FROM ${ENTRY_PHOTOS} WHERE ti.theme_id = ${tid} AND ${poiEntry} AND ${poiVis} AND ${poiLoc}
+       ) x JOIN pois po ON po.id = x.poi_id
        GROUP BY po.id ORDER BY pos`,
       qp
-    ).all<PoiRow>()
+    ).all<PoiRow>(),
+    prepQ(
+      db,
+      `SELECT ${entryCols(qe, viewer)} FROM ${ENTRY_FROM}
+       WHERE e.id IN (SELECT entry_id FROM theme_items WHERE theme_id = ${qe.p(id)}) AND ${entryById(qe, viewer)}`,
+      qe
+    ).all<EntryRow>()
   ]);
 
+  const entries = new Map(entriesRes.results.map((r) => [r.id, toEntrySummary(r)]));
   const photos = await summariesByIds(
     db,
     viewer,
-    itemsRes.results.map((i) => i.photo_id).filter((x): x is string => Boolean(x)),
+    [
+      ...itemsRes.results.map((i) => i.photo_id).filter((x): x is string => Boolean(x)),
+      ...[...entries.values()].flatMap((e) => e.photoIds)
+    ],
     true
   );
+  const entryOf = (entryId: string | null): ThemeEntry | null => {
+    const e = entryId ? entries.get(entryId) : undefined;
+    if (!e) return null;
+    const shown = e.photoIds.flatMap((pid) => {
+      const p = photos.get(pid);
+      return p ? [stripNote(p)] : [];
+    });
+    return { ...e, photos: shown };
+  };
   const items: ThemeItem[] = itemsRes.results.map((i): ThemeItem => {
     if (i.kind === 'photo')
       return { id: i.id, kind: 'photo', photoId: i.photo_id as string, text: i.text, photo: photos.get(i.photo_id as string) ?? null };
     if (i.kind === 'day') return { id: i.id, kind: 'day', day: i.day ?? '', text: i.text };
+    if (i.kind === 'entry') return { id: i.id, kind: 'entry', entryId: i.entry_id as string, text: i.text, entry: entryOf(i.entry_id) };
     return { id: i.id, kind: 'text', text: i.text ?? '' };
   });
   const pois: Poi[] = poisRes.results.map((r) => toPoi(r));
@@ -167,7 +215,7 @@ themes.get('/', async (c) => {
 
 themes.get('/:id', async (c) => {
   const detail = await loadThemeDetail(c.env.DB, paramId(c), await viewerId(c));
-  if (!detail) throw notFound('主题不存在，或你没有权限查看');
+  if (!detail) throw notFound('合集不存在，或你没有权限查看');
   return c.json(detail);
 });
 
@@ -187,8 +235,8 @@ interface ThemeFields {
 
 function parseThemeFields(body: Body, create: boolean): ThemeFields {
   const f: ThemeFields = {};
-  const kind = optEnum<ThemeKind>(body.kind, '主题类型', KINDS);
-  if (create && !kind) throw invalid('请选择主题类型：trip（旅程）或 topic（专题）');
+  const kind = optEnum<ThemeKind>(body.kind, '合集类型', KINDS);
+  if (create && !kind) throw invalid('请选择合集类型：trip（旅程）或 topic（专题）');
   if (kind) f.kind = kind;
   if (create || has(body, 'title')) f.title = reqStr(body, 'title', '标题', 1, THEME_LIMITS.titleMax);
   if (has(body, 'subtitle')) f.subtitle = optText(body.subtitle, '副标题', THEME_LIMITS.subtitleMax);
@@ -214,6 +262,16 @@ interface PhotoInfo {
   taken_at: string | null;
 }
 
+/** The given entries must all belong to `ownerId` (400 otherwise): a theme holds its owner's entries only. */
+async function assertOwnEntries(db: D1Database, ownerId: string, ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const row = await db
+    .prepare('SELECT COUNT(*) AS n FROM entries WHERE owner_id = ?1 AND id IN (SELECT value FROM json_each(?2))')
+    .bind(ownerId, JSON.stringify(ids))
+    .first<{ n: number }>();
+  if ((row?.n ?? 0) !== new Set(ids).size) throw invalid('记录必须是你自己的记录');
+}
+
 /** The given photos, all of which must belong to `ownerId` (400 otherwise). */
 async function ownPhotos(db: D1Database, ownerId: string, ids: string[]): Promise<Map<string, PhotoInfo>> {
   const out = new Map<string, PhotoInfo>();
@@ -228,8 +286,9 @@ async function ownPhotos(db: D1Database, ownerId: string, ids: string[]): Promis
 }
 
 interface NewItem {
-  kind: 'photo' | 'text' | 'day';
+  kind: ThemeItemKind;
   photoId?: string | null;
+  entryId?: string | null;
   text?: string | null;
   day?: string | null;
 }
@@ -241,14 +300,15 @@ function insertItems(db: D1Database, themeId: string, items: NewItem[]): D1Prepa
     pos: i,
     kind: it.kind,
     photoId: it.photoId ?? null,
+    entryId: it.entryId ?? null,
     text: it.text ?? null,
     day: it.day ?? null
   }));
   return prep(
     db,
-    `INSERT INTO theme_items (id, theme_id, position, kind, photo_id, text, day)
+    `INSERT INTO theme_items (id, theme_id, position, kind, photo_id, entry_id, text, day)
      SELECT json_extract(value, '$.id'), ?1, json_extract(value, '$.pos'), json_extract(value, '$.kind'),
-            json_extract(value, '$.photoId'), json_extract(value, '$.text'), json_extract(value, '$.day')
+            json_extract(value, '$.photoId'), json_extract(value, '$.entryId'), json_extract(value, '$.text'), json_extract(value, '$.day')
      FROM json_each(?2)`,
     themeId,
     JSON.stringify(rows)
@@ -337,10 +397,10 @@ async function ownedTheme(c: Ctx, user: SessionUser, id: string): Promise<OwnedT
   const row = await c.env.DB.prepare('SELECT id, owner_id, visibility, published_at FROM themes WHERE id = ?1')
     .bind(id)
     .first<OwnedTheme>();
-  if (!row) throw notFound('主题不存在');
+  if (!row) throw notFound('合集不存在');
   if (row.owner_id !== user.id) {
-    if (row.visibility === 'private') throw notFound('主题不存在');
-    throw forbidden('只能修改自己的主题');
+    if (row.visibility === 'private') throw notFound('合集不存在');
+    throw forbidden('只能修改自己的合集');
   }
   return row;
 }
@@ -379,10 +439,11 @@ themes.put('/:id/items', async (c) => {
   const row = await ownedTheme(c, user, paramId(c));
   const body = await readJson(c, 1024 * 1024);
   if (!Array.isArray(body.items)) throw invalid('items 需要是数组');
-  if (body.items.length > MAX_ITEMS) throw invalid(`一个主题最多 ${MAX_ITEMS} 个条目`);
+  if (body.items.length > MAX_ITEMS) throw invalid(`一个合集最多 ${MAX_ITEMS} 个条目`);
 
   const items: NewItem[] = [];
   const photoIds: string[] = [];
+  const entryIds: string[] = [];
   body.items.forEach((raw: unknown, i: number) => {
     const at = `第 ${i + 1} 个条目`;
     if (!isPlainObject(raw)) throw invalid(`${at}格式不对`);
@@ -397,11 +458,17 @@ themes.put('/:id/items', async (c) => {
     } else if (raw.kind === 'day') {
       if (typeof raw.day !== 'string' || !isDate(raw.day)) throw invalid(`${at}的日期格式应为 YYYY-MM-DD`);
       items.push({ kind: 'day', day: raw.day, text: optText(raw.text, `${at}的说明`, THEME_ITEM_LIMITS.captionMax) });
+    } else if (raw.kind === 'entry') {
+      if (typeof raw.entryId !== 'string' || !raw.entryId) throw invalid(`${at}缺少 entryId`);
+      entryIds.push(raw.entryId);
+      items.push({ kind: 'entry', entryId: raw.entryId, text: optText(raw.text, `${at}的说明`, THEME_ITEM_LIMITS.captionMax) });
     } else {
-      throw invalid(`${at}的类型需要是 photo、text 或 day`);
+      throw invalid(`${at}的类型需要是 photo、text、day 或 entry`);
     }
   });
-  await ownPhotos(db, row.owner_id, photoIds); // photos must belong to the theme's owner
+  // photos and entries must belong to the theme's owner
+  await ownPhotos(db, row.owner_id, photoIds);
+  await assertOwnEntries(db, row.owner_id, entryIds);
 
   const statements = [prep(db, 'DELETE FROM theme_items WHERE theme_id = ?1', row.id)];
   if (items.length) statements.push(insertItems(db, row.id, items));

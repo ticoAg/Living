@@ -42,15 +42,18 @@ export const fileKey = (f: { name: string; size: number; lastModified: number })
 
 const userPlace = (p: PlaceChoice | null) => (p && p.method !== 'auto' && p.method !== 'inferred' ? p : null);
 
-/** What to keep for this photo; null when nothing was filled in (or it is gone from the queue's concern). */
-export function draftOf(it: Item, now: number): Draft | null {
+/**
+ * What to keep for this photo; null when nothing was filled in (or it is gone from the queue's concern). `base` is the
+ * visibility a new photo starts with: only a different one was chosen.
+ */
+export function draftOf(it: Item, now: number, base: Visibility = 'public'): Draft | null {
   if (it.publish.state === 'done' || it.publish.state === 'duplicate') return null;
   const place = userPlace(it.place);
   const filled =
     it.title.trim() !== '' ||
     it.note.trim() !== '' ||
     it.tags.length > 0 ||
-    it.visibility !== 'public' ||
+    it.visibility !== base ||
     it.geoTouched ||
     it.themeIds.length > 0 ||
     !!place ||

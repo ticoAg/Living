@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { Poi, Tag } from '../../shared/types';
+import { Link } from 'wouter';
 import { Icon } from '../components/icons';
 import { invalidate, useApi } from '../lib/useApi';
 import { ensureSaved, planPlace } from '../studio/batch-place';
@@ -22,6 +23,7 @@ import { usePublishing } from '../studio/usePublishing';
 import { useQueueSelection } from '../studio/useQueueSelection';
 import { useUploadQueue } from '../studio/useUploadQueue';
 import { useKeep, useLeaveGuard, useRequireLogin, useTitle } from '../studio/util';
+import { VISIBILITY_LABEL } from '../themes/util';
 import '../styles/studio.css';
 
 // /upload — drop photos, let the browser read and resize them, confirm places, tag them one by one or several at a
@@ -39,7 +41,9 @@ export default function Upload() {
   useTitle('上传');
   const { user, ready } = useRequireLogin();
 
-  const queue = useUploadQueue(user?.id ?? null);
+  // new photos start as the account's setting says; each can be changed before it goes up
+  const base = user?.photoVisibility ?? 'private';
+  const queue = useUploadQueue(user?.id ?? null, base);
   const { items, itemsRef, update, patch, drafts } = queue;
   const { selected, checked, picked, pickedIds, selecting, setSelectedId, setChecked, onPickRow } = useQueueSelection(items, itemsRef);
   const [notice, setNotice] = useState<string | null>(null);
@@ -70,7 +74,7 @@ export default function Upload() {
       const added = fresh.map((f) => {
         const kept = drafts.take(f);
         if (kept) restored++;
-        const item = newItem(f, captures?.get(f));
+        const item = newItem(f, captures?.get(f), base);
         return kept ? { ...item, ...kept } : item;
       });
       if (restored) parts.push(`已恢复 ${restored} 张之前填的内容`);
@@ -79,7 +83,7 @@ export default function Upload() {
       update((prev) => [...prev, ...added]);
       setSelectedId((cur) => (cur && itemsRef.current.some((i) => i.id === cur) ? cur : added[0].id));
     },
-    [itemsRef, update, drafts, setSelectedId]
+    [itemsRef, update, drafts, setSelectedId, base]
   );
   const drop = useFileDrop(addFiles);
 
@@ -252,6 +256,12 @@ export default function Upload() {
             onClearPublished={clearPublished}
           />
         )}
+        <p className="up-notice small muted up-default">
+          新照片默认{VISIBILITY_LABEL[base]}
+          {base === 'public' ? '' : '可见'}
+          <span aria-hidden="true"> · </span>
+          <Link href="/settings#photos">更改</Link>
+        </p>
         {notice && (
           <p className="notice up-notice small" role="status">
             {notice}

@@ -1,3 +1,4 @@
+import type { EntrySummary } from '../../shared/types';
 import type { Draft, DraftItem, EditorPhoto } from './draft';
 import { dayIndex } from './util';
 
@@ -38,10 +39,18 @@ export function swapItem(items: DraftItem[], key: string, delta: -1 | 1): DraftI
   return next;
 }
 
+/** Every photo the items show, in order: photo items, and the photos of entry items. Repeats stay. */
+export function itemPhotos(items: readonly DraftItem[]): EditorPhoto[] {
+  return items.flatMap((it) => {
+    if (it.kind === 'photo') return it.photo ? [it.photo] : [];
+    return it.kind === 'entry' && it.entry ? it.entry.photos : [];
+  });
+}
+
 /** Drop an item; a cover that is no longer in the theme falls back to the first photo. */
 export function removeItem(d: Draft, key: string): Draft {
   const items = d.items.filter((it) => it.key !== key);
-  const stillThere = d.coverPhotoId && items.some((it) => it.kind === 'photo' && it.photoId === d.coverPhotoId);
+  const stillThere = d.coverPhotoId && itemPhotos(items).some((p) => p.id === d.coverPhotoId);
   return { ...d, items, coverPhotoId: stillThere ? d.coverPhotoId : null };
 }
 
@@ -52,8 +61,8 @@ export function insertAfter(items: readonly DraftItem[], key: string, item: Draf
   return next;
 }
 
-/** The photo picker: new photo items after `after`, or at the end when there is no such item. */
-export function insertPhotos(items: readonly DraftItem[], after: string | null, fresh: readonly DraftItem[]): DraftItem[] {
+/** A picker's photos or entries: new items after `after`, or at the end when there is no such item. */
+export function insertPicked(items: readonly DraftItem[], after: string | null, fresh: readonly DraftItem[]): DraftItem[] {
   const idx = after ? items.findIndex((it) => it.key === after) : -1;
   const next = items.slice();
   next.splice(idx >= 0 ? idx + 1 : next.length, 0, ...fresh);
@@ -66,15 +75,34 @@ export function dropEmptyText(d: Draft): Draft {
   return d.items.some(empty) ? { ...d, items: d.items.filter((it) => !empty(it)) } : d;
 }
 
-/** Photos that can be the cover: each photo once, in theme order, at most 300 buttons. */
+/** Photos that can be the cover: each photo once, entries' photos too, in theme order, at most 300 buttons. */
 export function coverChoices(items: readonly DraftItem[]): EditorPhoto[] {
   const seen = new Set<string>();
   const out: EditorPhoto[] = [];
-  for (const it of items) {
-    if (it.kind === 'photo' && it.photo && !seen.has(it.photoId)) {
-      seen.add(it.photoId);
-      out.push(it.photo);
+  for (const p of itemPhotos(items)) {
+    if (!seen.has(p.id)) {
+      seen.add(p.id);
+      out.push(p);
     }
   }
   return out.slice(0, 300);
+}
+
+/** Whether others may open the entry: finished, and public or unlisted. docs/data/entries.md#可见性 */
+export const entryShown = (e: Pick<EntrySummary, 'visibility' | 'status'>): boolean =>
+  e.visibility !== 'private' && e.status === 'published';
+
+/** What readers of a shared theme will not see: private photos, and entries that are private or not finished. */
+export function unseenByReaders(items: readonly DraftItem[]): { photos: number; entries: number } {
+  let photos = 0;
+  let entries = 0;
+  for (const it of items) {
+    if (it.kind === 'photo') {
+      if (it.photo?.visibility === 'private') photos++;
+    } else if (it.kind === 'entry' && it.entry) {
+      if (!entryShown(it.entry)) entries++;
+      else photos += it.entry.photos.filter((p) => p.visibility === 'private').length;
+    }
+  }
+  return { photos, entries };
 }

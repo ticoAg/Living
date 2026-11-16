@@ -14,7 +14,7 @@ export interface SourceNames {
 export function sourceName(source: Source, names: SourceNames): string {
   const parts: string[] = [];
   if (source.src === 'place') parts.push(names.place(source.place) ?? '地点');
-  else if (source.src === 'theme') parts.push(names.themeTitle || '主题');
+  else if (source.src === 'theme') parts.push(names.themeTitle || '合集');
   else if (source.src === 'today') parts.push('那年今日');
   else if (source.src === 'tags' && source.tags.length) {
     // ids the viewer cannot see (someone else's own tags) have no name; never print raw ids
@@ -59,7 +59,7 @@ export function scopeSwitches(opened: OpenedScope, source: Source, names: Source
     const on = source.src === 'theme';
     out.push({
       key: 'theme',
-      label: `主题 · ${names.themeTitle || '指定主题'}`,
+      label: `合集 · ${names.themeTitle || '指定合集'}`,
       on,
       patch: on ? { src: 'all', order: 'shuffle' } : { src: 'theme', theme: opened.theme, order: 'time' }
     });

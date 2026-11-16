@@ -17,7 +17,7 @@ sources:
 
 | 存储 | 放什么 | 文档 |
 |---|---|---|
-| D1 `living` | 用户、邀请码、标签、地点、照片、主题、记录、项目、隐私区域、设置，以及地点数据源的应答缓存 | 本目录下的十七张表 |
+| D1 `living` | 用户、邀请码、标签、地点、照片、合集、记录、项目、隐私区域、设置，以及地点数据源的应答缓存 | 本目录下的十七张表 |
 | R2 `living-photos` | 原图与三种尺寸图 | [R2 媒体文件](/data/media.md) |
 | KV `living-kv` | 会话、登录限流 | [KV](/data/kv.md) |
 
@@ -25,7 +25,7 @@ D1 只存需要查询的元数据和地点缓存，R2 只存文件。KV 免费�
 
 # 外键
 
-D1 强制外键。表之间一共 23 条外键：
+D1 强制外键。表之间一共 24 条外键：
 
 | 从 | 到 | 删除上级时 |
 |---|---|---|
@@ -42,6 +42,7 @@ D1 强制外键。表之间一共 23 条外键：
 | `themes.cover_photo_id` | `photos.id` | 置空 |
 | `theme_items.theme_id` | `themes.id` | 级联删除 |
 | `theme_items.photo_id` | `photos.id` | 级联删除 |
+| `theme_items.entry_id` | `entries.id` | 级联删除 |
 | `privacy_zones.owner_id` | `users.id` | 级联删除 |
 | `entries.owner_id` | `users.id` | 级联删除 |
 | `entry_media.entry_id` | `entries.id` | 级联删除 |
@@ -59,10 +60,10 @@ D1 强制外键。表之间一共 23 条外键：
 
 | 项 | 约定 |
 |---|---|
-| ID | 带前缀的 ULID：`u_` 用户、`ph_` 照片、`poi_` 地点、`th_` 主题、`it_` 主题条目、`en_` 记录、`pj_` 项目、`ms_` 里程碑、`t_` 用户标签、`pz_` 隐私区域。预置标签用可读的英文 id（如 `lake`，见 [预置标签](/data/preset-tags.md)）；邀请码和设置项分别以 `code`、`key` 为主键 |
-| 时间 | 除 `photos.taken_at` 和 `place_cache.expires_at`（Unix 秒）外都是 UTC 的 ISO 8601 文本 `YYYY-MM-DDTHH:MM:SSZ`，默认值由 SQLite 的 `strftime` 生成。`taken_at` 是不带时区的本地时间 `YYYY-MM-DDTHH:mm:ss`，时区另存 `tz`；记录的 `occurred_at` 同样是本地时间，可以只有日期 `YYYY-MM-DD`。主题和项目的 `start_date`、`end_date`、主题条目的 `day`、里程碑的 `date` 是 `YYYY-MM-DD` |
+| ID | 带前缀的 ULID：`u_` 用户、`ph_` 照片、`poi_` 地点、`th_` 合集、`it_` 合集条目、`en_` 记录、`pj_` 项目、`ms_` 里程碑、`t_` 用户标签、`pz_` 隐私区域。预置标签用可读的英文 id（如 `lake`，见 [预置标签](/data/preset-tags.md)）；邀请码和设置项分别以 `code`、`key` 为主键 |
+| 时间 | 除 `photos.taken_at` 和 `place_cache.expires_at`（Unix 秒）外都是 UTC 的 ISO 8601 文本 `YYYY-MM-DDTHH:MM:SSZ`，默认值由 SQLite 的 `strftime` 生成。`taken_at` 是不带时区的本地时间 `YYYY-MM-DDTHH:mm:ss`，时区另存 `tz`；记录的 `occurred_at` 同样是本地时间，可以只有日期 `YYYY-MM-DD`。合集和项目的 `start_date`、`end_date`、合集条目的 `day`、里程碑的 `date` 是 `YYYY-MM-DD` |
 | 布尔 | `INTEGER` 的 `0` / `1`（`in_living`、`favorite`） |
-| 枚举 | `TEXT` 加 `CHECK`，取值写在各表的 Schema 里，与 `shared/types.ts` 的联合类型一致。`entries.type`、`projects.type` 例外：取值会增加，只由 Worker 校验 |
+| 枚举 | `TEXT` 加 `CHECK`，取值写在各表的 Schema 里，与 `shared/types.ts` 的联合类型一致。`entries.type`、`projects.type`、`theme_items.kind` 例外：取值会增加，只由 Worker 校验 |
 | JSON | `photos.variants`、`photos.palette` 存 JSON 文本，由 Worker 序列化 |
 | 命名 | 列名 snake_case，接口 camelCase，由 Worker 转换，见 [接口约定](/api/conventions.md) |
 | 坐标 | WGS-84，单位度。高德的 GCJ-02 只在调用外部接口时临时转换，见 [决策：地点数据源](/architecture/decisions/0003-poi-providers.md) |
@@ -74,11 +75,11 @@ D1 强制外键。表之间一共 23 条外键：
 
 | 删除 | 一并删除 | 置空 | Worker 另外要做 |
 |---|---|---|---|
-| 用户 | 其照片、主题、记录、项目、用户标签、隐私区域，以及随之的 `photo_tags`、`theme_items`、`entry_media`、`entry_tags`、`entry_projects`、`milestones` | 邀请码的 `created_by` `used_by`、地点的 `created_by` | 清理 R2 里该用户的文件和 KV 里的会话 |
-| 照片 | `photo_tags`、`theme_items`、`entry_media` 中引用它的行 | `themes.cover_photo_id` | 把 `users.avatar_photo_id` 置空；引用它的记录 `revision` 加一；删除 R2 里的原图和三种尺寸图 |
+| 用户 | 其照片、合集、记录、项目、用户标签、隐私区域，以及随之的 `photo_tags`、`theme_items`、`entry_media`、`entry_tags`、`entry_projects`、`milestones` | 邀请码的 `created_by` `used_by`、地点的 `created_by` | 清理 R2 里该用户的文件和 KV 里的会话 |
+| 照片 | `photo_tags`、`theme_items`、`entry_media` 中引用它的行 | `themes.cover_photo_id` | 把 `users.avatar_photo_id` 置空；引用它的记录 `revision` 加一、合集更新 `updated_at`；删除 R2 里的原图和三种尺寸图 |
 | 标签 | 全部子孙标签，及对应的 `photo_tags`、`entry_tags` | — | — |
-| 主题 | 它的 `theme_items` | — | — |
-| 记录 | 它的 `entry_media`、`entry_tags`、`entry_projects`；照片、标签和项目本身不动 | — | — |
+| 合集 | 它的 `theme_items`；照片和记录本身不动 | — | — |
+| 记录 | 它的 `entry_media`、`entry_tags`、`entry_projects`、引用它的 `theme_items`；照片、标签、项目和合集本身不动 | — | 收录它的合集更新 `updated_at` |
 | 项目 | 它的 `entry_projects`、`milestones`；记录本身不动 | — | — |
 | 地点 | — | `photos.poi_id` | — |
 
@@ -92,8 +93,8 @@ D1 强制外键。表之间一共 23 条外键：
 | [pois](/data/pois.md) | 地点 |
 | [photos](/data/photos.md) | 照片 |
 | [photo_tags](/data/photo-tags.md) | 照片与标签 |
-| [themes](/data/themes.md) | 主题 |
-| [theme_items](/data/theme-items.md) | 主题条目 |
+| [themes](/data/themes.md) | 合集 |
+| [theme_items](/data/theme-items.md) | 合集条目：照片、记录、文字、日期分段 |
 | [entries](/data/entries.md) | 记录 |
 | [entry_media](/data/entry-media.md) | 记录与照片 |
 | [entry_tags](/data/entry-tags.md) | 记录与标签 |
@@ -104,4 +105,4 @@ D1 强制外键。表之间一共 23 条外键：
 | [settings](/data/settings.md) | 站点设置 |
 | [place_cache](/data/place-cache.md) | 地点数据源的应答缓存 |
 
-接下来的表（合集）和旧主题的兼容方式见 [数据演进](/data/evolution.md)。
+各阶段加了哪些表、主题如何成为合集，见 [数据演进](/data/evolution.md)。

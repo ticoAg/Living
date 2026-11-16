@@ -9,7 +9,7 @@ status: stable
 
 Living 是一个人的私人数字档案：随时记下发生的事、想法、练习和创作，带上照片，按时间、标签、地点回看。
 
-最初它是一本按地点、时间和主题组织的影像地图集；现在照片成为记录可以带上的媒体，图库、地图、主题和游记照旧。概念之间的边界见 [内容模型](/product/content-model.md)，方向调整的缘由见 [决策：以记录为中心](/architecture/decisions/0007-entry-first.md)。
+最初它是一本按地点、时间和主题组织的影像地图集；现在照片成为记录可以带上的媒体，图库、地图和游记照旧，主题成了可以收录记录的合集。概念之间的边界见 [内容模型](/product/content-model.md)，方向调整的缘由见 [决策：以记录为中心](/architecture/decisions/0007-entry-first.md)。
 
 # 为谁
 
@@ -17,11 +17,11 @@ Living 是一个人的私人数字档案：随时记下发生的事、想法、�
 
 # 核心价值
 
-1. **先记下来，再慢慢整理**：在 [今天](/product/features/today.md) 写一句就是一条 [记录](/product/features/entries.md)，不必先选类型、地点或主题；所有记录和照片在 [档案](/product/features/archive.md) 里按天排成一条时间线。
+1. **先记下来，再慢慢整理**：在 [今天](/product/features/today.md) 写一句就是一条 [记录](/product/features/entries.md)，不必先选类型、地点或合集；所有记录和照片在 [档案](/product/features/archive.md) 里按天排成一条时间线。
 2. **默认只属于自己**：新记录仅自己可见，公开要自己选；分享出去的东西不会顺带公开其中的私密照片。见 [隐私](/product/features/privacy.md)。
 3. **照片自己知道在哪**：根据 EXIF 里的 GPS 和镜头朝向，自动匹配到具体地点（断桥、孤山），而不只是一个坐标。见 [地点匹配](/product/features/poi-matching.md)。
 4. **按自己的方式整理**：预置一套多层级标签，用户可以在任意层级添加自己的标签。见 [多层级标签](/product/features/hierarchical-tags.md)。
-5. **每张照片都能写几句**：照片笔记连起来就是游记。见 [照片笔记](/product/features/photo-notes.md) 和 [主题](/product/features/themes.md)。
+5. **每张照片都能写几句**：照片笔记连起来就是游记。见 [照片笔记](/product/features/photo-notes.md) 和 [合集](/product/features/themes.md)。
 6. **好看地回看**：照片优先的图库、地图和地点页，以及适合放在客厅的 [Living 模式](/product/features/living-mode.md)。
 
 # 设计原则

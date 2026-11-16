@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Redirect, useLocation, useParams } from 'wouter';
-import type { PhotoSummary, Poi, SessionUser, ThemeDetail } from '../../shared/types';
+import type { PhotoSummary, Poi, SessionUser, ThemeDetail, ThemeEntry } from '../../shared/types';
 import { Icon } from '../components/icons';
 import PhotoPicker from '../components/PhotoPicker';
 import { api } from '../lib/api';
 import { useSession } from '../lib/session';
 import { setCached, useApi } from '../lib/useApi';
 import DeleteSection from '../themes/DeleteSection';
+import EntryPicker from '../themes/EntryPicker';
 import ItemRow, { type RowActions } from '../themes/ItemRow';
 import MetaFields from '../themes/MetaFields';
 import {
   dayItem,
   draftFromTheme,
   emptyDraft,
+  entryItem,
   mergeByDay,
   photoItem,
   textItem,
@@ -21,7 +23,7 @@ import {
   type EditorPhoto
 } from '../themes/draft';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
-import { insertAfter, insertPhotos, moveItem, removeItem, suggestDay, swapItem, type DropPos } from '../themes/items';
+import { insertAfter, insertPicked, itemPhotos, moveItem, removeItem, suggestDay, swapItem, type DropPos } from '../themes/items';
 import { useItemDrag } from '../themes/useItemDrag';
 import { useItemFocus } from '../themes/useItemFocus';
 import { usePickerSlot } from '../themes/usePickerSlot';
@@ -29,9 +31,9 @@ import { useThemeSave, type Message } from '../themes/useThemeSave';
 import { dayOf, errorMessage, unwrapTheme } from '../themes/util';
 import '../styles/themes.css';
 
-// /themes/new and /t/:id/edit. The form wires the draft (src/themes/draft.ts, items.ts) to the rows, the photo
-// picker and the save flow (useThemeSave); drag ordering, focus after a row change and the picker's insertion point
-// are hooks of their own.
+// /themes/new and /t/:id/edit, a collection's editor. The form wires the draft (src/themes/draft.ts, items.ts) to the
+// rows, the photo and entry pickers and the save flow (useThemeSave); drag ordering, focus after a row change and
+// each picker's insertion point are hooks of their own.
 
 /** The theme this page just wrote, so the edit route it moves to can open without another fetch. */
 let justSaved: ThemeDetail | null = null;
@@ -48,6 +50,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
   const [arranging, setArranging] = useState(false);
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const picker = usePickerSlot();
+  const entryPicker = usePickerSlot();
 
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -88,6 +91,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
   );
   const drag = useItemDrag(onDragMove);
   const openPicker = picker.openAt;
+  const openEntryPicker = entryPicker.openAt;
   const actions = useMemo<RowActions>(
     () => ({
       patch: (key, patch) =>
@@ -111,8 +115,8 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
       toggleMenu: (key) => setMenuKey((k) => (k === key ? null : key)),
       insert: (key, kind) => {
         setMenuKey(null);
-        if (kind === 'photo') {
-          openPicker(key);
+        if (kind === 'photo' || kind === 'entry') {
+          (kind === 'photo' ? openPicker : openEntryPicker)(key);
           return;
         }
         const cur = draftRef.current;
@@ -123,7 +127,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
       },
       ...drag.handlers
     }),
-    [pendingFocus, openPicker, drag.handlers]
+    [pendingFocus, openPicker, openEntryPicker, drag.handlers]
   );
 
   const append = (kind: 'text' | 'day') => {
@@ -137,11 +141,21 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
     const fresh = photos.map(photoItem);
     pendingFocus.current = { key: fresh[0].key, focus: false };
     const after = picker.after;
-    setDraft((d) => ({ ...d, items: insertPhotos(d.items, after, fresh) }));
+    setDraft((d) => ({ ...d, items: insertPicked(d.items, after, fresh) }));
     setMsg({ kind: 'info', text: `已加入 ${photos.length} 张照片` });
   };
 
+  const addEntries = (entries: ThemeEntry[]) => {
+    if (!entries.length) return;
+    const fresh = entries.map(entryItem);
+    pendingFocus.current = { key: fresh[0].key, focus: false };
+    const after = entryPicker.after;
+    setDraft((d) => ({ ...d, items: insertPicked(d.items, after, fresh) }));
+    setMsg({ kind: 'info', text: `已加入 ${entries.length} 条记录` });
+  };
+
   const photoIds = useMemo(() => new Set(draft.items.flatMap((it) => (it.kind === 'photo' ? [it.photoId] : []))), [draft.items]);
+  const entryIds = useMemo(() => new Set(draft.items.flatMap((it) => (it.kind === 'entry' ? [it.entryId] : []))), [draft.items]);
 
   async function autoArrange() {
     if (!draft.startDate || !draft.endDate) return;
@@ -169,7 +183,8 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
   }
 
   const trip = draft.kind === 'trip';
-  const photoCount = draft.items.filter((it) => it.kind === 'photo').length;
+  const photoCount = itemPhotos(draft.items).length;
+  const entryCount = entryIds.size;
   const shownMsg = msg && !(msg.kind === 'ok' && dirty) ? msg : null;
   const canSave = !saving && !deleting && (dirty || !themeId);
 
@@ -186,10 +201,10 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
         >
           <div className="ed-inner">
             <header className="ed-head">
-              <h1 className="display display-l">{themeId ? '编辑主题' : '新建主题'}</h1>
+              <h1 className="display display-l">{themeId ? '编辑合集' : '新建合集'}</h1>
               {themeId && (
                 <Link href={`/t/${themeId}`} className="btn btn-quiet">
-                  查看游记
+                  查看
                 </Link>
               )}
             </header>
@@ -202,7 +217,9 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
                   内容
                 </h2>
                 <span className="small muted mono">
-                  {draft.items.length} 项 · {photoCount} 张照片
+                  {[`${draft.items.length} 项`, `${photoCount} 张照片`, entryCount ? `${entryCount} 条记录` : '']
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               </div>
 
@@ -210,6 +227,10 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
                 <button id="th-add-photo" type="button" className="btn" onClick={() => openPicker(null)}>
                   <Icon name="plus" size={18} />
                   添加照片
+                </button>
+                <button type="button" className="btn" onClick={() => openEntryPicker(null)}>
+                  <Icon name="plus" size={18} />
+                  添加记录
                 </button>
                 <button type="button" className="btn btn-quiet" onClick={() => append('text')}>
                   添加文字段落
@@ -234,7 +255,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
 
               {draft.items.length === 0 ? (
                 <div className="ed-empty">
-                  <p>还没有内容。添加照片，或者先写一段文字。</p>
+                  <p>还没有内容。添加照片、记录，或者先写一段文字。</p>
                 </div>
               ) : (
                 <ol className="ed-items">
@@ -277,7 +298,7 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
                 {shownMsg?.kind === 'ok' && themeId && (
                   <>
                     {' '}
-                    <Link href={`/t/${themeId}`}>查看游记</Link>
+                    <Link href={`/t/${themeId}`}>查看</Link>
                   </>
                 )}
               </div>
@@ -298,10 +319,18 @@ function Form({ user, initial }: { user: SessionUser; initial?: ThemeDetail }) {
         open={picker.open}
         onClose={picker.close}
         existing={photoIds}
-        noun="主题"
+        noun="合集"
         from={trip ? draft.startDate : ''}
         to={trip ? draft.endDate : ''}
         onAdd={addPhotos}
+      />
+      <EntryPicker
+        open={entryPicker.open}
+        onClose={entryPicker.close}
+        existing={entryIds}
+        from={trip ? draft.startDate : ''}
+        to={trip ? draft.endDate : ''}
+        onAdd={addEntries}
       />
     </>
   );
@@ -313,7 +342,7 @@ function LoginGate() {
   return (
     <main className="th-page th-narrow">
       <div className="th-empty">
-        <p className="th-empty-title">登录后才能新建主题</p>
+        <p className="th-empty-title">登录后才能新建合集</p>
         <Link href="/login" className="btn btn-primary">
           登录
         </Link>
@@ -354,7 +383,7 @@ function Existing({ id, user }: { id: string; user: SessionUser }) {
     return (
       <main className="th-page th-narrow">
         <div className="th-empty" role="alert">
-          <p className="th-empty-title">主题加载失败</p>
+          <p className="th-empty-title">合集加载失败</p>
           <p className="muted">{errorMessage(error)}</p>
           <button type="button" className="btn" onClick={() => setAttempt((n) => n + 1)}>
             重试
@@ -370,7 +399,7 @@ function Existing({ id, user }: { id: string; user: SessionUser }) {
 export default function ThemeEditor() {
   const { id } = useParams<{ id?: string }>();
   const { user, loading } = useSession();
-  useDocumentTitle(id ? '编辑主题' : '新建主题');
+  useDocumentTitle(id ? '编辑合集' : '新建合集');
   useScrollTop(id ?? 'new');
 
   if (loading) return <p className="loading">加载中</p>;

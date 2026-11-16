@@ -50,11 +50,13 @@ const errorText = (e: unknown) => (e instanceof ApiError ? e.message : '网络�
 
 /**
  * Lists and counts that show what was saved: entry lists, projects (their counts, covers and photos follow their
- * entries, and a status change moves them too), photos' lists of their entries, tags' entry counts.
+ * entries, and a status change moves them too), collections showing the entry, photos' lists of their entries, tags'
+ * entry counts.
  */
 function refreshAround(fields: Partial<EntryPayload> | null) {
   invalidate('/api/entries?');
   invalidate('/api/projects');
+  invalidate('/api/themes');
   if (!fields || 'media' in fields) invalidate('/api/photos/');
   if (!fields || 'tagIds' in fields) invalidate('/api/tags');
 }

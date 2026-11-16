@@ -92,6 +92,11 @@
 .er-photo .img { max-height: 86vh; }
 .er-figure figcaption { margin-top: 10px; color: var(--ink-2); font-size: 14px; line-height: 1.75; white-space: pre-line; }
 .er-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--rule); }
+.er-foot-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.er-themes { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0 18px; }
+.er-themes a { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; color: var(--ink); font: 500 15px var(--serif); letter-spacing: 0.04em; text-decoration: none; }
+.er-themes a svg { color: var(--ink-3); }
+.er-themes a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
 .er-tags { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; color: var(--ink-2); font-size: 14px; }
 
 /* ---- writing an entry --------------------------------------------------------------------------- */

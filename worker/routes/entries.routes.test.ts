@@ -8,6 +8,8 @@ import {
   type EntryStatus,
   type EntrySummary,
   type PhotoDetail,
+  type ThemeDetail,
+  type ThemeItem,
   type Visibility
 } from '../../shared/types';
 import { Client, expectStatus, newUser, upload, usePlatform, type Json } from '../test-platform';
@@ -34,6 +36,18 @@ const rows = async (sql: string, ...params: unknown[]) =>
       .bind(...params)
       .all()
   ).results;
+
+/** updatedAt has a one-second resolution: set it instead of waiting. */
+const OLD = '2020-01-01T00:00:00Z';
+/** One of alice's collections (themes, docs/api/themes.md) holding `items`, with its updatedAt set to `at` when given. */
+async function collection(title: string, visibility: Visibility, items: Json[], at?: string): Promise<string> {
+  const id = expectStatus(await alice.post('/api/themes', { kind: 'topic', title, visibility }), 201).theme.id as string;
+  expectStatus(await alice.put(`/api/themes/${id}/items`, { items }), 200);
+  if (at) await platform.env.DB.prepare('UPDATE themes SET updated_at = ?1 WHERE id = ?2').bind(at, id).run();
+  return id;
+}
+/** A collection item showing the entry. */
+const holding = (e: EntryDetail, text?: string) => ({ kind: 'entry', entryId: e.id, text });
 
 describe('POST /api/entries', () => {
   it('records a private, finished note from a text and a time alone', async () => {
@@ -352,5 +366,72 @@ describe('DELETE /api/entries/:id', () => {
     const e = await create(alice, { body: 'x', tagIds: [tag.id, 'spring'] });
     expectStatus(await alice.del(`/api/tags/${tag.id}`), 200);
     expect(((await alice.get(`/api/entries/${e.id}`)).body as EntryDetail).tagIds).toEqual(['spring']);
+  });
+
+  it('takes the entry out of every collection holding it, keeps the rest of them, and moves their updatedAt on', async () => {
+    const photo = await upload(alice);
+    const gone = await create(alice, { title: '要删的', visibility: 'public' });
+    const kept = await create(alice, { title: '留下的', visibility: 'public' });
+    const twice = await collection(
+      '收了两次',
+      'public',
+      [
+        holding(gone, '第一次'),
+        { kind: 'text', text: '中间' },
+        { kind: 'photo', photoId: photo.id },
+        holding(kept),
+        holding(gone, '第二次')
+      ],
+      OLD
+    );
+    const once = await collection('只收了它', 'private', [holding(gone)], OLD);
+    const without = await collection('不收它', 'public', [holding(kept)], OLD);
+
+    expect(expectStatus(await alice.del(`/api/entries/${gone.id}`), 200)).toEqual({ ok: true });
+    const read = async (id: string) => expectStatus(await alice.get<ThemeDetail>(`/api/themes/${id}`), 200);
+    const shape = (i: ThemeItem) =>
+      i.kind === 'entry' ? `entry:${i.entryId}` : i.kind === 'photo' ? `photo:${i.photoId}` : `${i.kind}:${i.text}`;
+    const a = await read(twice);
+    expect(a.items.map(shape)).toEqual(['text:中间', `photo:${photo.id}`, `entry:${kept.id}`]);
+    expect(a).toMatchObject({ title: '收了两次', entryCount: 1, photoCount: 1 });
+    expect(a.updatedAt > OLD).toBe(true);
+    const b = await read(once);
+    expect(b.items).toEqual([]);
+    expect(b.updatedAt > OLD).toBe(true);
+    expect((await read(without)).updatedAt).toBe(OLD);
+    expect(await rows('SELECT id FROM theme_items WHERE entry_id = ?1', gone.id)).toEqual([]);
+  });
+});
+
+describe('collections holding an entry', () => {
+  it('are listed for others when public, the latest changed first, and for its author all of theirs, each once', async () => {
+    const e = await create(alice, { title: '断桥', visibility: 'public' });
+    expect(e.themes).toEqual([]);
+    const elsewhere = await create(alice, { title: '别的', visibility: 'public' });
+    const older = await collection('早先的', 'public', [holding(e)], '2026-01-01T00:00:00Z');
+    const secret = await collection('私下的', 'private', [holding(e)], '2026-02-01T00:00:00Z');
+    const twice = await collection(
+      '收了两次',
+      'public',
+      [holding(e, '一'), { kind: 'text', text: '中间' }, holding(e, '二')],
+      '2026-03-01T00:00:00Z'
+    );
+    const linked = await collection('仅链接', 'unlisted', [holding(e)], '2026-04-01T00:00:00Z');
+    await collection('不收它', 'public', [holding(elsewhere)], '2026-05-01T00:00:00Z');
+    const themesOf = async (viewer: Client) => expectStatus(await viewer.get<EntryDetail>(`/api/entries/${e.id}`), 200).themes;
+
+    expect(await themesOf(alice)).toEqual([
+      { id: linked, title: '仅链接' },
+      { id: twice, title: '收了两次' },
+      { id: secret, title: '私下的' },
+      { id: older, title: '早先的' }
+    ]);
+    // an unlisted collection is not given away from its entries
+    for (const viewer of [bob, anon]) {
+      expect(await themesOf(viewer)).toEqual([
+        { id: twice, title: '收了两次' },
+        { id: older, title: '早先的' }
+      ]);
+    }
   });
 });

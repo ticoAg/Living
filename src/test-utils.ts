@@ -93,6 +93,7 @@ export function themeDetail(over: Partial<ThemeDetail> = {}): ThemeDetail {
     endDate: null,
     visibility: 'public',
     photoCount: 0,
+    entryCount: 0,
     createdAt: '2026-11-08T00:00:00Z',
     updatedAt: '2026-11-08T00:00:00Z',
     publishedAt: null,
@@ -126,5 +127,5 @@ export function entry(id: string, over: Partial<EntrySummary> = {}): EntrySummar
 }
 
 export function entryDetail(id: string, over: Partial<EntryDetail> = {}): EntryDetail {
-  return { ...entry(id), body: '今天', media: [], revision: 1, ...over };
+  return { ...entry(id), body: '今天', media: [], revision: 1, themes: [], ...over };
 }

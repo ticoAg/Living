@@ -30,8 +30,10 @@ area: studio
 
 # 个人主页 `/@handle`
 
-显示名、简介、头像（取自己的一张照片）、照片数、主题数，有记录时还有记录数；下面是该用户的公开主题、已完成的 [记录](/product/features/entries.md)（他人只看到公开的，草稿和已归档的不在这里）和照片图库（可筛选、可 Living）。
+显示名、简介、头像（取自己的一张照片）、照片数、合集数，有记录、项目时还有记录数、项目数；下面是该用户的公开合集、已完成的 [记录](/product/features/entries.md)（他人只看到公开的，草稿和已归档的不在这里）和照片图库（可筛选、可 Living）。
 
 # 设置 `/settings`
 
-修改显示名、简介、头像、密码；管理 [隐私区域](/product/features/privacy.md)；站长和管理员还能看到 [站点管理](/product/features/admin.md)。
+修改显示名、简介、头像、密码；选择新照片的默认公开范围（公开、仅链接、仅自己）；管理 [隐私区域](/product/features/privacy.md)；站长和管理员还能看到 [站点管理](/product/features/admin.md)。
+
+新照片的默认公开范围：新账号是「仅自己」，这项设置出现之前就有的账号是「公开」。它只决定上传页给新照片预先选好的公开范围，改了之后已经上传的照片不变，见 [隐私](/product/features/privacy.md#新照片)。

@@ -8,6 +8,9 @@ export type GeoPrivacy = 'exact' | 'fuzzy' | 'hidden';
 export type PoiMethod = 'auto' | 'confirmed' | 'inferred' | 'manual';
 export type PoiSource = 'custom' | 'amap' | 'osm';
 export type ThemeKind = 'trip' | 'topic';
+/** What an item of a theme (合集) holds. The list may grow (the column has no CHECK). docs/data/theme-items.md */
+export const THEME_ITEM_KINDS = ['photo', 'text', 'day', 'entry'] as const;
+export type ThemeItemKind = (typeof THEME_ITEM_KINDS)[number];
 
 /** What an entry records. The list may grow (the column has no CHECK); labels in shared/entries.ts. docs/data/entries.md */
 export const ENTRY_TYPES = ['note', 'article', 'reading', 'practice', 'creation', 'trip'] as const;
@@ -53,6 +56,8 @@ export interface UserPublic {
 }
 export interface SessionUser extends UserPublic {
   role: Role;
+  /** Who sees a new photo unless its upload says otherwise: the account's setting, `private` for new accounts. */
+  photoVisibility: Visibility;
 }
 export interface UserProfile extends UserPublic {
   photoCount: number;
@@ -300,6 +305,7 @@ export interface CreatePhotoMeta {
   thumbhash?: string | null;
   palette?: string[] | null;
   focus?: [number, number] | null;
+  /** left out: the uploader's `photoVisibility` */
   visibility?: Visibility;
   inLiving?: boolean;
   favorite?: boolean;
@@ -338,21 +344,34 @@ export interface ThemeSummary {
   startDate: string | null;
   endDate: string | null;
   visibility: Visibility;
+  /** Photos as the requester sees them: photo items, and the photos of the entry items, each time it shows. */
   photoCount: number;
+  /** Entry items the requester may open. */
+  entryCount: number;
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
 }
 
+/** An entry as a theme shows it: its summary and the photos of it the requester may open, in order. */
+export interface ThemeEntry extends EntrySummary {
+  photos: PhotoSummary[];
+}
+
+/**
+ * An item the requester may not open (a private photo, an unfinished or private entry) keeps its place with `photo` or
+ * `entry` null; readers leave it out.
+ */
 export type ThemeItem =
   | { id: string; kind: 'photo'; photoId: string; text: string | null; photo: (PhotoSummary & { note: string | null }) | null }
   | { id: string; kind: 'text'; text: string }
-  | { id: string; kind: 'day'; day: string; text: string | null };
+  | { id: string; kind: 'day'; day: string; text: string | null }
+  | { id: string; kind: 'entry'; entryId: string; text: string | null; entry: ThemeEntry | null };
 
 export interface ThemeDetail extends ThemeSummary {
   intro: string | null;
   items: ThemeItem[];
-  /** POIs referenced by the photos, for the route map */
+  /** POIs of the photos, entry photos included, for the route map */
   pois: Poi[];
 }
 
@@ -374,6 +393,7 @@ export interface PutThemeItemsBody {
     | { kind: 'photo'; photoId: string; text?: string | null }
     | { kind: 'text'; text: string }
     | { kind: 'day'; day: string; text?: string | null }
+    | { kind: 'entry'; entryId: string; text?: string | null }
   )[];
 }
 
@@ -434,6 +454,8 @@ export interface EntryDetail extends EntrySummary {
   media: EntryMedia[];
   /** One more with every change. Send it back with `PATCH` to hear (409) about a change made elsewhere meanwhile. */
   revision: number;
+  /** Themes (合集) holding it that the requester may see in lists: public ones, or all of one's own. */
+  themes: { id: string; title: string }[];
 }
 
 export interface EntryMediaInput {

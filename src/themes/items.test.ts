@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { photo } from '../test-utils';
 import { dayItem, emptyDraft, photoItem, textItem, type Draft, type DraftItem } from './draft';
-import { coverChoices, dropEmptyText, insertAfter, insertPhotos, moveItem, removeItem, suggestDay, swapItem } from './items';
+import { coverChoices, dropEmptyText, insertAfter, insertPicked, moveItem, removeItem, suggestDay, swapItem } from './items';
 
 const shape = (items: readonly DraftItem[]) =>
   items.map((it) => (it.kind === 'photo' ? `photo:${it.photoId}` : it.kind === 'day' ? `day:${it.day}` : `text:${it.text}`));
@@ -75,11 +75,11 @@ describe('insertAfter', () => {
   });
 });
 
-describe('insertPhotos', () => {
+describe('insertPicked', () => {
   it('inserts after the item, or at the end without one', () => {
     const items = list();
     const fresh = [photoItem(photo('c')), photoItem(photo('d'))];
-    expect(shape(insertPhotos(items, items[1].key, fresh))).toEqual([
+    expect(shape(insertPicked(items, items[1].key, fresh))).toEqual([
       'photo:a',
       'text:x',
       'photo:c',
@@ -87,8 +87,8 @@ describe('insertPhotos', () => {
       'day:2026-05-01',
       'photo:b'
     ]);
-    expect(shape(insertPhotos(items, null, fresh)).slice(-2)).toEqual(['photo:c', 'photo:d']);
-    expect(shape(insertPhotos(items, 'nope', fresh)).slice(-2)).toEqual(['photo:c', 'photo:d']);
+    expect(shape(insertPicked(items, null, fresh)).slice(-2)).toEqual(['photo:c', 'photo:d']);
+    expect(shape(insertPicked(items, 'nope', fresh)).slice(-2)).toEqual(['photo:c', 'photo:d']);
   });
 });
 

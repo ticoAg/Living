@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'wouter';
+import { entryLabel, entryTypeLabel } from '../../shared/entries';
 import type { ThemeDetail, ThemeSummary } from '../../shared/types';
 import Img from '../components/Img';
 import MapView, { type MapPoint, type MapShapes } from '../components/MapView';
@@ -7,19 +8,27 @@ import { CategoryIcon, Icon } from '../components/icons';
 import { ApiError } from '../lib/api';
 import { useApi } from '../lib/useApi';
 import { useSession } from '../lib/session';
+import Markdown from '../entries/Markdown';
 import Prose from '../themes/Prose';
 import ThemeCard from '../themes/ThemeCard';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import { buildReaderModel, type Block } from '../themes/model';
 import { fmtRange, KIND_LABEL, unwrapTheme, VISIBILITY_LABEL } from '../themes/util';
+import '../styles/entries.css';
 import '../styles/themes.css';
+
+// /t/:id — a collection read from start to end: a trip as a travelogue with its route, a topic as a selection. Photos
+// and entries the reader may not open are already gone from it. Docs: /docs/product/features/travelogue.md
+
+/** photos of an entry drawn before the rest are left to the entry itself */
+const ENTRY_PHOTOS = 6;
 
 function Missing({ error, reload }: { error: unknown; reload: () => void }) {
   const gone = error instanceof ApiError && [401, 403, 404].includes(error.status);
   return (
     <main className="th-page th-narrow">
       <div className="th-empty" role="alert">
-        <p className="th-empty-title">{gone ? '找不到这个主题' : '主题加载失败'}</p>
+        <p className="th-empty-title">{gone ? '找不到这个合集' : '合集加载失败'}</p>
         <p className="muted">{gone ? '它可能已被删除，或者只有作者能看到。' : '请检查网络后重试。'}</p>
         <div className="row" style={{ justifyContent: 'center' }}>
           {!gone && (
@@ -28,7 +37,7 @@ function Missing({ error, reload }: { error: unknown; reload: () => void }) {
             </button>
           )}
           <Link href="/themes" className="btn">
-            全部主题
+            全部合集
           </Link>
         </div>
       </div>
@@ -36,7 +45,66 @@ function Missing({ error, reload }: { error: unknown; reload: () => void }) {
   );
 }
 
+function EntryBlock({ b }: { b: Extract<Block, { type: 'entry' }> }) {
+  const e = b.entry;
+  const href = `/e/${e.id}`;
+  const H = b.level === 2 ? 'h2' : 'h3';
+  const shown = e.photos.length > ENTRY_PHOTOS ? e.photos.slice(0, ENTRY_PHOTOS - 1) : e.photos;
+  const more = e.photos.length - shown.length;
+  const label = entryLabel(e.title, e.excerpt) || entryTypeLabel(e.type);
+  return (
+    <section
+      id={`item-${b.key}`}
+      className="rd-entry"
+      tabIndex={-1}
+      aria-label={e.title ? undefined : label}
+      aria-labelledby={e.title ? `item-${b.key}-h` : undefined}
+    >
+      {b.text && <Prose text={b.text} className="rd-prose" />}
+      <div className="rd-entry-card">
+        {(e.type !== 'note' || b.when) && (
+          <p className="rd-entry-meta">
+            {e.type !== 'note' && <span>{entryTypeLabel(e.type)}</span>}
+            {b.when && <span className="mono">{b.when}</span>}
+          </p>
+        )}
+        {e.title && (
+          <H id={`item-${b.key}-h`} className="rd-entry-title">
+            <Link href={href}>{e.title}</Link>
+          </H>
+        )}
+        <Markdown text={e.excerpt} compact className="rd-entry-text" />
+        {shown.length > 0 && (
+          <ul className="rd-entry-photos">
+            {shown.map((p) => (
+              <li key={p.id}>
+                <Link href={`/p/${p.id}`} className="rd-entry-photo" aria-label={p.title ?? '照片'}>
+                  <Img photo={p} ratio="1 / 1" sizes="(max-width: 640px) 32vw, 220px" alt="" />
+                </Link>
+              </li>
+            ))}
+            {more > 0 && (
+              <li>
+                <Link href={href} className="rd-entry-photos-more mono" aria-label={`还有 ${more} 张照片，在记录里`}>
+                  +{more}
+                </Link>
+              </li>
+            )}
+          </ul>
+        )}
+        {(e.hasMore || !e.title) && (
+          <Link href={href} className="rd-entry-more">
+            {e.hasMore ? '读全文' : '打开记录'}
+            <Icon name="right" size={14} />
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function BlockView({ b }: { b: Block }) {
+  if (b.type === 'entry') return <EntryBlock b={b} />;
   if (b.type === 'day') {
     return (
       <div id={`item-${b.key}`} className="rd-day">
@@ -95,7 +163,7 @@ function MoreFromAuthor({ theme }: { theme: ThemeDetail }) {
   return (
     <section className="rd-more" aria-labelledby="rd-more-h">
       <h2 id="rd-more-h" className="rd-foot-h">
-        <span className="handle">@{theme.ownerHandle}</span> 的其他主题
+        <span className="handle">@{theme.ownerHandle}</span> 的其他合集
       </h2>
       <ul className="th-grid">
         {others.map((t) => (
@@ -140,7 +208,7 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
       <div className="rd-bar">
         <Link href="/themes" className="rd-back">
           <Icon name="left" size={16} />
-          主题
+          合集
         </Link>
         <div className="row" style={{ gap: 8 }}>
           {model.photoCount > 0 && (
@@ -180,6 +248,14 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
           <span>
             <b className="mono">{model.photoCount}</b> 张照片
           </span>
+          {model.entryCount > 0 && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>
+                <b className="mono">{model.entryCount}</b> 条记录
+              </span>
+            </>
+          )}
           <span aria-hidden="true">·</span>
           <span>
             <b className="mono">{model.places.length}</b> 个地点
@@ -218,7 +294,7 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
         {model.blocks.map((b) => (
           <BlockView key={b.key} b={b} />
         ))}
-        {model.blocks.length === 0 && <p className="muted">这个主题还没有内容。</p>}
+        {model.blocks.length === 0 && <p className="muted">这个合集还没有内容。</p>}
       </article>
 
       <footer className="rd-foot">

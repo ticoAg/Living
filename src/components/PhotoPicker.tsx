@@ -1,20 +1,20 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { PhotoSummary, Tag } from '../../shared/types';
 import { fmtDay } from '../lib/format';
 import { buildTagTree, filterByTags, inclusiveCounts, isSwatch, swatchFill, type TagNode } from '../lib/tags';
 import { useApi } from '../lib/useApi';
-import '../styles/picker.css';
 import { Icon } from './icons';
 import Img from './Img';
+import PickerDialog from './PickerDialog';
 
-// The owner's own photos in a dialog, to add to a theme or an entry: a date range and tag filters, several at once.
+// The owner's own photos in a dialog, to add to a collection (theme) or an entry: a date range and tag filters, several at once.
 
 interface Props {
   open: boolean;
   onClose: () => void;
   /** ids of photos already there: shown, but not selectable */
   existing: ReadonlySet<string>;
-  /** what they are added to, for the label of a photo already in it: 主题, 记录 */
+  /** what they are added to, for the label of a photo already in it: 合集, 记录 */
   noun: string;
   /** date range to start with (a trip's own dates, an entry's day) */
   from?: string;
@@ -274,47 +274,19 @@ function Body({ existing, noun, from = '', to = '', onAdd, onClose, titleId }: O
 
 /** Modal over the owner's own photos: date range and tag filters, multi-select. */
 export default function PhotoPicker(props: Props) {
-  const { open, onClose } = props;
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  // a press that starts inside the panel and ends on the backdrop (text selection, a date picker) must not close it
-  const pressedBackdrop = useRef(false);
-
-  useEffect(() => {
-    const d = ref.current;
-    if (!d) return;
-    if (open && !d.open) d.showModal();
-    else if (!open && d.open) d.close();
-  }, [open]);
-
   return (
-    <dialog
-      ref={ref}
-      className="pp"
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        e.preventDefault();
-        onClose();
-      }}
-      onClose={onClose}
-      onMouseDown={(e) => {
-        pressedBackdrop.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        if (pressedBackdrop.current && e.target === e.currentTarget) onClose();
-      }}
-    >
-      {open && (
+    <PickerDialog open={props.open} onClose={props.onClose}>
+      {(titleId) => (
         <Body
           existing={props.existing}
           noun={props.noun}
           from={props.from}
           to={props.to}
           onAdd={props.onAdd}
-          onClose={onClose}
+          onClose={props.onClose}
           titleId={titleId}
         />
       )}
-    </dialog>
+    </PickerDialog>
   );
 }

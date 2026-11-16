@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: Living 模式
-description: 全屏轮播。什么都不选就随机播放全部；也可按标签、主题、地点、城市或"那年今日"取图；字段、间隔、转场都可配置，配置可写进链接。
+description: 全屏轮播。什么都不选就随机播放全部；也可按标签、合集、地点、城市或"那年今日"取图；字段、间隔、转场都可配置，配置可写进链接。
 tags: [browse, mvp]
 route: "/living"
 area: living
@@ -13,7 +13,7 @@ area: living
 | 图库的 Living 按钮 | 沿用当前城市、标签、色调筛选；没有筛选时随机全部 | `/living?src=tags&tags=lake&city=杭州` |
 | 照片详情 | 从这张开始 | `/living?start=<photoId>` |
 | 地点页、地图侧栏 | 只播放这个地点 | `/living?src=place&place=<poiId>` |
-| 游记 | 只播放这个主题 | `/living?src=theme&theme=<themeId>` |
+| 合集（游记） | 只播放这个合集：照片条目和记录条目里的照片，按合集的顺序，同一张只放一次 | `/living?src=theme&theme=<themeId>` |
 | 直接打开 | 随机全部；可存书签或添加到主屏幕当相框 | `/living` |
 
 个人主页的 Living 只播放该用户的照片（`user=<handle>`）。

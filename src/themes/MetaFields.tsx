@@ -2,8 +2,8 @@ import { useMemo, type Dispatch, type SetStateAction } from 'react';
 import { THEME_LIMITS } from '../../shared/limits';
 import type { ThemeKind, Visibility } from '../../shared/types';
 import Img from '../components/Img';
-import { photoDayRange, type Draft } from './draft';
-import { coverChoices } from './items';
+import { contentDayRange, type Draft } from './draft';
+import { coverChoices, unseenByReaders } from './items';
 import { KIND_LABEL, VISIBILITY_HINT, VISIBILITY_LABEL } from './util';
 
 const VISIBILITIES: Visibility[] = ['public', 'unlisted', 'private'];
@@ -21,11 +21,11 @@ interface Props {
 export default function MetaFields({ draft, set, setDraft, isNew }: Props) {
   const trip = draft.kind === 'trip';
   const coverPhotos = useMemo(() => coverChoices(draft.items), [draft.items]);
-  const privateCount = useMemo(
-    () => draft.items.filter((it) => it.kind === 'photo' && it.photo?.visibility === 'private').length,
-    [draft.items]
-  );
-  const range = useMemo(() => photoDayRange(draft.items), [draft.items]);
+  const unseen = useMemo(() => unseenByReaders(draft.items), [draft.items]);
+  const unseenText = [unseen.photos ? `${unseen.photos} 张照片` : '', unseen.entries ? `${unseen.entries} 条记录` : '']
+    .filter(Boolean)
+    .join('、');
+  const range = useMemo(() => contentDayRange(draft.items), [draft.items]);
 
   return (
     <section className="ed-sec" aria-labelledby="ed-basic">
@@ -124,7 +124,7 @@ export default function MetaFields({ draft, set, setDraft, isNew }: Props) {
             disabled={!range || (range.start === draft.startDate && range.end === draft.endDate)}
             onClick={() => range && setDraft((d) => ({ ...d, startDate: range.start, endDate: range.end }))}
           >
-            取自照片
+            取自内容
           </button>
         </div>
       )}
@@ -141,9 +141,9 @@ export default function MetaFields({ draft, set, setDraft, isNew }: Props) {
           ))}
         </div>
         <p className="small muted ed-hint">{VISIBILITY_HINT[draft.visibility]}</p>
-        {draft.visibility !== 'private' && privateCount > 0 && (
+        {draft.visibility !== 'private' && unseenText && (
           <p className="small ed-warn" role="note">
-            有 {privateCount} 张照片仅自己可见，读者看不到它们。
+            有 {unseenText}读者看不到。
           </p>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { PhotoSummary, Poi, Tag, ThemeDetail } from '../../shared/types';
 import { buildTagTree } from '../lib/tags';
+import { themePhotos } from '../themes/model';
 import { useApi } from '../lib/useApi';
 import { buildPlaylist } from './playlist';
 import type { Settings, Source } from './settings';
@@ -54,8 +55,9 @@ export function useLivingData({ source, settings, drawerEverOpened, startId, see
   const theme = useMemo(() => unwrap<ThemeDetail>(themeRes.data, 'theme'), [themeRes.data]);
   const themeTitle = useRef('');
   if (theme?.title) themeTitle.current = theme.title;
-  const themePhotos = useMemo(() => theme?.items?.flatMap((it) => (it.kind === 'photo' && it.photo ? [it.photo] : [])), [theme]);
-  const listed = source.src === 'theme' ? themePhotos : photosRes.data?.photos;
+  // a theme plays its photos and its entries' photos, in its order
+  const playable = useMemo(() => (theme?.items ? themePhotos(theme) : undefined), [theme]);
+  const listed = source.src === 'theme' ? playable : photosRes.data?.photos;
 
   // Keep the last good list while a refresh is in flight, so a midnight reload never blanks the screen.
   const listKey = source.src === 'theme' ? `theme:${source.theme}` : listPath;

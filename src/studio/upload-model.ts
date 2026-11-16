@@ -62,7 +62,8 @@ export interface Item {
   deviceFix: DeviceFix | null;
 }
 
-export function newItem(file: File, capture: Capture | null = null): Item {
+/** A queued file. `visibility` starts as the account's setting for new photos (SessionUser.photoVisibility). */
+export function newItem(file: File, capture: Capture | null = null, visibility: Visibility = 'public'): Item {
   return {
     id: uid(),
     file,
@@ -78,7 +79,7 @@ export function newItem(file: File, capture: Capture | null = null): Item {
     title: '',
     note: '',
     tags: [],
-    visibility: 'public',
+    visibility,
     geoPrivacy: 'exact',
     geoTouched: false,
     inLiving: true,

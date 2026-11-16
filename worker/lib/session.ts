@@ -1,5 +1,5 @@
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
-import type { Role, SessionUser } from '../../shared/types';
+import type { Role, SessionUser, Visibility } from '../../shared/types';
 import { randomToken } from './crypto';
 import { forbidden, unauthenticated, type Ctx } from './http';
 import { nowIso } from './sql';
@@ -16,12 +16,21 @@ interface UserRow {
   bio: string | null;
   avatar_photo_id: string | null;
   role: Role;
+  photo_visibility: Visibility;
 }
 
-export const USER_COLS = 'id, handle, display_name, bio, avatar_photo_id, role';
+export const USER_COLS = 'id, handle, display_name, bio, avatar_photo_id, role, photo_visibility';
 
 export function toSessionUser(r: UserRow): SessionUser {
-  return { id: r.id, handle: r.handle, displayName: r.display_name, bio: r.bio, avatarPhotoId: r.avatar_photo_id, role: r.role };
+  return {
+    id: r.id,
+    handle: r.handle,
+    displayName: r.display_name,
+    bio: r.bio,
+    avatarPhotoId: r.avatar_photo_id,
+    role: r.role,
+    photoVisibility: r.photo_visibility
+  };
 }
 
 /** Creates the KV session and sets the cookie. */

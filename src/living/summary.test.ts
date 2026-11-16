@@ -30,7 +30,7 @@ describe('sourceName', () => {
   });
   it('falls back to generic words, never raw ids', () => {
     expect(sourceName(source({ src: 'place', place: 'poi_9' }), none)).toBe('地点');
-    expect(sourceName(source({ src: 'theme', theme: 'th_1' }), none)).toBe('主题');
+    expect(sourceName(source({ src: 'theme', theme: 'th_1' }), none)).toBe('合集');
     expect(sourceName(source({ src: 'tags', tags: ['secret'] }), names)).toBe('标签');
     expect(sourceName(source({ src: 'tags', tags: ['secret', 'lake'] }), names)).toBe('湖');
     expect(sourceName(source({ src: 'tags' }), names)).toBe('全部');
@@ -70,12 +70,12 @@ describe('scopeSwitches', () => {
   it('switches a theme with its order', () => {
     const opened = { place: '', theme: 'th_1', city: '', user: '' };
     expect(scopeSwitches(opened, source({ src: 'theme', theme: 'th_1' }), names)[0]).toMatchObject({
-      label: '主题 · 西湖三日',
+      label: '合集 · 西湖三日',
       on: true,
       patch: { src: 'all', order: 'shuffle' }
     });
     expect(scopeSwitches(opened, source(), none)[0]).toMatchObject({
-      label: '主题 · 指定主题',
+      label: '合集 · 指定合集',
       on: false,
       patch: { src: 'theme', theme: 'th_1', order: 'time' }
     });

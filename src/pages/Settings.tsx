@@ -1,14 +1,17 @@
+import { useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { startScroll } from '../lib/scroll';
 import { useSession } from '../lib/session';
 import { PageHead } from '../studio/ui';
 import AdminSection from '../studio/settings/AdminSection';
 import PasswordSection from '../studio/settings/PasswordSection';
+import PhotoDefaultsSection from '../studio/settings/PhotoDefaultsSection';
 import ProfileSection from '../studio/settings/ProfileSection';
 import ZonesSection from '../studio/settings/ZonesSection';
 import { useRequireLogin, useTitle } from '../studio/util';
 import '../styles/studio.css';
 
-// /settings — profile, password, privacy zones; site administration for the owner and admins.
+// /settings — profile, password, new photos' visibility, privacy zones; site administration for the owner and admins.
 // Docs: /docs/product/features/accounts.md, privacy.md, admin.md
 
 const ROLE: Record<string, string> = { owner: '站长', admin: '管理员', member: '成员' };
@@ -18,8 +21,18 @@ export default function Settings() {
   const { ready } = useRequireLogin();
   const { user, logout } = useSession();
   const [, navigate] = useLocation();
+  const shown = ready && !!user;
 
-  if (!ready || !user) return <p className="loading">加载中</p>;
+  // the sections render once the session is known, so a link such as /settings#photos is taken to its section here
+  useEffect(() => {
+    if (!shown) return;
+    const id = decodeURIComponent(location.hash.slice(1));
+    const target = id ? document.getElementById(id) : null;
+    if (target) target.scrollIntoView();
+    else startScroll();
+  }, [shown]);
+
+  if (!shown) return <p className="loading">加载中</p>;
   const staff = user.role === 'owner' || user.role === 'admin';
 
   return (
@@ -36,6 +49,7 @@ export default function Settings() {
       <nav className="se-nav" aria-label="设置分区">
         <a href="#profile">个人资料</a>
         <a href="#password">密码</a>
+        <a href="#photos">新照片</a>
         <a href="#privacy">隐私区域</a>
         {staff && <a href="#admin">站点管理</a>}
       </nav>
@@ -43,6 +57,7 @@ export default function Settings() {
       <div className="se-stack">
         <ProfileSection user={user} />
         <PasswordSection />
+        <PhotoDefaultsSection user={user} />
         <ZonesSection />
         {staff && <AdminSection user={user} />}
         <div className="se-out">

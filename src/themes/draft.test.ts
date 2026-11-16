@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { ThemeItem } from '../../shared/types';
-import { photo, themeDetail } from '../test-utils';
+import { entry, photo, themeDetail } from '../test-utils';
 import {
   MAX_ITEMS,
   byTaken,
   dayItem,
   draftFromTheme,
   emptyDraft,
+  entryItem,
   itemsPayload,
   mergeByDay,
   metaPayload,
   nextKey,
-  photoDayRange,
+  contentDayRange,
   photoItem,
   textItem,
   validate,
@@ -24,7 +25,19 @@ const draft = (over: Partial<Draft> = {}): Draft => ({ ...emptyDraft('trip'), ti
 
 /** An item reduced to what a test cares about, since keys are generated. */
 const shape = (items: readonly DraftItem[]) =>
-  items.map((it) => (it.kind === 'photo' ? `photo:${it.photoId}` : it.kind === 'day' ? `day:${it.day}` : `text:${it.text}`));
+  items.map((it) =>
+    it.kind === 'photo'
+      ? `photo:${it.photoId}`
+      : it.kind === 'day'
+        ? `day:${it.day}`
+        : it.kind === 'entry'
+          ? `entry:${it.entryId}`
+          : `text:${it.text}`
+  );
+const themeEntry = (id: string, over: Parameters<typeof entry>[1] = {}, photos = [] as ReturnType<typeof photo>[]) => ({
+  ...entry(id, over),
+  photos
+});
 
 describe('keys', () => {
   it('are unique per item', () => {
@@ -183,7 +196,7 @@ describe('validate', () => {
     const photos = Array.from({ length: MAX_ITEMS }, (_, i) => photoItem(photo(`ph_${i}`)));
     expect(validate(draft({ items: photos }))).toBeNull();
     const tooMany = [...photos, photoItem(photo('one-more'))];
-    expect(validate(draft({ items: tooMany }))).toEqual({ text: `一个主题最多 ${MAX_ITEMS} 个条目，请先移除一些`, field: 'th-add-photo' });
+    expect(validate(draft({ items: tooMany }))).toEqual({ text: `一个合集最多 ${MAX_ITEMS} 个条目，请先移除一些`, field: 'th-add-photo' });
     // empty blocks are not sent, so they do not count against the limit
     expect(validate(draft({ items: [...photos, textItem(), textItem()] }))).toBeNull();
   });
@@ -200,7 +213,7 @@ describe('validate', () => {
   });
 });
 
-describe('photoDayRange', () => {
+describe('contentDayRange', () => {
   it('spans the earliest and latest capture day of the photos', () => {
     const items = [
       photoItem(taken('a', '2026-10-05T10:00:00')),
@@ -208,20 +221,58 @@ describe('photoDayRange', () => {
       photoItem(taken('b', '2026-10-03T23:59:00')),
       photoItem(taken('c', '2026-10-04T00:00:00'))
     ];
-    expect(photoDayRange(items)).toEqual({ start: '2026-10-03', end: '2026-10-05' });
+    expect(contentDayRange(items)).toEqual({ start: '2026-10-03', end: '2026-10-05' });
   });
 
   it('is one day for a single photo, and ignores photos without a time or a photo', () => {
-    expect(photoDayRange([photoItem(taken('a', '2026-10-05T10:00:00')), photoItem(taken('b', null))])).toEqual({
+    expect(contentDayRange([photoItem(taken('a', '2026-10-05T10:00:00')), photoItem(taken('b', null))])).toEqual({
       start: '2026-10-05',
       end: '2026-10-05'
     });
-    expect(photoDayRange([{ key: 'k', kind: 'photo', photoId: 'gone', text: '', photo: null }])).toBeNull();
+    expect(contentDayRange([{ key: 'k', kind: 'photo', photoId: 'gone', text: '', photo: null }])).toBeNull();
   });
 
-  it('is null without any dated photo', () => {
-    expect(photoDayRange([])).toBeNull();
-    expect(photoDayRange([textItem(), dayItem('2026-10-03'), photoItem(taken('a', null))])).toBeNull();
+  it('counts the day an entry happened and its photos’ days', () => {
+    const items = [
+      photoItem(taken('a', '2026-10-04T10:00:00')),
+      entryItem(themeEntry('e1', { occurredAt: '2026-10-06' })),
+      entryItem(themeEntry('e2', { occurredAt: '2026-10-05T08:00:00' }, [taken('b', '2026-10-02T09:00:00')]))
+    ];
+    expect(contentDayRange(items)).toEqual({ start: '2026-10-02', end: '2026-10-06' });
+    expect(contentDayRange([{ key: 'k', kind: 'entry', entryId: 'gone', text: '', entry: null }])).toBeNull();
+  });
+
+  it('is null without any dated photo or entry', () => {
+    expect(contentDayRange([])).toBeNull();
+    expect(contentDayRange([textItem(), dayItem('2026-10-03'), photoItem(taken('a', null))])).toBeNull();
+  });
+});
+
+describe('entry items', () => {
+  it('start with no words of the collection’s own', () => {
+    expect(entryItem(themeEntry('e1'))).toMatchObject({ kind: 'entry', entryId: 'e1', text: '' });
+  });
+
+  it('come from a theme, entry and caption as they are', () => {
+    const e = themeEntry('e1', { title: '断桥' }, [photo('p1')]);
+    const items: ThemeItem[] = [
+      { id: 'i1', kind: 'entry', entryId: 'e1', text: '那天的雪', entry: e },
+      { id: 'i2', kind: 'entry', entryId: 'e2', text: null, entry: null }
+    ];
+    expect(draftFromTheme(themeDetail({ items })).items).toEqual([
+      { key: expect.any(String), kind: 'entry', entryId: 'e1', text: '那天的雪', entry: e },
+      { key: expect.any(String), kind: 'entry', entryId: 'e2', text: '', entry: null }
+    ]);
+  });
+
+  it('are saved with their caption trimmed at the end, and left out when the entry is gone', () => {
+    const kept = { ...entryItem(themeEntry('e1')), text: '  雪后  \n' };
+    const bare = entryItem(themeEntry('e2'));
+    const gone: DraftItem = { key: 'k', kind: 'entry', entryId: 'e3', text: '说明', entry: null };
+    expect(itemsPayload([kept, gone, bare])).toEqual([
+      { kind: 'entry', entryId: 'e1', text: '  雪后' },
+      { kind: 'entry', entryId: 'e2', text: null }
+    ]);
   });
 });
 

@@ -1,5 +1,5 @@
-/* The photo picker (components/PhotoPicker.tsx): a dialog over the owner's own photos, used by the theme and entry
-   editors. */
+/* The pickers' dialog (components/PickerDialog.tsx): the photo picker over the owner's own photos, used by the
+   collection and entry editors, and the entry picker of the collection editor. */
 
 body:has(dialog.pp[open]) { overflow: hidden; }
 .pp { width: min(1080px, calc(100vw - 32px)); max-width: none; max-height: min(90vh, 920px); padding: 0; overflow: hidden; border: 0; border-radius: var(--r-stage); background: var(--paper); color: var(--ink); box-shadow: var(--lift-3); }
@@ -52,3 +52,20 @@ body:has(dialog.pp[open]) { overflow: hidden; }
   .pp-filters, .pp-scroll, .pp-foot { padding-left: 16px; padding-right: 16px; }
   .pp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* The entry picker (themes/EntryPicker.tsx): the same dialog, a list of rows instead of a grid. */
+.pp-dates .ep-words { flex: 2 1 220px; max-width: none; }
+.ep-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ep-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 8px 12px 8px 8px; border: 1px solid var(--rule); border-radius: 14px; background: var(--sheet); color: var(--ink); text-align: left; cursor: pointer; }
+.ep-row:hover { border-color: var(--rule-2); }
+.ep-row[aria-pressed='true'] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.ep-row:disabled { cursor: default; opacity: 0.55; }
+.ep-row:focus-visible { outline: 2px solid var(--hydro); outline-offset: 2px; }
+.ep-thumb { display: block; overflow: hidden; border-radius: 10px; background: var(--mat); }
+.ep-thumb-blank { display: grid; place-items: center; aspect-ratio: 1 / 1; color: var(--ink-3); }
+.ep-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ep-meta { display: flex; flex-wrap: wrap; gap: 0 10px; color: var(--ink-3); font-size: 12.5px; }
+.ep-label { overflow: hidden; font: 600 15px/1.5 var(--serif); letter-spacing: 0.02em; text-overflow: ellipsis; white-space: nowrap; }
+.ep-check { display: grid; place-items: center; width: 24px; height: 24px; border: 1.5px solid var(--rule-2); border-radius: 50%; }
+.ep-row[aria-pressed='true'] .ep-check { border-color: var(--ink); background: var(--ink); color: #fff; }
+.ep-added { padding: 0 8px; border-radius: var(--r-pill); background: var(--mat); color: var(--ink-2); font-size: 11px; line-height: 20px; }

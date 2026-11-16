@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Visibility } from '../../shared/types';
 import type { Item } from './upload-model';
 import { useUploadDrafts } from './useUploadDrafts';
 
@@ -7,10 +8,10 @@ import { useUploadDrafts } from './useUploadDrafts';
  * work (reading, matching, publishing) and wake whatever waits on `changed()`. `alive` turns false when the page goes
  * away; the photos' object URLs are revoked then. What was typed for each photo is kept as a draft (useUploadDrafts).
  */
-export function useUploadQueue(userId: string | null) {
+export function useUploadQueue(userId: string | null, base: Visibility) {
   const [items, setItems] = useState<Item[]>([]);
   const itemsRef = useRef<Item[]>([]);
-  const drafts = useUploadDrafts(userId, items);
+  const drafts = useUploadDrafts(userId, items, base);
 
   const alive = useRef(true);
   /** a publishing run waiting for photos to be processed or matched */

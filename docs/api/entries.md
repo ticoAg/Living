@@ -31,10 +31,11 @@ sources:
 
 # GET /api/entries/:id
 
-`EntryDetail`：摘要的全部字段，加完整的 `body`、`media`（照片及其在这条记录里的说明）和 `revision`。
+`EntryDetail`：摘要的全部字段，加完整的 `body`、`media`（照片及其在这条记录里的说明）、`revision` 和 `themes`。
 
 - 他人只能打开 `published` 且 `public` 或 `unlisted` 的记录；其余（包括草稿、已归档）返回 404，与不存在无法区分。
 - `media` 略去请求者不能打开的照片，不留空位；照片对象不带笔记 `note`。
+- `themes`：收录这条记录、请求者能在列表里看到的 [合集](/api/themes.md)（公开的，本人：全部），每个带 `id`、`title`，按合集的 `updatedAt` 倒序。仅链接可见的合集不从记录页透露，与照片页一样。
 
 # POST /api/entries（登录）
 
@@ -71,7 +72,7 @@ sources:
 
 # DELETE /api/entries/:id（本人）
 
-→ `{ "ok": true }`。记录与它的照片关联、标签关联、项目关联一起删除，照片、标签和项目本身不受影响。
+→ `{ "ok": true }`。记录与它的照片关联、标签关联、项目关联、合集里的条目一起删除，照片、标签、项目和合集本身不受影响；收录过它的合集更新 `updatedAt`。
 
 # 别处的变化
 
@@ -79,5 +80,6 @@ sources:
 - `GET /api/tags` 的 `entryCount`、`GET /api/users/:handle` 的 `entryCount`：同样只数请求者能在列表里看到的记录。
 - 删除照片会从引用它的记录里移除它，并让这些记录的 `revision` 加一；删除标签会移除记录上的这个标签；删除项目会让记录不再属于它，`revision` 不变。
 - 项目的统计、封面和照片来自其中的记录，见 [项目接口](/api/projects.md)。
+- 合集可以收录记录，统计、封面和地点也算上记录里的照片，见 [合集接口](/api/themes.md)。
 
 数据见 [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md)、[entry_projects](/data/entry-projects.md)。
