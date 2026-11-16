@@ -9,13 +9,15 @@ sources:
     title: 产品方向调整（Issue #47）
   - resource: https://github.com/ticoAg/Living/blob/main/migrations/0005_entries.sql
     title: 第一阶段的迁移
+  - resource: https://github.com/ticoAg/Living/blob/main/migrations/0006_projects.sql
+    title: 第二阶段的迁移
 ---
 # 阶段
 
 | 阶段 | 数据 | 状态 |
 |---|---|---|
 | 一：记录 | [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md) | 已建（`0005_entries.sql`） |
-| 二：项目 | `projects`、`entry_projects`、`milestones` | 计划，见 [项目](#项目) |
+| 二：项目 | [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md) | 已建（`0006_projects.sql`），见 [项目](#项目) |
 | 三：合集与媒体 | 合集（由 [themes](/data/themes.md) 演进）、记录与地点 | 计划，见 [主题](#主题) |
 | 四：完整档案 | 全文索引、导出 | 计划 |
 
@@ -30,15 +32,12 @@ sources:
 
 # 项目
 
-第二阶段。项目描述一个持续的过程（学书法、一年读书计划），可以聚合记录、媒体和里程碑；不强制每条记录都属于项目。
+第二阶段，已建。项目描述一个持续的过程（学书法、一年读书计划），聚合作者自己的记录和里程碑；不强制每条记录都属于项目。表见 [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md)。与草案不同的地方：
 
-| 表 | 列（草案） |
-|---|---|
-| `projects` | `id`（`pj_`）、`owner_id`、`title`、`description`（目标）、`type`、`start_date`、`end_date`、`status`（`active` `paused` `completed`）、`visibility`（默认 `private`）、`created_at`、`updated_at` |
-| `entry_projects` | `entry_id`、`project_id`，主键两列；删除项目不删除记录 |
-| `milestones` | `id`、`project_id`、`title`、`body`、`occurred_at`、`position` |
+- 里程碑只有一个日期 `date`（`YYYY-MM-DD`），不带时刻，也没有 `position`：按日期排列，日期晚于今天的就是计划中的。
+- 项目自己不存照片：项目页的作品来自其中记录的照片，统计和封面每次读取时算出。
 
-可见性：项目公开不公开其中的私密记录；项目页的时间线按 [entries 的规则](/data/entries.md#可见性) 逐条过滤。
+可见性：项目公开不公开其中的私密记录；项目页和统计按 [entries 的规则](/data/entries.md#可见性) 逐条过滤，与主题显示仅链接的照片一样，显示凭链接能打开的记录。
 
 # 主题
 

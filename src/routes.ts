@@ -28,6 +28,9 @@ export const Today = page(() => import('./pages/Today'));
 export const Archive = page(() => import('./pages/Archive'));
 export const EntryReader = page(() => import('./pages/EntryReader'));
 export const EntryEditor = page(() => import('./pages/EntryEditor'));
+export const Projects = page(() => import('./pages/Projects'));
+export const ProjectPage = page(() => import('./pages/ProjectPage'));
+export const ProjectForm = page(() => import('./pages/ProjectForm'));
 export const Explore = page(() => import('./pages/Explore'));
 export const Profile = page(() => import('./pages/Profile'));
 export const Photo = page(() => import('./pages/Photo'));
@@ -69,6 +72,10 @@ const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   [/^\/entries\/new$/, EntryEditor, () => []],
   [/^\/e\/([^/]+)\/edit$/, EntryEditor, (m) => [`/api/entries/${enc(dec(m[1]))}`]],
   [/^\/e\/([^/]+)$/, EntryReader, (m) => [`/api/entries/${enc(dec(m[1]))}`]],
+  [/^\/projects$/, Projects, () => ['/api/projects?mine=1']],
+  [/^\/projects\/new$/, ProjectForm, () => []],
+  [/^\/projects\/([^/]+)\/edit$/, ProjectForm, (m) => [`/api/projects/${enc(dec(m[1]))}`]],
+  [/^\/projects\/([^/]+)$/, ProjectPage, (m) => [`/api/projects/${enc(dec(m[1]))}`, `/api/entries?project=${enc(dec(m[1]))}`]],
   [/^\/(?:@|%40)([^/]+)\/?$/i, Profile, (m) => [`/api/users/${enc(dec(m[1]))}`]],
   [/^\/p\/([^/]+)$/, Photo, (m) => [`/api/photos/${enc(dec(m[1]))}`, '/api/photos']],
   [/^\/place\/([^/]+)$/, Place, (m) => [`/api/pois/${enc(dec(m[1]))}`, `/api/photos?poi=${enc(dec(m[1]))}`, '/api/tags']],
@@ -104,8 +111,23 @@ export function warm(url: URL, data: boolean): void {
   }
 }
 
-/** Chunks worth having before anyone asks: the pages one click away from the gallery, and from Today. */
-const IDLE = [Explore, Photo, Place, Profile, MapPage, IndexPage, Themes, ThemeReader, Living, Today, Archive, EntryReader];
+/** Chunks worth having before anyone asks: the pages one click away from the gallery, and from Today and the archive. */
+const IDLE = [
+  Explore,
+  Photo,
+  Place,
+  Profile,
+  MapPage,
+  IndexPage,
+  Themes,
+  ThemeReader,
+  Living,
+  Today,
+  Archive,
+  EntryReader,
+  Projects,
+  ProjectPage
+];
 
 function slowNetwork(): boolean {
   const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;

@@ -334,3 +334,27 @@ test.describe('entries a visitor sees', () => {
     await context.close();
   });
 });
+
+test.describe('a project a visitor sees', () => {
+  test('a public one with the entries shared by link in it; a private one is not found', async ({ page, browser }) => {
+    const api = apiOf(page.request);
+    const { projects } = await api.get<{ projects: { id: string; title: string; visibility: string }[] }>('/api/projects?mine=1');
+    const shared = projects.find((p) => p.visibility === 'public');
+    expect(shared, 'the story keeps a public project').toBeTruthy();
+    const { project: kept } = await api.post<{ project: { id: string } }>('/api/projects', {
+      title: '只给自己看',
+      startDate: '2026-05-01'
+    });
+
+    const context = await browser.newContext({ storageState: undefined });
+    const guest = await context.newPage();
+    await guest.goto(`/projects/${shared?.id}`);
+    await expect(guest.getByRole('heading', { level: 1, name: shared?.title ?? '' })).toBeVisible();
+    await expect(guest.getByRole('region', { name: '记录' }).locator('a.en-card')).toHaveCount(2);
+    await expect(guest.getByRole('link', { name: '记一笔' })).toHaveCount(0);
+    await expect(guest.getByRole('link', { name: `@${OWNER.handle}` })).toBeVisible();
+    await guest.goto(`/projects/${kept.id}`);
+    await expect(guest.getByText('项目不存在，或你没有权限查看')).toBeVisible();
+    await context.close();
+  });
+});

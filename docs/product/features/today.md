@@ -17,6 +17,7 @@ area: entries
 
 - 只有登录后可用；未登录时引导登录。登录和注册后默认来到这里。
 - 顶部是随手记的输入框，见 [记录](/product/features/entries.md#写)。
+- **进行中**：已经开始的进行中 [项目](/product/features/projects.md)，各带「记一笔」；今天记过的打勾。
 - **今天**：发生在今天的已完成记录，以及今天拍的、还没放进当天记录里的照片。按作者设备的本地日期判断。
 - **草稿**：所有草稿，最近改过的在前，不限日期。
 - **往年今天**：往年同月同日发生的已完成记录和拍的照片，按年份倒序，标出是几年前。
@@ -25,4 +26,4 @@ area: entries
 
 # 相关
 
-- [档案](/product/features/archive.md)、[内容模型](/product/content-model.md)、[Living 模式](/product/features/living-mode.md) 的「那年今日」
+- [档案](/product/features/archive.md)、[项目](/product/features/projects.md)、[内容模型](/product/content-model.md)、[Living 模式](/product/features/living-mode.md) 的「那年今日」

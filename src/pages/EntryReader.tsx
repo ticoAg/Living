@@ -9,17 +9,23 @@ import Img from '../components/Img';
 import { fmtLongDay, fmtTime } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { MY_PROJECTS, useProjectList } from '../projects/api';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import { VISIBILITY_LABEL } from '../themes/util';
 import '../styles/browse.css';
 import '../styles/entries.css';
 
-// /e/:id — an entry to read: its text as Markdown, its photos with their captions, its tags. Others see it only once it
+// /e/:id — an entry to read: the projects it is in, its text as Markdown, its photos with their captions, its tags. Others see it only once it
 // is finished and not private; its photos are each shown or left out by their own visibility. Docs: /docs/product/features/entries.md
 
 function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
   const tags = useTagMap(own ? '/api/tags' : `/api/tags?owner=${encodeURIComponent(e.ownerHandle)}`);
   const tagNames = e.tagIds.map((id) => tags.byId.get(id)?.name).filter((n): n is string => !!n);
+  // the projects it is in that the reader may see listed: the author's own, or the public ones
+  const { projects } = useProjectList(
+    e.projectIds.length ? (own ? MY_PROJECTS : `/api/projects?owner=${encodeURIComponent(e.ownerHandle)}`) : null
+  );
+  const inProjects = (projects ?? []).filter((p) => e.projectIds.includes(p.id));
   const day = fmtLongDay(occurredDay(e.occurredAt));
   const marks = [
     e.type !== 'note' ? entryTypeLabel(e.type) : '',
@@ -30,6 +36,15 @@ function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
   return (
     <article className="er">
       <header className="er-head">
+        {inProjects.length > 0 && (
+          <p className="er-projects">
+            {inProjects.map((p) => (
+              <Link key={p.id} href={`/projects/${p.id}`}>
+                {p.title}
+              </Link>
+            ))}
+          </p>
+        )}
         <p className="er-meta">
           <span>
             {e.occurredAt.slice(0, 4)} · {day}

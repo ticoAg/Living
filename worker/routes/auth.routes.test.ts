@@ -88,7 +88,7 @@ describe('POST /api/auth/register', () => {
   it('checks handle, display name and password', async () => {
     await newUser(platform, 'site_owner', 'owner');
     await platform.env.DB.prepare(`UPDATE settings SET value = 'open' WHERE key = 'registration'`).run();
-    for (const handle of ['ab', '_bob', 'bob!', 'a'.repeat(25), 'admin', 'Settings', 'www']) {
+    for (const handle of ['ab', '_bob', 'bob!', 'a'.repeat(25), 'admin', 'Settings', 'www', 'Today', 'archive', 'projects']) {
       expect((await signUp(new Client(platform), handle)).status, handle).toBe(400);
     }
     expect((await signUp(new Client(platform), 'bob', undefined, 'short')).status).toBe(400);

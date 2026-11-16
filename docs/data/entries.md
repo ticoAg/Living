@@ -35,8 +35,8 @@ sources:
 # 关系
 
 - 作者 [users](/data/users.md)，删除用户时记录级联删除。
-- 照片在 [entry_media](/data/entry-media.md)，标签在 [entry_tags](/data/entry-tags.md)；删除记录时这两处的行级联删除，照片和标签本身不受影响。
-- 功能说明：[记录](/product/features/entries.md)、[今天](/product/features/today.md)、[档案](/product/features/archive.md)；在内容模型里的位置见 [内容模型](/product/content-model.md)。接口：[记录接口](/api/entries.md)。
+- 照片在 [entry_media](/data/entry-media.md)，标签在 [entry_tags](/data/entry-tags.md)，所属的项目在 [entry_projects](/data/entry-projects.md)；删除记录时这三处的行级联删除，照片、标签和项目本身不受影响。
+- 功能说明：[记录](/product/features/entries.md)、[今天](/product/features/today.md)、[档案](/product/features/archive.md)、[项目](/product/features/projects.md)；在内容模型里的位置见 [内容模型](/product/content-model.md)。接口：[记录接口](/api/entries.md)。
 
 # 可见性
 

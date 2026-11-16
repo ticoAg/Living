@@ -1,6 +1,9 @@
 # Directory Update Log
 
 ## 2026-11-16
+* **Creation**: 第二阶段：项目与成长档案。迁移 `0006_projects.sql` 新增 [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md)；[项目接口](/api/projects.md) 支持项目的列表、详情、创建、修改、删除和里程碑，记录接口加上 `project=` 和 `projectIds`。新项目默认仅自己可见；项目里只显示和统计读者凭链接能打开的记录和照片，记录上只列出读者能在列表里看到的项目。
+* **Creation**: 新页面 [项目](/product/features/projects.md)：项目列表（档案下与时间线并列）、项目页（天数与统计、最初与最近的作品、按里程碑分出的阶段、项目里的记录）、项目的新建与编辑；从项目页记一笔时记录预先放进项目，类型按项目定。「今天」列出进行中的项目，记录页列出所属项目，个人主页列出项目和项目数，见 [导航](/architecture/frontend.md#导航)。
+* **Update**: [接口约定](/api/conventions.md#可见性) 写明容器的规则：主题、记录、项目里显示并计入仅链接的内容，从内容找容器时按列表规则。保留用户名加入 projects，[认证接口](/api/auth.md) 的保留名单补上第一阶段加入的 today、archive、entries、e。
 * **Creation**: 方向调整为以记录为中心的个人数字档案（[Issue #47](https://github.com/ticoAg/Living/issues/47)）。第零阶段：[内容模型](/product/content-model.md)（记录、媒体、项目、合集的边界与关系，类型、时间、状态与可见性）、[数据演进](/data/evolution.md)（项目与合集的表、旧主题的兼容、迁移规则、照片默认可见性的评估）、[决策：以记录为中心](/architecture/decisions/0007-entry-first.md)；[产品愿景](/product/vision.md)、[用户与场景](/product/personas.md)、[路线图](/product/roadmap.md) 随之改写。
 * **Creation**: 第一阶段：记录成为一等公民。迁移 `0005_entries.sql` 新增 [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md)，[记录接口](/api/entries.md) 支持列表、详情、创建、修改（带 `revision`，过期返回 409）和删除；新记录默认仅自己可见，草稿和已归档的对他人不可见。
 * **Creation**: 新页面 [今天](/product/features/today.md)（随手记、今天的记录与照片、草稿、往年今天）、[档案](/product/features/archive.md)（记录与照片按天排成一条时间线，按类型、标签筛选，按年份跳转）、[记录](/product/features/entries.md) 的阅读页与编辑器（Markdown、自动保存、本机备份、冲突提示、关联自己的照片并写说明、标签、公开范围与状态）。

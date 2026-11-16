@@ -36,16 +36,17 @@ export interface EntryDraft {
   visibility: Visibility;
   media: DraftMedia[];
   tagIds: string[];
+  projectIds: string[];
 }
 
 /** What a request sets; `status` is the editor's actions' to set. */
 export type EntryPayload = Required<Omit<CreateEntryBody, 'status'>>;
 
-/** A new entry: a note of this moment, for the author alone. */
-export function emptyDraft(now = new Date(), body = ''): EntryDraft {
+/** A new entry: a note of this moment, for the author alone; `start` for one begun from a project. */
+export function emptyDraft(now = new Date(), body = '', start: Partial<Pick<EntryDraft, 'type' | 'projectIds'>> = {}): EntryDraft {
   const at = localDateTime(now);
   return {
-    type: 'note',
+    type: start.type ?? 'note',
     title: '',
     body,
     date: at.slice(0, 10),
@@ -53,7 +54,8 @@ export function emptyDraft(now = new Date(), body = ''): EntryDraft {
     heldTime: at.slice(11),
     visibility: 'private',
     media: [],
-    tagIds: []
+    tagIds: [],
+    projectIds: start.projectIds ?? []
   };
 }
 
@@ -68,7 +70,8 @@ export function draftFromEntry(e: EntryDetail): EntryDraft {
     heldTime: time,
     visibility: e.visibility,
     media: e.media.map((m) => ({ photoId: m.photoId, caption: m.caption ?? '', photo: m.photo })),
-    tagIds: [...e.tagIds]
+    tagIds: [...e.tagIds],
+    projectIds: [...e.projectIds]
   };
 }
 
@@ -86,7 +89,9 @@ export function payloadOf(d: EntryDraft): EntryPayload {
     occurredAt: occurredAtOf(d),
     visibility: d.visibility,
     media: d.media.map((m) => ({ photoId: m.photoId, caption: m.caption.trim() || null })),
-    tagIds: d.tagIds
+    tagIds: d.tagIds,
+    // in the order the server answers with (the projects' creation), so choosing them in another order changes nothing
+    projectIds: [...d.projectIds].sort()
   };
 }
 
@@ -167,6 +172,8 @@ export function parseBackup(raw: string | null): Backup | null {
   if (![d.title, d.body, d.date, d.time, d.heldTime].every(str)) return null;
   if (!(ENTRY_TYPES as readonly unknown[]).includes(d.type) || !(VISIBILITIES as readonly unknown[]).includes(d.visibility)) return null;
   if (!Array.isArray(d.media) || !Array.isArray(d.tagIds) || !d.tagIds.every(str)) return null;
+  // copies kept before entries had projects carry none
+  if (d.projectIds !== undefined && !(Array.isArray(d.projectIds) && d.projectIds.every(str))) return null;
   const media: DraftMedia[] = [];
   for (const m of d.media as unknown[]) {
     if (!m || typeof m !== 'object') return null;
@@ -174,7 +181,8 @@ export function parseBackup(raw: string | null): Backup | null {
     if (!str(photoId) || !str(caption)) return null;
     media.push({ photoId, caption, photo: photo && typeof photo === 'object' ? (photo as PhotoSummary) : null });
   }
-  return { draft: { ...(d as unknown as EntryDraft), media, tagIds: [...(d.tagIds as string[])] }, at };
+  const projectIds = Array.isArray(d.projectIds) ? [...(d.projectIds as string[])] : [];
+  return { draft: { ...(d as unknown as EntryDraft), media, tagIds: [...(d.tagIds as string[])], projectIds }, at };
 }
 
 /** The storage slot of a backup: the author's, for an entry or (`new`) for one not yet created. */

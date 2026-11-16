@@ -7,6 +7,7 @@ import TagFilter from '../browse/TagFilter';
 import { EmptyState, LoadError, Loading, TruncatedNote } from '../browse/ui';
 import { replaceQuery, splitIds, useQuery } from '../browse/url';
 import { MY_ENTRIES, MY_PHOTOS, useEntryList, usePhotoMap } from '../entries/api';
+import ArchiveTabs from '../entries/ArchiveTabs';
 import EntryCard from '../entries/EntryCard';
 import PhotoRun from '../entries/PhotoRun';
 import { buildTimeline, keepEntries, showsPhotos, yearMarks, type Kind } from '../entries/timeline';
@@ -210,6 +211,7 @@ export default function Archive() {
   useScrollTop();
   return (
     <main className="page-narrow en">
+      <ArchiveTabs />
       <header className="en-head">
         <h1 className="display display-l">档案</h1>
       </header>

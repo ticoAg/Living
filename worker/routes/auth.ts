@@ -15,7 +15,7 @@ export const auth = new Hono<AppEnv>({ strict: false });
 
 const RESERVED = new Set([
   ...'admin api media living login register settings studio themes upload map index place t p www root owner'.split(' '),
-  ...'today archive entries e'.split(' ')
+  ...'today archive entries e projects'.split(' ')
 ]);
 
 interface InviteRow {

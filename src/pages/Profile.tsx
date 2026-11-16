@@ -9,10 +9,14 @@ import Img from '../components/Img';
 import { useEntryList, useTagMap } from '../entries/api';
 import EntryCard from '../entries/EntryCard';
 import { useApi } from '../lib/useApi';
-import { fmtDay } from '../lib/format';
+import { fmtDay, localDay } from '../lib/format';
 import { useSession } from '../lib/session';
+import { useProjectList } from '../projects/api';
+import ProjectCard from '../projects/ProjectCard';
+import { byStatusAndTouch } from '../projects/stages';
 import '../styles/browse.css';
 import '../styles/entries.css';
+import '../styles/projects.css';
 
 const VISIBILITY: Record<string, string> = { unlisted: '仅链接可见', private: '仅自己可见' };
 
@@ -60,7 +64,31 @@ function ProfileEntries({ handle, photos }: { handle: string; photos: readonly P
   );
 }
 
-/** /@handle — the user's header, entries, public themes and gallery. */
+/** The person's projects the viewer may see listed: the public ones, or all of one's own, marked. */
+function ProfileProjects({ handle }: { handle: string }) {
+  const { user } = useSession();
+  const own = !!user && user.handle.toLowerCase() === handle.toLowerCase();
+  const { projects } = useProjectList(`/api/projects?owner=${enc(handle)}`);
+  const sorted = useMemo(() => [...(projects ?? [])].sort(byStatusAndTouch), [projects]);
+  if (!sorted.length) return null;
+  const today = localDay();
+  return (
+    <section className="prof-projects" aria-labelledby="prof-projects">
+      <h2 id="prof-projects" className="bw-h2">
+        项目
+      </h2>
+      <ul className="pj-list">
+        {sorted.map((p) => (
+          <li key={p.id}>
+            <ProjectCard project={p} today={today} own={own} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** /@handle — the user's header, projects, entries, public themes and gallery. */
 export default function Profile() {
   // The route is declared as "/@:handle"; accept the handle with or without its "@"
   const params = useParams() as Record<string, string | undefined>;
@@ -122,6 +150,12 @@ export default function Profile() {
               <span className="prof-unit">条记录</span>
             </span>
           )}
+          {profile.projectCount > 0 && (
+            <span>
+              <span className="prof-num">{profile.projectCount}</span>
+              <span className="prof-unit">个项目</span>
+            </span>
+          )}
         </p>
       </header>
 
@@ -147,6 +181,8 @@ export default function Profile() {
           </ul>
         </section>
       )}
+
+      <ProfileProjects handle={profile.handle} />
 
       <ProfileEntries handle={profile.handle} photos={photos} />
 

@@ -51,6 +51,8 @@ export const newId = {
   theme: () => `th_${ulid()}`,
   item: () => `it_${ulid()}`,
   entry: () => `en_${ulid()}`,
+  project: () => `pj_${ulid()}`,
+  milestone: () => `ms_${ulid()}`,
   tag: () => `t_${ulid()}`,
   zone: () => `pz_${ulid()}`
 };

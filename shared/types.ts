@@ -16,6 +16,12 @@ export type EntryType = (typeof ENTRY_TYPES)[number];
 export const ENTRY_STATUSES = ['draft', 'published', 'archived'] as const;
 export type EntryStatus = (typeof ENTRY_STATUSES)[number];
 
+/** What a project is about. The list may grow (no CHECK); labels in shared/projects.ts. docs/data/projects.md */
+export const PROJECT_TYPES = ['learning', 'practice', 'reading', 'creation', 'other'] as const;
+export type ProjectType = (typeof PROJECT_TYPES)[number];
+export const PROJECT_STATUSES = ['active', 'paused', 'completed'] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
 /** POI categories double as map-legend symbols. */
 export const POI_CATEGORIES = [
   '桥',
@@ -53,6 +59,8 @@ export interface UserProfile extends UserPublic {
   themeCount: number;
   /** Entries the requester may see in lists: finished public ones, or all of one's own. */
   entryCount: number;
+  /** Projects the requester may see in lists: public ones, or all of one's own. */
+  projectCount: number;
   createdAt: string;
 }
 
@@ -401,6 +409,8 @@ export interface EntrySummary {
   photoIds: string[];
   /** Direct tags. */
   tagIds: string[];
+  /** Projects it belongs to that the requester may see in lists: public ones, or all of one's own. */
+  projectIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -446,6 +456,8 @@ export interface CreateEntryBody {
   /** One's own photos, in order. */
   media?: EntryMediaInput[];
   tagIds?: string[];
+  /** One's own projects; other ids are dropped. */
+  projectIds?: string[];
 }
 
 /** `PATCH /api/entries/:id`: what is given changes; `media` and `tagIds` replace the whole list. */
@@ -453,6 +465,91 @@ export interface UpdateEntryBody extends Partial<CreateEntryBody> {
   /** The revision this edit started from; when the entry has moved on, the answer is 409 and nothing changes. */
   revision?: number;
 }
+
+// ---- projects (docs/api/projects.md) ----------------------------------------------------------------------------------
+
+export interface ProjectSummary {
+  id: string;
+  ownerId: string;
+  ownerHandle: string;
+  type: ProjectType;
+  title: string;
+  /** Markdown: what it is for, the plan. */
+  description: string | null;
+  /** `YYYY-MM-DD`, the author's local day. */
+  startDate: string;
+  /** The planned or actual last day; null when open-ended. */
+  endDate: string | null;
+  status: ProjectStatus;
+  visibility: Visibility;
+  /**
+   * Its finished entries the requester may open (the author's own: all finished ones), and of those the days they
+   * happened on, their photos the requester may open, and the latest `occurredAt`. Drafts and archived entries are
+   * not counted.
+   */
+  entryCount: number;
+  dayCount: number;
+  photoCount: number;
+  lastOccurredAt: string | null;
+  /** The latest of those photos. */
+  cover: PhotoSummary | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Milestone {
+  id: string;
+  projectId: string;
+  title: string;
+  /** Markdown: what the stage it closes came to. */
+  body: string | null;
+  /** `YYYY-MM-DD`: the day it was reached, or the day aimed at while it is still ahead. */
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  /** By date, earliest first. */
+  milestones: Milestone[];
+  /**
+   * The photos of its entries that the requester may open, in the entries the requester may open (the author: every
+   * entry of theirs in it, drafts too). Enough to show those entries without the author's whole library.
+   */
+  photos: PhotoSummary[];
+}
+
+/** `GET /api/projects`. */
+export interface ProjectListResponse {
+  projects: ProjectSummary[];
+}
+
+/** `POST /api/projects`. `startDate` is required: the browser knows the local day, the Worker does not. */
+export interface CreateProjectBody {
+  title: string;
+  /** default `other` */
+  type?: ProjectType;
+  description?: string | null;
+  startDate: string;
+  endDate?: string | null;
+  /** default `active` */
+  status?: ProjectStatus;
+  /** default `private` */
+  visibility?: Visibility;
+}
+
+/** `PATCH /api/projects/:id`: what is given changes. */
+export type UpdateProjectBody = Partial<CreateProjectBody>;
+
+/** `POST /api/projects/:id/milestones`. */
+export interface CreateMilestoneBody {
+  title: string;
+  body?: string | null;
+  date: string;
+}
+
+/** `PATCH /api/projects/:id/milestones/:milestoneId`. */
+export type UpdateMilestoneBody = Partial<CreateMilestoneBody>;
 
 export interface PrivacyZone {
   id: string;

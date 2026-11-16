@@ -9,6 +9,9 @@
 // Entries add a status to the visibility: others only ever see finished (`published`) entries. Drafts and archived
 // entries are their author's alone, whatever their visibility says.
 //
+// A container shown to someone (a theme, an entry, a project) shows only what they could open by id: making it
+// public never makes a private photo or entry public.
+//
 // Each helper registers its parameter on `q` and returns SQL text; `a` is the table alias.
 
 import type { Sql } from './sql';
@@ -27,6 +30,16 @@ export function photoLocation(q: Sql, viewer: string | null, a = 'p'): string {
 
 export function themeList(q: Sql, viewer: string | null, a = 'th'): string {
   return viewer ? `(${a}.visibility = 'public' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility = 'public'`;
+}
+
+/** Projects in lists and counts: public ones, plus every project of the viewer's own. Their status hides nothing. */
+export function projectList(q: Sql, viewer: string | null, a = 'pj'): string {
+  return viewer ? `(${a}.visibility = 'public' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility = 'public'`;
+}
+
+/** Projects that open by id or link: public and unlisted ones, plus every project of the viewer's own. */
+export function projectById(q: Sql, viewer: string | null, a = 'pj'): string {
+  return viewer ? `(${a}.visibility != 'private' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility != 'private'`;
 }
 
 /** Entries in lists and counts: finished public ones, plus every entry of the viewer's own. */

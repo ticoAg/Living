@@ -11,7 +11,8 @@ import { newId } from '../lib/ids';
 import { requireUser, viewerId } from '../lib/session';
 import { capped, nowIso, prep, prepInsert, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
-import { entryList } from '../lib/visibility';
+import { usableProjectIds } from '../lib/projects';
+import { entryById, entryList, projectById } from '../lib/visibility';
 
 export const entries = new Hono<AppEnv>({ strict: false });
 
@@ -24,6 +25,7 @@ entries.get('/', async (c) => {
   const viewer = await viewerId(c);
   const db = c.env.DB;
   const ownerHandle = c.req.query('owner');
+  const projectId = c.req.query('project');
   const mine = ['1', 'true'].includes(c.req.query('mine') ?? '');
   if (mine && !viewer) throw unauthenticated();
 
@@ -37,12 +39,30 @@ entries.get('/', async (c) => {
     ownerId = u.id;
   }
 
+  if (projectId) {
+    // a project's entries are shown with the project: none at all unless the viewer may open it
+    const pq = new Sql();
+    const open = await prepQ(
+      db,
+      `SELECT 1 AS ok FROM projects pj WHERE pj.id = ${pq.p(projectId)} AND ${projectById(pq, viewer)}`,
+      pq
+    ).first();
+    if (!open) {
+      listCache(c, viewer);
+      return c.json({ entries: [], truncated: false } satisfies EntryListResponse);
+    }
+  }
+
   const q = new Sql();
   const cols = entryCols(q, viewer);
-  // scoped lists show finished public entries plus all of the viewer's own; the unscoped list is everyone's public ones
-  const where = [ownerId || mine ? entryList(q, viewer) : `e.visibility = 'public' AND e.status = 'published'`];
+  // Scoped lists show finished public entries plus all of the viewer's own; the unscoped list is everyone's public
+  // ones. A project shows what the viewer could open by link, as a theme shows its unlisted photos.
+  const where = [
+    projectId ? entryById(q, viewer) : ownerId || mine ? entryList(q, viewer) : `e.visibility = 'public' AND e.status = 'published'`
+  ];
   if (mine) where.push(`e.owner_id = ${q.p(viewer)}`);
   if (ownerId) where.push(`e.owner_id = ${q.p(ownerId)}`);
+  if (projectId) where.push(`EXISTS (SELECT 1 FROM entry_projects ep WHERE ep.entry_id = e.id AND ep.project_id = ${q.p(projectId)})`);
   const res = await prepQ(
     db,
     // Latest first. A day-only time ('2026-11-16') sorts after the timed entries of that day; ties by insertion order.
@@ -81,6 +101,21 @@ function writeMedia(db: D1Database, entryId: string, media: MediaField[], replac
   return out;
 }
 
+function writeProjects(db: D1Database, entryId: string, projectIds: string[], replace = false): D1PreparedStatement[] {
+  const out = replace ? [prep(db, 'DELETE FROM entry_projects WHERE entry_id = ?1', entryId)] : [];
+  if (projectIds.length) {
+    out.push(
+      prep(
+        db,
+        'INSERT OR IGNORE INTO entry_projects (entry_id, project_id) SELECT ?1, value FROM json_each(?2)',
+        entryId,
+        JSON.stringify(projectIds)
+      )
+    );
+  }
+  return out;
+}
+
 function writeTags(db: D1Database, entryId: string, tagIds: string[], replace = false): D1PreparedStatement[] {
   const out = replace ? [prep(db, 'DELETE FROM entry_tags WHERE entry_id = ?1', entryId)] : [];
   if (tagIds.length) {
@@ -104,6 +139,8 @@ entries.post('/', async (c) => {
   );
   // like a photo's: presets and the author's own tags; others are dropped
   const tagIds = f.tagIds ? await usableTagIds(db, user.id, f.tagIds) : [];
+  // the author's own projects; others (someone else's, deleted meanwhile) are dropped
+  const projectIds = f.projectIds ? await usableProjectIds(db, user.id, f.projectIds) : [];
 
   const id = newId.entry();
   const now = nowIso();
@@ -123,7 +160,8 @@ entries.post('/', async (c) => {
       updated_at: now
     }),
     ...writeMedia(db, id, media),
-    ...writeTags(db, id, tagIds)
+    ...writeTags(db, id, tagIds),
+    ...writeProjects(db, id, projectIds)
   ]);
   return c.json({ entry: await loadEntryDetail(db, id, user.id) }, 201);
 });
@@ -173,6 +211,7 @@ entries.patch('/:id', async (c) => {
     );
   }
   const tagIds = f.tagIds ? await usableTagIds(db, user.id, f.tagIds) : undefined;
+  const projectIds = f.projectIds ? await usableProjectIds(db, user.id, f.projectIds) : undefined;
 
   const q = new Sql();
   const sets: string[] = [];
@@ -185,12 +224,13 @@ entries.patch('/:id', async (c) => {
   if (f.status) set('status', f.status);
 
   const statements: D1PreparedStatement[] = [];
-  if (sets.length || f.media || tagIds) {
+  if (sets.length || f.media || tagIds || projectIds) {
     set('updated_at', nowIso());
     statements.push(prepQ(db, `UPDATE entries SET ${sets.join(', ')}, revision = revision + 1 WHERE id = ${q.p(row.id)}`, q));
   }
   if (f.media) statements.push(...writeMedia(db, row.id, f.media, true));
   if (tagIds) statements.push(...writeTags(db, row.id, tagIds, true));
+  if (projectIds) statements.push(...writeProjects(db, row.id, projectIds, true));
   if (statements.length) await db.batch(statements);
   return c.json({ entry: await loadEntryDetail(db, row.id, user.id) });
 });
@@ -203,6 +243,7 @@ entries.delete('/:id', async (c) => {
   await db.batch([
     prep(db, 'DELETE FROM entry_media WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_tags WHERE entry_id = ?1', row.id),
+    prep(db, 'DELETE FROM entry_projects WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entries WHERE id = ?1', row.id)
   ]);
   return c.json({ ok: true });

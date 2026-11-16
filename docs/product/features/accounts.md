@@ -11,7 +11,7 @@ area: studio
 - 字段：邀请码、用户名（3–24 位，字母数字下划线连字符，不区分大小写，唯一）、显示名、密码（至少 8 位）。
 - 注册方式由站点设置决定：`invite`（默认，需要邀请码）、`open`（任何人）、`closed`（不开放）。
 - 站点还没有任何用户时，只有角色为 `owner` 的邀请码能注册，注册者成为站长。
-- 保留用户名：admin、api、media、living、login、register、settings、studio、themes、upload、map、index、today、archive、entries 等。
+- 保留用户名：admin、api、media、living、login、register、settings、studio、themes、upload、map、index、today、archive、entries、projects 等。
 
 # 登录与会话
 

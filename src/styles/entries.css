@@ -78,6 +78,9 @@
 /* ---- reading an entry --------------------------------------------------------------------------- */
 
 .er { padding-top: 36px; }
+.er-projects { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 10px; font-size: 14px; }
+.er-projects a { color: var(--hydro-ink); text-decoration: none; }
+.er-projects a:hover { color: var(--hydro); text-decoration: underline; text-underline-offset: 0.2em; }
 .er-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 14px; color: var(--ink-3); font-size: 14px; }
 .er-title { overflow-wrap: anywhere; }
 .er-by { margin: 12px 0 0; font-size: 14px; }
@@ -116,6 +119,7 @@
 .ee-sec:first-of-type { margin-top: 24px; }
 .ee-sec p { margin: 0; }
 .ee-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ee-projects { --gap: 6px; }
 .ee-h { margin: 0; font: 600 17px var(--serif); letter-spacing: 0.06em; }
 .ee-media { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .ee-photo { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; align-items: start; gap: 12px; }

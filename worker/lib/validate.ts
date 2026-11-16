@@ -32,6 +32,22 @@ export function optText(v: unknown, label: string, max: number): string | null {
   return s;
 }
 
+/**
+ * Optional Markdown, kept as written: blank lines before it and whitespace after it go, line ends become `\n`, and the
+ * first line keeps its own indentation (a paragraph may open with full-width spaces). Blank → null.
+ */
+export function optMarkdown(v: unknown, label: string, max: number): string | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== 'string') throw invalid(`${label}需要是文字`);
+  const s = v
+    .replace(/\r\n?/g, '\n')
+    .replace(/^(?:[ \t　]*\n)+/, '')
+    .replace(/\s+$/, '');
+  if (!s.trim()) return null;
+  if (cpLen(s) > max) throw invalid(`${label}最多 ${max} 个字符`);
+  return s;
+}
+
 export interface NumOpts {
   min?: number;
   max?: number;

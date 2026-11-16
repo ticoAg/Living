@@ -9,12 +9,13 @@ import { todayView } from '../entries/timeline';
 import { SignedOut } from '../entries/ui';
 import { fmtLongDay, localDay } from '../lib/format';
 import { useSession } from '../lib/session';
+import ActiveProjects from '../projects/ActiveProjects';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import '../styles/browse.css';
 import '../styles/entries.css';
 
-// /today — the day so far: a quick note, the day's entries and photos, what is unfinished, and the same day in the
-// years before. Docs: /docs/product/features/today.md
+// /today — the day so far: a quick note, the projects going on, the day's entries and photos, what is unfinished, and
+// the same day in the years before. Docs: /docs/product/features/today.md
 
 function Body({ user }: { user: SessionUser }) {
   const today = localDay();
@@ -75,6 +76,7 @@ function Body({ user }: { user: SessionUser }) {
   return (
     <>
       <QuickCapture userId={user.id} />
+      <ActiveProjects today={today} />
       {body}
     </>
   );

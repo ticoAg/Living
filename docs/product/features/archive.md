@@ -14,7 +14,7 @@ area: entries
 
 # 规则
 
-- 只有登录后可用，只显示自己的内容，不论公开范围和状态。
+- 只有登录后可用，只显示自己的内容，不论公开范围和状态。顶部的「时间线」「项目」在档案的两页之间切换，[项目](/product/features/projects.md) 另见。
 - 时间线按天倒序。记录放在发生的那天，照片放在拍摄的那天；一天之内按时间倒序，只有日期的记录排在当天最后。已经放进当天某条记录的照片不再单独出现。
 - 草稿也在时间线里，带「草稿」标记，点开直接继续写；已归档的默认不显示。
 - **筛选**：类型（全部、出现过的记录类型、照片）、已归档、[多层级标签](/product/features/hierarchical-tags.md)。标签同时筛记录和照片，各按自己的标签。筛选条件写在地址里，刷新和收藏后保留。
@@ -26,4 +26,4 @@ area: entries
 
 # 相关
 
-- [今天](/product/features/today.md)、[记录](/product/features/entries.md)、[图库](/product/features/gallery.md)
+- [今天](/product/features/today.md)、[记录](/product/features/entries.md)、[项目](/product/features/projects.md)、[图库](/product/features/gallery.md)

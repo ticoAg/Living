@@ -19,6 +19,9 @@ import {
   Place,
   PlaceEdit,
   Profile,
+  ProjectForm,
+  ProjectPage,
+  Projects,
   Register,
   Settings,
   TagsManager,
@@ -31,6 +34,7 @@ import {
 
 // Route table. Each page module is owned by one area (see /docs/architecture/frontend.md):
 // entries — Today, Archive, EntryReader, EntryEditor
+// projects — Projects, ProjectPage, ProjectForm
 // browse — Explore, Profile, Photo, Place, MapPage, IndexPage
 // living — Living
 // studio — Upload, PhotoEdit, PlaceEdit, TagsManager, Login, Register, Settings
@@ -47,6 +51,10 @@ function Routes() {
           the entry's own address */}
       <Route path={/^\/(?:entries\/new|e\/(?<id>[^/]+)\/edit)$/} component={EntryEditor} />
       <Route path="/e/:id" component={EntryReader} />
+      <Route path="/projects" component={Projects} />
+      <Route path="/projects/new" component={ProjectForm} />
+      <Route path="/projects/:id/edit" component={ProjectForm} />
+      <Route path="/projects/:id" component={ProjectPage} />
       {/* wouter reads "@:handle" as a literal segment, and static assets redirect /@x to /%40x;
           a RegExp route captures the handle in either form */}
       <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/?$/i} component={Profile} />

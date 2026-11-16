@@ -25,7 +25,7 @@ const GUEST_NAV: NavItem[] = [
 // (browse/LibraryTabs.tsx). Docs: /docs/architecture/frontend.md#导航
 const MEMBER_NAV: NavItem[] = [
   { href: '/today', label: '今天', icon: 'today', match: (p) => p.startsWith('/today') || p.startsWith('/entries/') },
-  { href: '/archive', label: '档案', icon: 'archive', match: (p) => p.startsWith('/archive') || p.startsWith('/e/') },
+  { href: '/archive', label: '档案', icon: 'archive', match: (p) => ['/archive', '/e/', '/projects'].some((s) => p.startsWith(s)) },
   {
     href: '/',
     label: '图库',

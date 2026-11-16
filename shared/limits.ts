@@ -60,6 +60,24 @@ export const ENTRY_LIMITS = {
   tagCount: 200
 } as const;
 
+/** `POST /api/projects`, `PATCH /api/projects/:id`. */
+export const PROJECT_LIMITS = {
+  titleMax: 100,
+  /** Markdown */
+  descriptionMax: 5000,
+  /** projects one entry belongs to */
+  perEntry: 50
+} as const;
+
+/** `POST /api/projects/:id/milestones` and its `PATCH`. */
+export const MILESTONE_LIMITS = {
+  titleMax: 100,
+  /** Markdown */
+  bodyMax: 20000,
+  /** milestones of one project */
+  count: 500
+} as const;
+
 export const TAG_LIMITS = {
   nameMax: 24
 } as const;

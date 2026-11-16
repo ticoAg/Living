@@ -23,6 +23,13 @@ describe('emptyDraft', () => {
     expect(d).toMatchObject({ type: 'note', body: '一句话', date: '2026-11-16', time: '08:30', visibility: 'private', media: [] });
     expect(occurredAtOf(d)).toBe('2026-11-16T08:30:15');
   });
+
+  it('starts as a project asks: its kind of entry, in it', () => {
+    const d = emptyDraft(at, '', { type: 'practice', projectIds: ['pj_1'] });
+    expect(d).toMatchObject({ type: 'practice', projectIds: ['pj_1'], body: '' });
+    expect(payloadOf(d).projectIds).toEqual(['pj_1']);
+    expect(payloadOf({ ...d, projectIds: ['pj_2', 'pj_1'] }).projectIds).toEqual(['pj_1', 'pj_2']);
+  });
 });
 
 describe('draftFromEntry', () => {
@@ -34,7 +41,8 @@ describe('draftFromEntry', () => {
       occurredAt: '2026-11-16T21:05:42',
       visibility: 'unlisted',
       media: [{ photoId: 'ph_a', caption: null, photo: photo('ph_a') }],
-      tagIds: ['t_1']
+      tagIds: ['t_1'],
+      projectIds: ['pj_1']
     });
     const d = draftFromEntry(e);
     expect(d).toMatchObject({ title: '长安的荔枝', date: '2026-11-16', time: '21:05', heldTime: '21:05:42' });
@@ -45,7 +53,8 @@ describe('draftFromEntry', () => {
       occurredAt: '2026-11-16T21:05:42',
       visibility: 'unlisted',
       media: [{ photoId: 'ph_a', caption: null }],
-      tagIds: ['t_1']
+      tagIds: ['t_1'],
+      projectIds: ['pj_1']
     });
   });
 
@@ -162,5 +171,11 @@ describe('parseBackup', () => {
     }
     expect(parseBackup(JSON.stringify({ draft: { ...draft, media: [{ photoId: 1 }] }, at: 'x' }))).toBeNull();
     expect(parseBackup(JSON.stringify({ draft: { ...draft, tagIds: [1] }, at: 'x' }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ draft: { ...draft, projectIds: 'pj_1' }, at: 'x' }))).toBeNull();
+  });
+
+  it('reads a copy kept before entries had projects as in none', () => {
+    const { projectIds: _gone, ...older } = draft;
+    expect(parseBackup(JSON.stringify({ draft: older, at: 'x' }))?.draft.projectIds).toEqual([]);
   });
 });

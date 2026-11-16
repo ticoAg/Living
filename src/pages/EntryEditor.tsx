@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
 import { ENTRY_STATUS_LABELS, ENTRY_TYPE_LABELS, entryLabel } from '../../shared/entries';
+import { entryTypeFor } from '../../shared/projects';
 import { ENTRY_LIMITS } from '../../shared/limits';
 import {
   ENTRY_TYPES,
@@ -8,10 +9,12 @@ import {
   type EntryDetail,
   type EntryStatus,
   type EntryType,
+  type ProjectDetail,
   type SessionUser,
   type Visibility
 } from '../../shared/types';
 import { LoadError, Loading } from '../browse/ui';
+import { useQuery } from '../browse/url';
 import AutoTextarea from '../components/AutoTextarea';
 import { Icon } from '../components/icons';
 import Img from '../components/Img';
@@ -34,6 +37,8 @@ import { useEntryAutosave, type SaveState } from '../entries/useEntryAutosave';
 import { ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { setCached, useApi } from '../lib/useApi';
+import { projectPath } from '../projects/api';
+import EntryProjects from '../projects/EntryProjects';
 import TagPicker from '../studio/TagPicker';
 import { applyTagEdit } from '../studio/tag-board';
 import { useDocumentTitle } from '../themes/hooks';
@@ -85,13 +90,19 @@ interface EditorProps {
   initial: EntryDetail | null;
   /** text carried over from the quick note */
   handoff: string;
+  /** a new entry's project, when it is written from the project's page */
+  project: ProjectDetail | null;
   onCreated: (entry: EntryDetail) => void;
 }
 
-function Editor({ user, initial, handoff, onCreated }: EditorProps) {
+function Editor({ user, initial, handoff, project, onCreated }: EditorProps) {
   const id = useId();
   const [, navigate] = useLocation();
-  const [draft, setDraft] = useState<EntryDraft>(() => (initial ? draftFromEntry(initial) : emptyDraft(new Date(), handoff)));
+  const [draft, setDraft] = useState<EntryDraft>(() =>
+    initial
+      ? draftFromEntry(initial)
+      : emptyDraft(new Date(), handoff, project ? { projectIds: [project.id], type: entryTypeFor(project.type) } : {})
+  );
   // a copy kept on this device that the server does not have: offered once, as the editor opens
   const [offer, setOffer] = useState<Backup | null>(() => {
     if (!initial && handoff) return null;
@@ -358,6 +369,8 @@ function Editor({ user, initial, handoff, onCreated }: EditorProps) {
         )}
       </section>
 
+      <EntryProjects id={`${id}-projects`} value={draft.projectIds} onChange={(ids) => set('projectIds', ids)} />
+
       <section className="ee-sec" aria-labelledby={`${id}-tags`}>
         <h2 id={`${id}-tags`} className="ee-h">
           标签
@@ -499,6 +512,10 @@ export default function EntryEditor() {
   // read once per editor: later changes to the cached copy are this editor's own saves
   const { data, error, reload } = useApi<EntryDetail>(id && user ? `/api/entries/${encodeURIComponent(id)}` : null);
   const [handoff] = useState(() => handoffBody(history.state));
+  // /entries/new?project=… starts the entry in that project, as the kind of entry the project keeps
+  const query = useQuery();
+  const projectId = id ? null : query.get('project');
+  const project = useApi<ProjectDetail>(projectId && user ? projectPath(projectId) : null);
 
   if (loading) return <Loading />;
   if (!user) {
@@ -535,12 +552,14 @@ export default function EntryEditor() {
       </main>
     );
   }
+  if (projectId && !project.data && !project.error) return <Loading />;
   return (
     <Editor
       key={key}
       user={user}
       initial={id ? (data ?? null) : null}
       handoff={id ? '' : handoff}
+      project={project.data?.ownerId === user.id ? project.data : null}
       onCreated={(e) => {
         adopt(e.id);
         setCached(`/api/entries/${e.id}`, e);

@@ -15,7 +15,7 @@ import {
 import { invalid } from './http';
 import { summariesByIds } from './photos';
 import { prepQ, Sql } from './sql';
-import { entryById, photoById } from './visibility';
+import { entryById, photoById, projectList } from './visibility';
 
 export interface EntryRow {
   id: string;
@@ -33,6 +33,8 @@ export interface EntryRow {
   /** comma-separated, in order; only photos the viewer may open */
   photo_ids: string | null;
   tag_ids: string | null;
+  /** comma-separated, in the order the projects were created; only projects the viewer may see in lists */
+  project_ids: string | null;
   body?: string | null;
   revision?: number;
 }
@@ -41,14 +43,17 @@ export const ENTRY_FROM = 'entries e JOIN users u ON u.id = e.owner_id';
 
 /**
  * Columns of a summary. The body comes as its head only, enough for the excerpt; photo ids only name the photos
- * `viewer` may open (public, unlisted, or their own), in the entry's order.
+ * `viewer` may open (public, unlisted, or their own), in the entry's order; project ids only the projects `viewer`
+ * may see in lists, as a photo page lists only themes it may advertise.
  */
 export function entryCols(q: Sql, viewer: string | null): string {
   return `e.id, e.owner_id, u.handle AS owner_handle, e.type, e.title, substr(e.body, 1, ${ENTRY_EXCERPT_MAX + 1}) AS body_head,
     e.occurred_at, e.visibility, e.status, e.created_at, e.updated_at,
     (SELECT group_concat(photo_id) FROM (SELECT em.photo_id FROM entry_media em JOIN photos p ON p.id = em.photo_id
        WHERE em.entry_id = e.id AND ${photoById(q, viewer, 'p')} ORDER BY em.position)) AS photo_ids,
-    (SELECT group_concat(et.tag_id) FROM entry_tags et WHERE et.entry_id = e.id) AS tag_ids`;
+    (SELECT group_concat(et.tag_id) FROM entry_tags et WHERE et.entry_id = e.id) AS tag_ids,
+    (SELECT group_concat(project_id) FROM (SELECT ep.project_id FROM entry_projects ep JOIN projects pj ON pj.id = ep.project_id
+       WHERE ep.entry_id = e.id AND ${projectList(q, viewer, 'pj')} ORDER BY ep.project_id)) AS project_ids`;
 }
 
 const ids = (s: string | null): string[] => (s ? s.split(',') : []);
@@ -68,6 +73,7 @@ export function toEntrySummary(r: EntryRow): EntrySummary {
     status: r.status,
     photoIds: ids(r.photo_ids),
     tagIds: ids(r.tag_ids),
+    projectIds: ids(r.project_ids),
     createdAt: r.created_at,
     updatedAt: r.updated_at
   };

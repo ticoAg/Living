@@ -1,10 +1,10 @@
 // Validation of the JSON bodies of POST /api/entries and PATCH /api/entries/:id (CreateEntryBody, UpdateEntryBody).
 // Docs: /docs/api/entries.md
 
-import { ENTRY_LIMITS } from '../../shared/limits';
+import { ENTRY_LIMITS, PROJECT_LIMITS } from '../../shared/limits';
 import { ENTRY_STATUSES, ENTRY_TYPES, VISIBILITIES, type EntryStatus, type EntryType, type Visibility } from '../../shared/types';
 import { ID_RE, invalid } from './http';
-import { cpLen, has, isPlainObject, optEnum, optNum, optOccurredAt, optText, strArray, type Body } from './validate';
+import { has, isPlainObject, optEnum, optMarkdown, optNum, optOccurredAt, optText, strArray, type Body } from './validate';
 
 export interface MediaField {
   photoId: string;
@@ -21,25 +21,13 @@ export interface EntryFields {
   status?: EntryStatus;
   media?: MediaField[];
   tagIds?: string[];
+  projectIds?: string[];
   /** PATCH only: the revision the edit started from */
   revision?: number;
 }
 
-/**
- * The body as written, Markdown. Blank lines before it and whitespace after it go; the first line keeps its own
- * indentation (a paragraph may open with full-width spaces). Blank → null.
- */
-export function optBody(v: unknown): string | null {
-  if (v === null || v === undefined) return null;
-  if (typeof v !== 'string') throw invalid('正文需要是文字');
-  const s = v
-    .replace(/\r\n?/g, '\n')
-    .replace(/^(?:[ \t　]*\n)+/, '')
-    .replace(/\s+$/, '');
-  if (!s.trim()) return null;
-  if (cpLen(s) > ENTRY_LIMITS.bodyMax) throw invalid(`正文最多 ${ENTRY_LIMITS.bodyMax} 个字符`);
-  return s;
-}
+/** The body as written, Markdown (see optMarkdown). Blank → null. */
+export const optBody = (v: unknown): string | null => optMarkdown(v, '正文', ENTRY_LIMITS.bodyMax);
 
 /** The photos of an entry, in order. A photo listed twice counts once, where it first appears. */
 export function parseMedia(v: unknown): MediaField[] {
@@ -76,6 +64,10 @@ export function parseEntryFields(body: Body, create: boolean): EntryFields {
   if (has(body, 'tagIds')) {
     if (!Array.isArray(body.tagIds)) throw invalid('标签需要是数组');
     f.tagIds = strArray(body.tagIds, '标签', ENTRY_LIMITS.tagCount);
+  }
+  if (has(body, 'projectIds')) {
+    if (!Array.isArray(body.projectIds)) throw invalid('项目需要是数组');
+    f.projectIds = strArray(body.projectIds, '项目', PROJECT_LIMITS.perEntry);
   }
   if (!create && has(body, 'revision')) {
     const rev = optNum(body.revision, 'revision', { int: true, min: 1 });

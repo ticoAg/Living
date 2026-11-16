@@ -12,7 +12,7 @@ tags: [architecture]
   │  /api/*  /media/*  → 先进入 Worker（run_worker_first）
   ▼
 Worker `living` (Hono)
-  ├─ D1  `living`         用户、记录、照片、标签、地点、主题、邀请、设置；地点与逆地理缓存 place_cache
+  ├─ D1  `living`         用户、记录、项目、照片、标签、地点、主题、邀请、设置；地点与逆地理缓存 place_cache
   ├─ R2  `living-photos`  原图 o/{ownerId}/{photoId}.{ext}，尺寸图 v/{photoId}/{s|m|l}.{webp|jpg}
   ├─ KV  `living-kv`      会话 sess:*、登录限流 rl:*（KV 每天 1000 次写入只留给登录）
   ├─ 外部：高德 Web 服务（可选）、OpenStreetMap Photon / Nominatim（Overpass 作后备）

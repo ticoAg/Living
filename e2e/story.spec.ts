@@ -212,6 +212,68 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     clean('photo page and profile with entries');
   });
 
+  await test.step('projects: start one, keep each practice in it, mark a milestone', async () => {
+    await follow(nav.getByRole('link', { name: '档案' }));
+    await follow(page.getByRole('navigation', { name: '档案' }).getByRole('link', { name: '项目' }));
+    await expect(page.getByRole('heading', { level: 1, name: '项目' })).toBeVisible();
+    await follow(page.getByRole('link', { name: '新建项目' }).first());
+    await page.getByLabel('项目名称').fill('从零开始学书法');
+    await page.getByLabel('开始').fill('2026-05-01');
+    await page.getByRole('group', { name: '公开范围' }).getByRole('button', { name: '公开', exact: true }).click();
+    await page.getByRole('button', { name: '创建' }).click();
+    await expect(page).toHaveURL(/\/projects\/pj_[^/]+$/);
+    const projectUrl = new URL(page.url()).pathname;
+    await expect(page.getByRole('heading', { level: 1, name: '从零开始学书法' })).toBeVisible();
+
+    // each practice is an entry written from the project: in it from the start, and a practice; shared by link only,
+    // so the profile does not list them while the public project shows them
+    for (const [day, title, count] of [
+      ['2026-05-02', '第一次临帖', 2],
+      ['2026-05-03', '横画练了一页', 1]
+    ] as const) {
+      await follow(page.getByRole('link', { name: '记一笔' }));
+      await expect(page).toHaveURL(/\/entries\/new\?project=pj_/);
+      await expect(page.getByRole('group', { name: '项目' }).getByRole('button', { name: '从零开始学书法' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await expect(page.getByLabel('类型')).toHaveValue('practice');
+      await page.getByLabel('标题', { exact: true }).fill(title);
+      await expect(page).toHaveURL(/\/e\/en_[^/]+\/edit$/, { timeout: 15_000 });
+      await page.getByLabel('日期', { exact: true }).fill(day);
+      await page.getByRole('button', { name: '添加', exact: true }).click();
+      await page.getByRole('button', { name: '全选' }).click();
+      await page.getByRole('button', { name: `添加 ${count} 张` }).click();
+      await page.getByRole('group', { name: '公开范围' }).getByRole('button', { name: '仅链接', exact: true }).click();
+      await page.getByRole('button', { name: '完成', exact: true }).click();
+      await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
+      // the entry leads back to its project
+      await follow(page.getByRole('link', { name: '从零开始学书法' }));
+      await expect(page).toHaveURL(new RegExp(`${projectUrl}$`));
+    }
+
+    await page.getByRole('button', { name: '里程碑', exact: true }).click();
+    await page.getByLabel('里程碑名称').fill('临完第一页');
+    await page.getByLabel('日期').fill('2026-05-02');
+    await page.getByLabel('阶段总结').fill('笔画还在**抖**。');
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    const stages = page.getByRole('region', { name: '阶段' });
+    await expect(stages.getByRole('heading', { level: 3, name: '临完第一页' })).toBeVisible();
+    await expect(stages.locator('strong')).toHaveText('抖');
+    // the stage going on holds the later practice and its photo
+    await expect(stages.getByRole('listitem').filter({ has: page.getByRole('heading', { level: 3, name: '现在' }) })).toContainText(
+      '1 条记录'
+    );
+    await expect(page.getByRole('region', { name: '最初与最近' }).getByRole('figure')).toHaveCount(2);
+    await expect(page.getByText('2 条记录 · 2 天 · 3 张照片')).toBeVisible();
+    await expect(page.getByRole('region', { name: '记录' }).locator('a.en-card')).toHaveCount(2);
+
+    // Today offers the next practice
+    await follow(nav.getByRole('link', { name: '今天' }));
+    await expect(page.getByRole('region', { name: '进行中' }).getByRole('link', { name: /记一笔\s*：从零开始学书法/ })).toBeVisible();
+    clean('projects');
+  });
+
   await test.step('Living', async () => {
     await page.goto('/living');
     await expect(page.getByLabel('Living 全屏轮播')).toBeVisible();
