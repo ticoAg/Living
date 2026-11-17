@@ -49,6 +49,7 @@ export const Themes = page(() => import('./pages/Themes'));
 export const ThemeReader = page(() => import('./pages/ThemeReader'));
 export const ThemeEditor = page(() => import('./pages/ThemeEditor'));
 export const ShareOpen = page(() => import('./pages/ShareOpen'));
+export const Search = page(() => import('./pages/Search'));
 export const NotFound = page(() => import('./pages/NotFound'));
 
 const enc = encodeURIComponent;
@@ -98,7 +99,8 @@ const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   [/^\/themes\/new$/, ThemeEditor, () => []],
   [/^\/t\/[^/]+\/edit$/, ThemeEditor, () => []],
   [/^\/t\/([^/]+)$/, ThemeReader, (m) => [`/api/themes/${enc(dec(m[1]))}`]],
-  [/^\/s\/[^/]+$/, ShareOpen, () => []]
+  [/^\/s\/[^/]+$/, ShareOpen, () => []],
+  [/^\/search$/, Search, () => []]
 ];
 
 /** Fetch the chunk for `url` and, with `data`, the GET requests its page will make. */

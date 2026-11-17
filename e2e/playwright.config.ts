@@ -35,6 +35,9 @@ export default defineConfig({
       // A camera that is not there, for the site's own camera: getUserMedia gets a generated picture, and the
       // question whether the page may use it is answered yes (the headless shell refuses the camera without this).
       args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+      // Chromium names files in the locale's encoding: without a UTF-8 one (a container with LANG unset), the
+      // export into a folder cannot make the Chinese file names a person's browser makes.
+      env: { ...process.env, LANG: process.env.LANG?.toUpperCase().includes('UTF-8') ? process.env.LANG : 'C.UTF-8' },
       ...(process.env.E2E_CHROMIUM ? { executablePath: process.env.E2E_CHROMIUM } : {})
     }
   },

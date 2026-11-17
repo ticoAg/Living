@@ -286,7 +286,9 @@ test.describe('phone width', () => {
     ['map', '/map', '地图'],
     ['tag manager', '/studio/tags', '标签'],
     ['today', '/today', '今天'],
-    ['archive', '/archive', '档案']
+    ['archive', '/archive', '档案'],
+    ['search', '/search?q=%E8%A5%BF%E6%B9%96', '搜索'],
+    ['settings', '/settings', '设置']
   ] as const) {
     test(`${name} does not scroll sideways`, async ({ page }) => {
       await page.goto(path);

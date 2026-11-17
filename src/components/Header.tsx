@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'wouter';
+import { useCallback } from 'react';
 import { useSession } from '../lib/session';
+import { useSearchShortcut } from '../search/shortcut';
 import CaptureButton from './CaptureButton';
 import { Icon, type IconName } from './icons';
 
@@ -40,6 +42,10 @@ export default function Header() {
   const { user, expired, askLogin, logout } = useSession();
   const signedIn = !!user && !expired;
   const nav = signedIn ? MEMBER_NAV : GUEST_NAV;
+  useSearchShortcut(
+    signedIn,
+    useCallback(() => navigate('/search'), [navigate])
+  );
   // on phones the camera button sits in the middle of the bar, between the two halves
   const half = nav.length / 2;
   const link = (n: NavItem) => (
@@ -63,6 +69,14 @@ export default function Header() {
         <div className="site-bar">
           {signedIn ? (
             <>
+              <Link
+                href="/search"
+                className="btn btn-ghost btn-icon"
+                aria-label="搜索"
+                aria-current={path === '/search' ? 'page' : undefined}
+              >
+                <Icon name="search" size={18} />
+              </Link>
               <Link href="/upload" className="btn btn-primary site-upload" aria-label="上传">
                 <Icon name="upload" size={18} />
                 <span aria-hidden="true">上传</span>

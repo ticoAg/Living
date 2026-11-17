@@ -16,7 +16,7 @@ tags: [api, account]
 
 请求 `{ "invite"?: string, "handle": string, "displayName": string, "password": string }` → 201 `{ "user": SessionUser }` 并设置会话 Cookie。新账号的 `photoVisibility` 为 `private`。
 
-- `handle`：`^[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}$`，不区分大小写唯一，且不在保留名单（admin api media living login register settings studio themes upload map index place t p www root owner today archive entries e projects s）。
+- `handle`：`^[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}$`，不区分大小写唯一，且不在保留名单（admin api media living login register settings studio themes upload map index place t p www root owner today archive entries e projects s search）。
 - `password`：至少 8 个字符。`displayName`：1–40 字符。
 - `needsSetup` 时必须提供角色为 `owner` 的有效邀请码。之后按 `registration`：`invite` 需要有效邀请码；`open` 不需要（提供则按邀请码角色）；`closed` 返回 403。
 - 邀请码有效 = 存在、未使用、未过期；使用后写入 `used_by`、`used_at`，用户角色取邀请码的 `role`。

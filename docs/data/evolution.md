@@ -15,6 +15,8 @@ sources:
     title: 第三阶段的迁移
   - resource: https://github.com/ticoAg/Living/blob/main/migrations/0008_shares_places.sql
     title: 第三阶段的迁移：分享链接与记录的地点
+  - resource: https://github.com/ticoAg/Living/blob/main/migrations/0009_search.sql
+    title: 第四阶段的迁移：搜索的部分索引
 ---
 # 阶段
 
@@ -23,7 +25,7 @@ sources:
 | 一：记录 | [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md) | 已建（`0005_entries.sql`） |
 | 二：项目 | [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md) | 已建（`0006_projects.sql`），见 [项目](#项目) |
 | 三：合集与媒体 | 合集（[themes](/data/themes.md) 原地演进，[theme_items](/data/theme-items.md) 加入记录条目）、[users](/data/users.md) 的新照片默认公开范围、[share_links](/data/share-links.md)、[entries](/data/entries.md) 的地点 | 已建（`0007_collections.sql`、`0008_shares_places.sql`），见 [合集](#合集)、[照片的默认可见性](#照片的默认可见性)、[分享链接](#分享链接)、[记录的地点](#记录的地点)；新媒体按需要再加，见 [媒体](#媒体) |
-| 四：完整档案 | 全文索引、导出 | 计划 |
+| 四：完整档案 | 搜索用的部分索引 `photos_owner_text`（[photos](/data/photos.md#索引)）；导出不加表 | 搜索与导出已做（`0009_search.sql`），见 [搜索](#搜索)、[导出与备份](#导出与备份)；日历、年度回顾和成长视图还没做 |
 
 产品上的边界见 [内容模型](/product/content-model.md)，分阶段的范围见 [路线图](/product/roadmap.md)。
 
@@ -94,6 +96,19 @@ sources:
 
 [photos](/data/photos.md) 继续作为媒体层，图片处理不重写。[entry_media](/data/entry-media.md) 的名字已经为视频、录音、文件留了位置：增加新媒体时，或给 `photos` 加 `kind`，或另建表并让关联表带上媒体类型，到时再按实际需要定。原图仍只对本人开放，私密附件的文件、缩略图和计数都按同一套权限过滤。
 
+# 搜索
+
+[搜索](/api/search.md) 只搜登录者自己的行，用 `LIKE '%词%'` 直接查表，不建 FTS5 全文索引：
+
+- D1 标准的导出不支持虚拟表；带虚拟表的导出（`--compatibility sqlite3_cli_only`）只能给 SQLite 命令行用，导不回 D1。有了 FTS5，[备份](/runbooks/backup.md) 就得先删掉索引再导出、导出后重建。
+- 中文没有空格，两个字（西湖、书法）就是一个词，FTS5 的分词器都帮不上：默认的把一整句当成一个词，trigram 至少要三个字才用得上索引；`LIKE` 本来就是按字找。
+- 一个人的档案在几千到几万行之间，按 `owner_id` 读一遍的行数在免费额度（每天 500 万行）里很宽裕。照片多，所以 `0009_search.sql` 加了部分索引 `photos_owner_text`，只收有标题或笔记的照片。
+
+记录多到搜索明显变慢、或读取行数成了问题时，再考虑全文索引（以及相应的备份流程）。
+
 # 导出与备份
 
-第四阶段：完整导出为 Markdown（每条记录一个文件，带 frontmatter）、JSON（全部元数据）和原始媒体文件；说明 D1 与 R2 的备份和恢复流程。Cloudflare 托管的存储不等于本地自托管，产品说明里要写清楚。
+- **导出**（[导出接口](/api/export.md)）：不加表。Worker 按页读出登录者自己的行，浏览器拼成 Markdown、living.json 和原文件。导出的格式有版本号（`living-export` 第 1 版），字段改动时升版本，旧版本的字段说明留在文档里。
+- **备份**：站长用 `wrangler d1 export` 导出整个 D1，用 rclone 复制 R2 的桶；恢复先导入新库、核对后再换上，见 [备份与恢复](/runbooks/backup.md)。
+- Cloudflare 托管的存储不等于本地自托管：数据在站长的 Cloudflare 账号里，个人的导出和站长的备份才是在自己手里的副本，产品说明（[愿景](/product/vision.md)、[导出](/product/features/export.md#隐私)）里写明了。
+- 还不能把导出导回 Living：导入要处理 id 冲突、别的账号的地点和标签、重复的照片（`photos_owner_sha`），以后单独设计。

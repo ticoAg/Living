@@ -11,7 +11,7 @@ area: studio
 - 字段：邀请码、用户名（3–24 位，字母数字下划线连字符，不区分大小写，唯一）、显示名、密码（至少 8 位）。
 - 注册方式由站点设置决定：`invite`（默认，需要邀请码）、`open`（任何人）、`closed`（不开放）。
 - 站点还没有任何用户时，只有角色为 `owner` 的邀请码能注册，注册者成为站长。
-- 保留用户名：admin、api、media、living、login、register、settings、studio、themes、upload、map、index、today、archive、entries、projects 等。
+- 保留用户名：admin、api、media、living、login、register、settings、studio、themes、upload、map、index、today、archive、entries、projects、search 等。
 
 # 登录与会话
 
@@ -34,6 +34,6 @@ area: studio
 
 # 设置 `/settings`
 
-修改显示名、简介、头像、密码；选择新照片的默认公开范围（公开、仅链接、仅自己）；管理 [隐私区域](/product/features/privacy.md) 和自己的全部 [分享链接](/product/features/sharing.md)（复制或删除）；站长和管理员还能看到 [站点管理](/product/features/admin.md)。
+修改显示名、简介、头像、密码；选择新照片的默认公开范围（公开、仅链接、仅自己）；管理 [隐私区域](/product/features/privacy.md) 和自己的全部 [分享链接](/product/features/sharing.md)（复制或删除）；[导出](/product/features/export.md) 自己的整个档案；站长和管理员还能看到 [站点管理](/product/features/admin.md)。
 
 新照片的默认公开范围：新账号是「仅自己」，这项设置出现之前就有的账号是「公开」。它只决定上传页给新照片预先选好的公开范围，改了之后已经上传的照片不变，见 [隐私](/product/features/privacy.md#新照片)。

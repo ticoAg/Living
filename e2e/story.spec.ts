@@ -2,7 +2,8 @@
 // sample photos, gives them a place, keeps a few entries, shares one with a guest, then opens every page. Each step
 // checks the page's key elements and that nothing reached the console as an error. The session it ends with is saved
 // for regressions.spec.ts.
-import { mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OWNER, OWNER_STATE } from './env.ts';
@@ -12,6 +13,28 @@ const FIXTURES = ['1-west-lake-1.jpg', '2-west-lake-2.jpg', '3-west-lake-3.jpg']
   fileURLToPath(new URL(`fixtures/${f}`, import.meta.url))
 );
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
+
+const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+
+/** The files of a ZIP of stored entries (what the export writes), by name, in the archive's order. */
+function zipFiles(zip: Buffer): Map<string, Buffer> {
+  const end = zip.length - 22;
+  expect(zip.readUInt32LE(end)).toBe(0x06054b50);
+  const out = new Map<string, Buffer>();
+  let at = zip.readUInt32LE(end + 16);
+  for (let i = 0; i < zip.readUInt16LE(end + 10); i++) {
+    expect(zip.readUInt32LE(at)).toBe(0x02014b50);
+    expect(zip.readUInt16LE(at + 10)).toBe(0);
+    const size = zip.readUInt32LE(at + 24);
+    const nameLen = zip.readUInt16LE(at + 28);
+    const offset = zip.readUInt32LE(at + 42);
+    const name = zip.subarray(at + 46, at + 46 + nameLen).toString('utf8');
+    const start = offset + 30 + zip.readUInt16LE(offset + 26) + zip.readUInt16LE(offset + 28);
+    out.set(name, zip.subarray(start, start + size));
+    at += 46 + nameLen;
+  }
+  return out;
+}
 
 interface ApiPhoto {
   id: string;
@@ -390,6 +413,95 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
 
     await api.patch(`/api/photos/${hidden?.id}`, { visibility: 'public' });
     clean('share links');
+  });
+
+  await test.step('search: the owner finds her own words from any page with /', async () => {
+    await page.goto('/today');
+    // the key works once the page knows who is signed in, as the header's search button shows
+    await expect(page.getByRole('link', { name: '搜索', exact: true })).toBeVisible();
+    await page.keyboard.press('/');
+    await expect(page).toHaveURL(/\/search$/);
+    const box = page.getByRole('searchbox', { name: '搜索' });
+    await expect(box).toBeFocused();
+    await box.fill('断桥');
+    await expect(page).toHaveURL(/\/search\?q=%E6%96%AD%E6%A1%A5$/);
+    const entries = page.getByRole('region', { name: /^记录/ });
+    const afternoon = entries.getByRole('link', { name: /西湖边的一个下午/ });
+    await expect(afternoon).toBeVisible();
+    await expect(afternoon.locator('mark').first()).toHaveText('断桥');
+    // a milestone's summary, as plain text
+    await box.fill('抖');
+    const projects = page.getByRole('region', { name: /^项目/ });
+    await expect(projects.getByRole('link', { name: /从零开始学书法/ })).toContainText('笔画还在抖');
+    await expect(entries).toBeHidden();
+    await box.fill('没有这几个字');
+    await expect(page.getByText('没有找到「没有这几个字」')).toBeVisible();
+    clean('search');
+  });
+
+  await test.step('export: a zip with the Markdown, living.json and the originals as uploaded', async () => {
+    await page.goto('/settings#export');
+    const section = page.getByRole('region', { name: '导出' });
+    await expect(section).toContainText('4 条记录 · 3 张照片 · 1 个项目 · 1 个合集');
+    const [download] = await Promise.all([page.waitForEvent('download'), section.getByRole('button', { name: '下载 zip' }).click()]);
+    await expect(section.getByRole('status')).toContainText('导出完成');
+    expect(download.suggestedFilename()).toMatch(new RegExp(`^living-${OWNER.handle}-\\d{4}-\\d{2}-\\d{2}\\.zip$`));
+    const files = zipFiles(readFileSync(await download.path()));
+    const root = `living-${OWNER.handle}/`;
+    const names = [...files.keys()];
+    expect(names.every((n) => n.startsWith(root))).toBe(true);
+    expect(names.filter((n) => n.startsWith(`${root}entries/2026/`))).toHaveLength(4);
+    expect(names).toContain(`${root}projects/从零开始学书法.md`);
+    expect(names).toContain(`${root}collections/西湖两日.md`);
+    // living.json comes last, with everything
+    expect(names.at(-1)).toBe(`${root}living.json`);
+    const json = JSON.parse((files.get(`${root}living.json`) as Buffer).toString('utf8'));
+    expect(json).toMatchObject({ format: 'living-export', version: 1, profile: { handle: OWNER.handle } });
+    expect(json.photos).toHaveLength(3);
+    // each original is the very file that was uploaded
+    const uploaded = new Set(FIXTURES.map((f) => sha256(readFileSync(f))));
+    for (const p of json.photos as { file: string; sha256: string }[]) {
+      const bytes = files.get(`${root}${p.file}`) as Buffer;
+      expect(sha256(bytes)).toBe(p.sha256);
+      expect(uploaded.has(p.sha256)).toBe(true);
+    }
+    const afternoon = (files.get(names.find((n) => n.endsWith('西湖边的一个下午.md')) as string) as Buffer).toString('utf8');
+    expect(afternoon).toContain('title: "西湖边的一个下午"');
+    expect(afternoon).toMatch(/!\[桥上的人\]\(<\.\.\/\.\.\/media\/2026\/2026-\d{2}-\d{2}_ph_[0-9A-Z]+\.jpg>\)/);
+    clean('export to a zip');
+  });
+
+  await test.step('export into a folder: the second time downloads nothing again', async () => {
+    // the folder picker cannot be clicked through: the page gets a folder of its own origin's file system instead
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'showDirectoryPicker', {
+        value: async () => (await navigator.storage.getDirectory()).getDirectoryHandle('picked', { create: true })
+      });
+    });
+    // already at /settings#export: a reload, so that the new page runs the script
+    await page.reload();
+    const section = page.getByRole('region', { name: '导出' });
+    await section.getByRole('button', { name: '导出到文件夹' }).click();
+    await expect(section.getByRole('status')).toContainText(`已导出到「living-${OWNER.handle}」`);
+    const listed = await page.evaluate(async (name) => {
+      const out: Record<string, number> = {};
+      const walk = async (dir: FileSystemDirectoryHandle, prefix: string): Promise<void> => {
+        for await (const h of (dir as unknown as { values(): AsyncIterable<FileSystemHandle> }).values()) {
+          if (h.kind === 'directory') await walk(h as FileSystemDirectoryHandle, `${prefix}${h.name}/`);
+          else out[`${prefix}${h.name}`] = (await (h as FileSystemFileHandle).getFile()).size;
+        }
+      };
+      const picked = await (await navigator.storage.getDirectory()).getDirectoryHandle('picked');
+      await walk(await picked.getDirectoryHandle(name), '');
+      return out;
+    }, `living-${OWNER.handle}`);
+    const paths = Object.keys(listed);
+    expect(paths).toEqual(expect.arrayContaining(['README.md', 'living.json', 'projects/从零开始学书法.md', 'collections/西湖两日.md']));
+    expect(paths.filter((p) => /^media\/2026\/2026-\d{2}-\d{2}_ph_[0-9A-Z]+\.jpg$/.test(p))).toHaveLength(3);
+
+    await section.getByRole('button', { name: '导出到文件夹' }).click();
+    await expect(section.getByRole('status')).toContainText('3 张照片上次已经导出，这次没有再下载。');
+    clean('export to a folder');
   });
 
   await test.step('Living', async () => {

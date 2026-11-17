@@ -79,7 +79,7 @@ npx wrangler d1 time-travel info living --timestamp=<unix 秒或 RFC3339 时间>
 npx wrangler d1 time-travel restore living --timestamp=<unix 秒或 RFC3339 时间>
 ```
 
-恢复会覆盖当前数据库，命令会返回一个 bookmark，可以用来撤销这次恢复。Time Travel 只覆盖 D1，R2 里的文件和 KV 不在其中。
+恢复会覆盖当前数据库，命令会返回一个 bookmark，可以用来撤销这次恢复。Time Travel 只覆盖 D1，R2 里的文件和 KV 不在其中。超过保留期的恢复、R2 的备份和从 SQL 导出恢复，见 [备份与恢复](/runbooks/backup.md)。
 
 # 迁移规则
 

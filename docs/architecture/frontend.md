@@ -36,6 +36,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `/themes` `/themes/new` | `src/pages/Themes.tsx`、`ThemeEditor.tsx` | themes（合集） |
 | `/t/:id` `/t/:id/edit` | `src/pages/ThemeReader.tsx`、`ThemeEditor.tsx` | themes（合集） |
 | `/s/:token` | `src/pages/ShareOpen.tsx` | shares |
+| `/search` | `src/pages/Search.tsx` | search |
 
 页面模块按路由拆分，统一在 `src/routes.ts` 声明。首屏之后浏览器空闲时依次预取 browse、themes、living 以及今天、档案、记录阅读页、项目列表和项目页的分块（省流量模式与 2G 下跳过）；鼠标停在站内链接上约 80ms、按下或键盘聚焦时，预取目标路由的分块和它挂载时要发的 GET 请求（进入共享缓存），所以切页通常不再出现「加载中」。分块确实没到时，「加载中」在 400ms 后才显示。`src/lib/scroll.ts` 按历史记录保存滚动位置：前进、后退回到离开时的位置，新跳转从顶部开始。瀑布流（`src/browse/Masonry.tsx`）和档案的时间线分段渲染（`src/lib/usePaged.ts`），已渲染的数量记在当前历史记录的 `history.state` 里，返回时先渲染出同样多的内容，滚动位置才能恢复。
 
@@ -78,7 +79,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/components/PickerDialog.tsx` | 挑选器的对话框：照片挑选器和合集编辑器的记录挑选器（`src/themes/EntryPicker.tsx`）共用，Esc 或点背景关闭 |
 | `src/components/AutoTextarea.tsx` | 随内容长高的文本框 |
 | `src/components/SectionTabs.tsx` | 一个分区内几页之间的标签（图库的照片 / 地图 / 索引、档案的时间线 / 项目），只对登录的人显示 |
-| `src/components/Header.tsx` | 站点页眉与导航（见 [导航](#导航)）：字标在左，四个分区居中（当前分区是一枚衬底色的胶囊），上传按钮和账户菜单在右；手机上（≤640px）页眉一行（字标、上传、账户），四个分区移到底部固定栏，每项是图标加名字，登录后栏的正中是拍照按钮 |
+| `src/components/Header.tsx` | 站点页眉与导航（见 [导航](#导航)）：字标在左，四个分区居中（当前分区是一枚衬底色的胶囊），登录后的搜索按钮、上传按钮和账户菜单在右；手机上（≤640px）页眉一行（字标、上传、账户），四个分区移到底部固定栏，每项是图标加名字，登录后栏的正中是拍照按钮 |
 | `src/components/CaptureButton.tsx` | 手机底栏的拍照按钮：打开页面内相机（`src/studio/CameraSheet.tsx`，按需加载），拍下的照片连同手机定位交给上传队列；系统相机作为备选，见 [拍照](/product/features/upload.md#拍照) |
 | `src/components/ErrorBoundary.tsx` | 路由外的错误边界：分块失效时重新加载，其他错误显示「出错了」 |
 | `src/styles/base.css` | 设计令牌与通用控件（按钮、标签片、色块、分段、输入框） |
@@ -89,6 +90,8 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 |---|---|
 | 访客 | 图库、合集、地图、索引 |
 | 登录后 | 今天、档案、图库、合集 |
+
+登录后页眉右侧有搜索按钮，在任何页面按 `/`（不在输入框里时）也能打开 [搜索](/product/features/search.md)，已经在搜索页时把光标放进搜索框（`src/search/shortcut.ts`）。
 
 登录后图库、地图、索引合为「图库」一个分区，三个页面顶部用 `src/browse/LibraryTabs.tsx` 的「照片 / 地图 / 索引」切换；照片页和地点页也算在图库里。档案的时间线和项目同样是一个分区，顶部用 `src/entries/ArchiveTabs.tsx` 的「时间线 / 项目」切换；项目页、项目的新建与编辑，已有记录的阅读和编辑页都算在档案里，新建记录算在今天里。分区数不变，手机底栏的拍照按钮仍在正中。
 

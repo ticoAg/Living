@@ -88,6 +88,7 @@ sources:
 - `photos_visibility_taken`（`visibility`, `taken_at`）：首页公开照片按时间排序。
 - `photos_poi`（`poi_id`）：地点页取该地点的照片。
 - `photos_region_todo`（`id`）：仅 `province IS NULL` 的行，即每小时的补全任务还要查的照片；补上后离开索引。
+- `photos_owner_text`（`owner_id`, `taken_at`）：仅有标题或笔记（`title IS NOT NULL OR note IS NOT NULL`）的行，[搜索](/api/search.md#读取的行数) 只读这些照片，不必走遍没写字的。
 
 # 省、市、区县
 

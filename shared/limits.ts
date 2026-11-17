@@ -13,6 +13,13 @@ export const POI_SEARCH_LIMITS = {
   queryMax: 60
 } as const;
 
+/** Searching one's archive (`GET /api/search?q=`). */
+export const SEARCH_LIMITS = {
+  queryMax: 100,
+  /** words of one query; a quoted phrase is one */
+  termCount: 5
+} as const;
+
 /** Province, city and district names, on photos and on new places. */
 export const REGION_LIMITS = {
   nameMax: 60

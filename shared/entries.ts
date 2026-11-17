@@ -74,6 +74,20 @@ function plainLine(s: string): string {
 }
 
 /**
+ * Markdown as one line of plain text: the words of every line, without their marks, fences and rules, joined by
+ * spaces. For snippets, which show a piece of a body wherever the words were found.
+ */
+export function plainText(markdown: string): string {
+  const out: string[] = [];
+  for (const raw of markdown.split(/\r\n?|\n/)) {
+    if (FENCE.test(raw) || BREAK.test(raw)) continue;
+    const line = plainLine(raw.replace(LINE_MARKS, ''));
+    if (line) out.push(line);
+  }
+  return out.join(' ');
+}
+
+/**
  * A short plain-text name for an entry: its title, else the first line of its body that has words, without its
  * Markdown, else ''. At most `max` code points (then an ellipsis).
  */

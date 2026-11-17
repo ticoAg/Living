@@ -619,6 +619,322 @@ export interface CreateMilestoneBody {
 /** `PATCH /api/projects/:id/milestones/:milestoneId`. */
 export type UpdateMilestoneBody = Partial<CreateMilestoneBody>;
 
+// ---- search (docs/api/search.md) -------------------------------------------------------------------------------------
+
+/** The groups of `GET /api/search`, in the order a results page shows them. */
+export const SEARCH_GROUPS = ['entries', 'photos', 'projects', 'themes', 'places', 'tags'] as const;
+export type SearchGroupName = (typeof SEARCH_GROUPS)[number];
+
+/** Hits a group carries when the whole archive is searched; `?in=<group>` asks one group for up to SEARCH_GROUP_MAX. */
+export const SEARCH_HITS: Record<SearchGroupName, number> = { entries: 50, photos: 60, projects: 20, themes: 20, places: 20, tags: 20 };
+export const SEARCH_GROUP_MAX = 500;
+
+/** One group: its first hits and how many matched in all. */
+export interface SearchGroup<T> {
+  hits: T[];
+  total: number;
+}
+
+export interface SearchEntryHit {
+  id: string;
+  type: EntryType;
+  title: string | null;
+  /** The title, else the body's first line as plain text, else the type's name. */
+  label: string;
+  occurredAt: string;
+  status: EntryStatus;
+  visibility: Visibility;
+  /** Its first photo. */
+  photo: PhotoSummary | null;
+  /** Plain text around the first word found in the body or a caption, else the start of the body; null without one. */
+  snippet: string | null;
+}
+
+export interface SearchPhotoHit extends PhotoSummary {
+  /** Plain text around the first word found in the note, else its start; null without a note. */
+  snippet: string | null;
+}
+
+export interface SearchProjectHit {
+  id: string;
+  type: ProjectType;
+  title: string;
+  status: ProjectStatus;
+  visibility: Visibility;
+  startDate: string;
+  endDate: string | null;
+  /** From the description or a milestone (its title, then its summary). */
+  snippet: string | null;
+}
+
+export interface SearchThemeHit {
+  id: string;
+  kind: ThemeKind;
+  title: string;
+  subtitle: string | null;
+  visibility: Visibility;
+  startDate: string | null;
+  endDate: string | null;
+  cover: PhotoSummary | null;
+  /** From the opening words or an item (a paragraph, a caption, a day's heading). */
+  snippet: string | null;
+}
+
+/** A place one's photos or entries are at (or one made). Counts are one's own. */
+export interface SearchPlaceHit {
+  id: string;
+  name: string;
+  category: string;
+  city: string | null;
+  district: string | null;
+  photoCount: number;
+  entryCount: number;
+}
+
+/** A preset or one's own tag; presets only when one uses them. Counts are one's own. */
+export interface SearchTagHit {
+  id: string;
+  name: string;
+  parentName: string | null;
+  color: string | null;
+  photoCount: number;
+  entryCount: number;
+}
+
+/** `GET /api/search?q=`: the signed-in user's own archive. A group is there when it was searched. */
+export interface SearchResponse {
+  /** The words searched for, as the query was read: every hit has all of them. */
+  terms: string[];
+  entries?: SearchGroup<SearchEntryHit>;
+  photos?: SearchGroup<SearchPhotoHit>;
+  projects?: SearchGroup<SearchProjectHit>;
+  themes?: SearchGroup<SearchThemeHit>;
+  places?: SearchGroup<SearchPlaceHit>;
+  tags?: SearchGroup<SearchTagHit>;
+}
+
+// ---- export (docs/api/export.md) -------------------------------------------------------------------------------------
+
+/** The parts of an export, each read page by page from `GET /api/export/:part`. */
+export const EXPORT_PARTS = [
+  'photos',
+  'photoTags',
+  'entries',
+  'entryMedia',
+  'entryTags',
+  'entryProjects',
+  'projects',
+  'milestones',
+  'themes',
+  'themeItems',
+  'tags',
+  'places',
+  'privacyZones',
+  'shareLinks'
+] as const;
+export type ExportPart = (typeof EXPORT_PARTS)[number];
+
+/** `GET /api/export`: what an export of one's archive will hold. */
+export interface ExportSummary {
+  profile: ExportProfile;
+  /** rows of each part */
+  counts: Record<ExportPart, number>;
+  /** the photos' original files, in bytes */
+  originalBytes: number;
+}
+
+/** `GET /api/export/:part?after=`: up to a page of rows (fields per part: docs/api/export.md); `next` reads on. */
+export interface ExportPage<T = Record<string, unknown>> {
+  rows: T[];
+  next: string | null;
+}
+
+export interface ExportProfile {
+  id: string;
+  handle: string;
+  displayName: string;
+  bio: string | null;
+  avatarPhotoId: string | null;
+  role: Role;
+  photoVisibility: Visibility;
+  createdAt: string;
+}
+
+export interface ExportPhoto {
+  id: string;
+  title: string | null;
+  note: string | null;
+  takenAt: string | null;
+  tz: string | null;
+  lat: number | null;
+  lng: number | null;
+  alt: number | null;
+  heading: number | null;
+  geoPrivacy: GeoPrivacy;
+  province: string | null;
+  city: string | null;
+  district: string | null;
+  poiId: string | null;
+  poiDistance: number | null;
+  poiMethod: PoiMethod | null;
+  camera: string | null;
+  lens: string | null;
+  focal: number | null;
+  focal35: number | null;
+  aperture: number | null;
+  shutter: string | null;
+  iso: number | null;
+  width: number;
+  height: number;
+  /** R2 key of the original, served to its owner at `/media/<fileKey>` */
+  fileKey: string;
+  fileType: string | null;
+  fileSize: number | null;
+  sha256: string | null;
+  variants: Variants;
+  thumbhash: string | null;
+  palette: string[] | null;
+  focus: [number, number] | null;
+  visibility: Visibility;
+  inLiving: boolean;
+  favorite: boolean;
+  uploadedAt: string;
+  updatedAt: string | null;
+}
+
+export interface ExportPhotoTag {
+  photoId: string;
+  tagId: string;
+  source: 'manual' | 'suggested';
+}
+
+export interface ExportEntry {
+  id: string;
+  type: EntryType;
+  title: string | null;
+  body: string | null;
+  occurredAt: string;
+  visibility: Visibility;
+  status: EntryStatus;
+  revision: number;
+  poiId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportEntryMedia {
+  entryId: string;
+  photoId: string;
+  position: number;
+  caption: string | null;
+}
+
+export interface ExportEntryTag {
+  entryId: string;
+  tagId: string;
+}
+
+export interface ExportEntryProject {
+  entryId: string;
+  projectId: string;
+}
+
+export interface ExportProject {
+  id: string;
+  type: ProjectType;
+  title: string;
+  description: string | null;
+  startDate: string;
+  endDate: string | null;
+  status: ProjectStatus;
+  visibility: Visibility;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportMilestone {
+  id: string;
+  projectId: string;
+  title: string;
+  body: string | null;
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportTheme {
+  id: string;
+  kind: ThemeKind;
+  title: string;
+  subtitle: string | null;
+  intro: string | null;
+  coverPhotoId: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  visibility: Visibility;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string | null;
+}
+
+export interface ExportThemeItem {
+  id: string;
+  themeId: string;
+  position: number;
+  kind: ThemeItemKind;
+  photoId: string | null;
+  entryId: string | null;
+  text: string | null;
+  day: string | null;
+}
+
+/** Presets (`ownerId` null) and one's own tags. */
+export interface ExportTag {
+  id: string;
+  ownerId: string | null;
+  parentId: string | null;
+  name: string;
+  color: string | null;
+  sort: number;
+  createdAt: string;
+}
+
+/** Places one's photos or entries are at, and places one made. */
+export interface ExportPlace {
+  id: string;
+  name: string;
+  aliases: string[];
+  category: string;
+  city: string | null;
+  district: string | null;
+  lat: number;
+  lng: number;
+  radius: number;
+  source: PoiSource;
+  sourceId: string | null;
+  /** made by this account */
+  own: boolean;
+  createdAt: string;
+}
+
+export interface ExportPrivacyZone {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  radius: number;
+  createdAt: string;
+}
+
+/** A share link without its token: the token opens the item, and an export file is not the place for it. */
+export interface ExportShareLink {
+  id: string;
+  kind: ShareKind;
+  itemId: string;
+  createdAt: string;
+  expiresAt: string | null;
+}
+
 export interface PrivacyZone {
   id: string;
   name: string;

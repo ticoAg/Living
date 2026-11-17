@@ -1,6 +1,9 @@
 # Directory Update Log
 
 ## 2026-11-17
+* **Creation**: 第四阶段：[搜索](/product/features/search.md)。`/search` 在自己的档案里找字，记录、照片、项目、合集、地点和标签分组列出，各带总数，片段里标出找到的字；页眉的放大镜或在任何页面按 `/` 打开。只搜自己的内容，包括草稿和仅自己可见的，见 [搜索接口](/api/search.md)。按字匹配（`LIKE`），不建 FTS5：D1 导出不支持虚拟表，理由见 [数据演进](/data/evolution.md#搜索)；迁移 `0009_search.sql` 加部分索引 `photos_owner_text`（[photos](/data/photos.md#索引)）。保留用户名加入 search。
+* **Creation**: [导出](/product/features/export.md)：设置里把自己的整个档案导出为 Markdown（记录、项目、合集各一个文件，带 frontmatter）、living.json 和照片原文件。下载 zip（每个约 1 GB，可分几个），或在 Chrome、Edge 里导出到文件夹，再次导出只下载新的照片、清理删去的文件；原文件缺了用大图代替。浏览器拼装，Worker 按页读出，见 [导出接口](/api/export.md)（含 [导出文件的格式](/api/export.md#导出的文件)）。
+* **Creation**: 运行手册 [备份与恢复](/runbooks/backup.md)：D1 用 `wrangler d1 export` 导出成 SQL，R2 用 rclone 复制到自己的硬盘；恢复先导入新库、核对后再换上。[愿景](/product/vision.md)、README 写明托管存储不等于本地自托管；[隐私](/product/features/privacy.md#搜索与导出)、[费用](/architecture/cloudflare.md#费用)、[路线图](/product/roadmap.md)、[数据演进](/data/evolution.md#导出与备份) 随之更新。
 * **Creation**: [分享链接](/product/features/sharing.md)：作者为自己的一条记录、一个合集或一个项目生成 `/s/<token>`，拿到的人不用登录就能看这一项和其中的内容，包括仅自己可见的；草稿、已归档的记录和原图除外，位置精度照旧。可随时删除，可设 1 天、7 天、30 天的有效期，设置里统一管理。迁移 `0008_shares_places.sql` 新增 [share_links](/data/share-links.md)；接口见 [分享链接接口](/api/shares.md)，打开过链接的浏览器把它记在 Cookie 里，读取接口每次核对，删除和过期立刻生效。
 * **Update**: 记录可以选一个地点（[entries](/data/entries.md#地点) 的 `poi_id`）：编辑器先列出照片所在的地点，也能按名称搜索；记录页和卡片显示地点，[地点页](/product/features/places.md) 列出在这里的记录（`GET /api/entries?poi=`）。能看到记录的人都能看到地点，在隐私区域内时编辑器提醒，见 [隐私](/product/features/privacy.md#记录)。
 * **Update**: 数据演进和路线图：第三阶段除新媒体和地图上的记录图层外都已完成，见 [数据演进](/data/evolution.md#分享链接)、[路线图](/product/roadmap.md)。保留用户名加入 s。

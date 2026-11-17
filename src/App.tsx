@@ -23,6 +23,7 @@ import {
   ProjectPage,
   Projects,
   Register,
+  Search,
   Settings,
   ShareOpen,
   TagsManager,
@@ -41,6 +42,7 @@ import {
 // studio — Upload, PhotoEdit, PlaceEdit, TagsManager, Login, Register, Settings
 // themes — Themes, ThemeReader, ThemeEditor
 // shares — ShareOpen
+// search — Search
 // The lazy page modules and their prefetching live in ./routes.
 
 function Routes() {
@@ -77,6 +79,7 @@ function Routes() {
       <Route path="/t/:id/edit" component={ThemeEditor} />
       <Route path="/t/:id" component={ThemeReader} />
       <Route path="/s/:token" component={ShareOpen} />
+      <Route path="/search" component={Search} />
       <Route component={NotFound} />
     </Switch>
   );
