@@ -17,6 +17,7 @@ import { GEO_PRIVACIES, POI_METHODS, VISIBILITIES } from '../lib/photoInput';
 import { loadPhotoDetail, loadPhotoRow, PHOTO_FROM, SUMMARY_COLS, toSummary, type PhotoRow } from '../lib/photos';
 import { findOrCreatePoi, getPoiRow, parseNewPoi, type PoiRow } from '../lib/poi';
 import { requireUser, viewerId } from '../lib/session';
+import { grantFor, sharedCache } from '../lib/shares';
 import { capped, nowIso, parseJson, prep, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
 import { readUploadForm, resolveUpload, savePhoto, storeFiles, uploadFiles, type Upload } from '../lib/upload';
@@ -90,8 +91,12 @@ photos.get('/', async (c) => {
 // ---- detail ---------------------------------------------------------------------------------------------------
 
 photos.get('/:id', async (c) => {
-  const detail = await loadPhotoDetail(c.env.DB, paramId(c), await viewerId(c));
+  const id = paramId(c);
+  // a share link opens the photos shown in what it shares (lib/shares.ts)
+  const grant = await grantFor(c, 'photo', id);
+  const detail = await loadPhotoDetail(c.env.DB, id, await viewerId(c), grant);
   if (!detail) throw notFound('照片不存在，或你没有权限查看');
+  if (grant) sharedCache(c);
   return c.json(detail);
 });
 

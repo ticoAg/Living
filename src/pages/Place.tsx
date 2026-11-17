@@ -17,21 +17,26 @@ import { replaceQuery, useQuery } from '../browse/url';
 import Img from '../components/Img';
 import { CategoryIcon, Icon } from '../components/icons';
 import MapView, { type MapPoint, type MapShapes } from '../components/MapView';
+import { useEntryList } from '../entries/api';
+import EntryCard from '../entries/EntryCard';
 import { fmtDistance } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 import '../styles/browse.css';
+import '../styles/entries.css';
 
 type Nearby = Poi & { distance: number };
 
 const photoId = (p: PhotoSummary) => p.id;
 
-/** /place/:id — one place: map with its matching radius and every shot position, filters, photos, neighbours. */
+/** /place/:id — one place: map with its matching radius and every shot position, the entries set here, filters, photos, neighbours. */
 export default function Place() {
   const { id } = useParams<{ id: string }>();
   const { user } = useSession();
   const res = useApi<{ poi: PoiDetail; nearby?: Nearby[] }>(id ? `/api/pois/${enc(id)}` : null);
   const { photos } = usePhotoList(id ? `poi=${enc(id)}` : null);
+  // entries whose author put them here, as the viewer may see them in lists
+  const { entries } = useEntryList(id ? `/api/entries?poi=${enc(id)}` : null);
   const { tree } = useTagTree();
   const q = useQuery();
   const part = q.get('part') ?? '';
@@ -63,6 +68,7 @@ export default function Place() {
   }, [visible]);
 
   const visibleIds = useMemo(() => new Set(visible.map((r) => r.p.id)), [visible]);
+  const photoById = useMemo(() => new Map((photos ?? []).map((p) => [p.id, p])), [photos]);
   const shownPhotos = useMemo(() => visible.map((r) => r.p), [visible]);
   const tileSize = useCallback((p: PhotoSummary) => placeTileSize(p, showOwner), [showOwner]);
   const tile = useCallback((p: PhotoSummary) => <PlaceTile photo={p} showOwner={showOwner} />, [showOwner]);
@@ -213,6 +219,21 @@ export default function Place() {
           )}
         </div>
       </section>
+
+      {entries && entries.length > 0 && (
+        <section className="plc-entries" aria-labelledby="plc-entries-h">
+          <h2 id="plc-entries-h" className="bw-h2">
+            记录
+          </h2>
+          <ul className="en-list">
+            {entries.map((e) => (
+              <li key={e.id}>
+                <EntryCard entry={e} photos={photoById} withDay own={e.ownerId === myId} by={e.ownerId !== myId} place={false} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {rows.length > 1 && (
         <div className="plc-filters">

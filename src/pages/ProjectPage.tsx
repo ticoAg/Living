@@ -16,6 +16,7 @@ import { projectEntriesPath, useProject } from '../projects/api';
 import MilestoneForm from '../projects/MilestoneForm';
 import { countsText, spanText } from '../projects/ProjectCard';
 import { courseOf, firstAndLatest, type Stage } from '../projects/stages';
+import ShareButton from '../shares/ShareButton';
 import { occurredDay } from '../../shared/entries';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import { fmtRange, VISIBILITY_LABEL } from '../themes/util';
@@ -142,6 +143,7 @@ function Page({ project: p, photoById, own }: { project: ProjectDetail; photoByI
               <Icon name="plus" size={18} />
               记一笔
             </Link>
+            <ShareButton kind="project" id={p.id} />
             <Link href={`/projects/${p.id}/edit`} className="btn btn-quiet">
               <Icon name="edit" size={18} />
               编辑

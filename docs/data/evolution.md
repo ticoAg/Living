@@ -13,6 +13,8 @@ sources:
     title: 第二阶段的迁移
   - resource: https://github.com/ticoAg/Living/blob/main/migrations/0007_collections.sql
     title: 第三阶段的迁移
+  - resource: https://github.com/ticoAg/Living/blob/main/migrations/0008_shares_places.sql
+    title: 第三阶段的迁移：分享链接与记录的地点
 ---
 # 阶段
 
@@ -20,7 +22,7 @@ sources:
 |---|---|---|
 | 一：记录 | [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md) | 已建（`0005_entries.sql`） |
 | 二：项目 | [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md) | 已建（`0006_projects.sql`），见 [项目](#项目) |
-| 三：合集与媒体 | 合集（[themes](/data/themes.md) 原地演进，[theme_items](/data/theme-items.md) 加入记录条目）、[users](/data/users.md) 的新照片默认公开范围 | 已建（`0007_collections.sql`），见 [合集](#合集)、[照片的默认可见性](#照片的默认可见性)；记录与地点、分享链接、新媒体还是计划 |
+| 三：合集与媒体 | 合集（[themes](/data/themes.md) 原地演进，[theme_items](/data/theme-items.md) 加入记录条目）、[users](/data/users.md) 的新照片默认公开范围、[share_links](/data/share-links.md)、[entries](/data/entries.md) 的地点 | 已建（`0007_collections.sql`、`0008_shares_places.sql`），见 [合集](#合集)、[照片的默认可见性](#照片的默认可见性)、[分享链接](#分享链接)、[记录的地点](#记录的地点)；新媒体按需要再加，见 [媒体](#媒体) |
 | 四：完整档案 | 全文索引、导出 | 计划 |
 
 产品上的边界见 [内容模型](/product/content-model.md)，分阶段的范围见 [路线图](/product/roadmap.md)。
@@ -28,7 +30,7 @@ sources:
 # 迁移的规则
 
 - **只加不改**：新表、新列；不改写已有行的含义。
-- **不改可见性**：任何迁移都不改变已有照片、合集的 `visibility`、`geo_privacy`。已经分享出去的内容保持原样，隐私上的收紧由作者在界面里自己做。
+- **不改可见性**：任何迁移都不改变已有照片、合集的 `visibility`、`geo_privacy`。已经分享出去的内容保持原样，隐私上的收紧由作者在界面里自己做。分享链接也不是迁移放开的：只有作者自己建了，才有人能凭它看到私密内容。
 - **旧地址不断**：`/t/:id`、`/p/:id` 及其接口在新模型上线后照常可用。
 - **重建表时逐行照搬**：SQLite 改不了 CHECK 等约束，非改不可时建新表、复制每一行（id 不变）、换名；行的含义不变。
 - **不替作者写记录**：照片笔记、合集里的文字段落不自动变成记录。需要时提供「转为记录」这样由作者发起的动作。
@@ -70,6 +72,23 @@ sources:
 - 已有账号设为 `public`，上传行为不变，直到本人在设置里修改。没有直接把所有人改成 `private`：访客看到的图库、地图、索引和 Living 都由公开照片组成，悄悄改掉正在用的上传流程，照片发出去了却不再出现在图库里。
 - 上传页把每张新照片预先设成这个值，顶部写着当前的默认值，链到设置；接口收到没有公开范围的上传时也按它保存。
 - 迁移不改任何照片的公开范围；已有照片的隐私由作者自己检查、修改。
+
+# 分享链接
+
+第三阶段，已建：[share_links](/data/share-links.md)。仅链接（`unlisted`）的地址一旦发出就收不回，除非改公开范围，那样所有拿到地址的人一起失去；分享链接补上「只给这几个人看，随时收回，到期自动失效」。
+
+- 一个链接指向一条记录、一个合集或一个项目；一项可以有几个链接，分别删除。
+- 打开的人能看到这一项和其中显示的内容，不管它们各自的公开范围；草稿、已归档的记录和原图除外，位置精度照旧。到达范围见 [分享链接接口](/api/shares.md#能看到什么)。
+- 授权不写进内容的行里，也不改任何 `visibility`：读取时按请求带来的链接临时放宽，规则在 `worker/lib/shares.ts` 和 `worker/lib/visibility.ts` 的 `grant` 参数。删掉链接、链接过期，下一个请求就打不开。
+- 列表、主页、图库、地图和搜索不看分享链接：它们照旧只显示公开的内容。
+
+# 记录的地点
+
+第三阶段，已建：[entries](/data/entries.md#地点) 的 `poi_id`，复用全站共享的 [pois](/data/pois.md)。
+
+- 一条记录最多一个地点，可以不选；与照片的地点相互独立，记录的照片在哪里不决定记录在哪里。
+- 记录没有位置精度：能看到记录的人都能看到地点的名称和城市。地点落在作者的隐私区域内时，编辑器提醒，不自动隐藏，因为地点是作者亲手选的。
+- 地点页列出在这里的记录；地图上还没有记录这一层，从地图出发找记录留到以后。
 
 # 媒体
 

@@ -48,6 +48,7 @@ export const Settings = page(() => import('./pages/Settings'));
 export const Themes = page(() => import('./pages/Themes'));
 export const ThemeReader = page(() => import('./pages/ThemeReader'));
 export const ThemeEditor = page(() => import('./pages/ThemeEditor'));
+export const ShareOpen = page(() => import('./pages/ShareOpen'));
 export const NotFound = page(() => import('./pages/NotFound'));
 
 const enc = encodeURIComponent;
@@ -78,7 +79,11 @@ const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   [/^\/projects\/([^/]+)$/, ProjectPage, (m) => [`/api/projects/${enc(dec(m[1]))}`, `/api/entries?project=${enc(dec(m[1]))}`]],
   [/^\/(?:@|%40)([^/]+)\/?$/i, Profile, (m) => [`/api/users/${enc(dec(m[1]))}`]],
   [/^\/p\/([^/]+)$/, Photo, (m) => [`/api/photos/${enc(dec(m[1]))}`, '/api/photos']],
-  [/^\/place\/([^/]+)$/, Place, (m) => [`/api/pois/${enc(dec(m[1]))}`, `/api/photos?poi=${enc(dec(m[1]))}`, '/api/tags']],
+  [
+    /^\/place\/([^/]+)$/,
+    Place,
+    (m) => [`/api/pois/${enc(dec(m[1]))}`, `/api/photos?poi=${enc(dec(m[1]))}`, '/api/tags', `/api/entries?poi=${enc(dec(m[1]))}`]
+  ],
   [/^\/map$/, MapPage, () => BROWSE],
   [/^\/index$/, IndexPage, () => BROWSE],
   [/^\/living$/, Living, () => []],
@@ -92,7 +97,8 @@ const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   [/^\/themes$/, Themes, () => []],
   [/^\/themes\/new$/, ThemeEditor, () => []],
   [/^\/t\/[^/]+\/edit$/, ThemeEditor, () => []],
-  [/^\/t\/([^/]+)$/, ThemeReader, (m) => [`/api/themes/${enc(dec(m[1]))}`]]
+  [/^\/t\/([^/]+)$/, ThemeReader, (m) => [`/api/themes/${enc(dec(m[1]))}`]],
+  [/^\/s\/[^/]+$/, ShareOpen, () => []]
 ];
 
 /** Fetch the chunk for `url` and, with `data`, the GET requests its page will make. */

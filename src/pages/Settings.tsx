@@ -7,11 +7,13 @@ import AdminSection from '../studio/settings/AdminSection';
 import PasswordSection from '../studio/settings/PasswordSection';
 import PhotoDefaultsSection from '../studio/settings/PhotoDefaultsSection';
 import ProfileSection from '../studio/settings/ProfileSection';
+import SharesSection from '../studio/settings/SharesSection';
 import ZonesSection from '../studio/settings/ZonesSection';
 import { useRequireLogin, useTitle } from '../studio/util';
 import '../styles/studio.css';
 
-// /settings — profile, password, new photos' visibility, privacy zones; site administration for the owner and admins.
+// /settings — profile, password, new photos' visibility, privacy zones, share links; site administration for the owner
+// and admins.
 // Docs: /docs/product/features/accounts.md, privacy.md, admin.md
 
 const ROLE: Record<string, string> = { owner: '站长', admin: '管理员', member: '成员' };
@@ -51,6 +53,7 @@ export default function Settings() {
         <a href="#password">密码</a>
         <a href="#photos">新照片</a>
         <a href="#privacy">隐私区域</a>
+        <a href="#shares">分享链接</a>
         {staff && <a href="#admin">站点管理</a>}
       </nav>
 
@@ -59,6 +62,7 @@ export default function Settings() {
         <PasswordSection />
         <PhotoDefaultsSection user={user} />
         <ZonesSection />
+        <SharesSection />
         {staff && <AdminSection user={user} />}
         <div className="se-out">
           <button

@@ -120,6 +120,7 @@ export function entry(id: string, over: Partial<EntrySummary> = {}): EntrySummar
     photoIds: [],
     tagIds: [],
     projectIds: [],
+    poi: null,
     createdAt: '2026-11-16T01:00:00Z',
     updatedAt: '2026-11-16T01:00:00Z',
     ...over

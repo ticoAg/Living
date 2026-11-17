@@ -10,6 +10,7 @@ import { useApi } from '../lib/useApi';
 import { useSession } from '../lib/session';
 import Markdown from '../entries/Markdown';
 import Prose from '../themes/Prose';
+import ShareButton from '../shares/ShareButton';
 import ThemeCard from '../themes/ThemeCard';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import { buildReaderModel, type Block } from '../themes/model';
@@ -217,6 +218,7 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
               Living
             </Link>
           )}
+          {isOwner && <ShareButton kind="theme" id={theme.id} />}
           {isOwner && (
             <Link href={editHref} className="btn btn-quiet">
               <Icon name="edit" size={16} />

@@ -1,5 +1,10 @@
 # Directory Update Log
 
+## 2026-11-17
+* **Creation**: [分享链接](/product/features/sharing.md)：作者为自己的一条记录、一个合集或一个项目生成 `/s/<token>`，拿到的人不用登录就能看这一项和其中的内容，包括仅自己可见的；草稿、已归档的记录和原图除外，位置精度照旧。可随时删除，可设 1 天、7 天、30 天的有效期，设置里统一管理。迁移 `0008_shares_places.sql` 新增 [share_links](/data/share-links.md)；接口见 [分享链接接口](/api/shares.md)，打开过链接的浏览器把它记在 Cookie 里，读取接口每次核对，删除和过期立刻生效。
+* **Update**: 记录可以选一个地点（[entries](/data/entries.md#地点) 的 `poi_id`）：编辑器先列出照片所在的地点，也能按名称搜索；记录页和卡片显示地点，[地点页](/product/features/places.md) 列出在这里的记录（`GET /api/entries?poi=`）。能看到记录的人都能看到地点，在隐私区域内时编辑器提醒，见 [隐私](/product/features/privacy.md#记录)。
+* **Update**: 数据演进和路线图：第三阶段除新媒体和地图上的记录图层外都已完成，见 [数据演进](/data/evolution.md#分享链接)、[路线图](/product/roadmap.md)。保留用户名加入 s。
+
 ## 2026-11-16
 * **Update**: 第三阶段：主题原地成为 [合集](/product/features/themes.md)，界面改称合集，`/themes`、`/t/:id`、已有内容、顺序和公开范围不变。迁移 `0007_collections.sql` 重建 [theme_items](/data/theme-items.md)（逐行照搬），加入记录条目（`kind = 'entry'`、`entry_id`）；旅程仍是旅程，没有变成项目，理由见 [数据演进](/data/evolution.md#合集)。
 * **Update**: [合集接口](/api/themes.md) 的条目可以是自己的记录；读者只看到能打开的记录和照片，`photoCount`、新的 `entryCount`、封面、路线和地点都只算这些，也算上记录里的照片。记录详情带上收录它的合集（`themes`，列表规则），删除记录时从合集里移除，见 [记录接口](/api/entries.md)。

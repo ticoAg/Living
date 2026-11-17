@@ -54,7 +54,8 @@ export const newId = {
   project: () => `pj_${ulid()}`,
   milestone: () => `ms_${ulid()}`,
   tag: () => `t_${ulid()}`,
-  zone: () => `pz_${ulid()}`
+  zone: () => `pz_${ulid()}`,
+  share: () => `sl_${ulid()}`
 };
 
 /** 10 characters from the unambiguous alphabet (no 0 O 1 I L), rejection-sampled for uniformity. */

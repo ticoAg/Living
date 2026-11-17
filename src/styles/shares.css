@@ -1,0 +1,26 @@
+/* Share links: the dialog on one's entry, collection or project, the list in settings, and the page a link opens.
+   Docs: /docs/product/features/sharing.md */
+
+.sh { width: min(480px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 48px); overflow: auto; padding: 0; border: 0; border-radius: var(--r-stage); background: var(--sheet); color: var(--ink); box-shadow: var(--lift-3); }
+.sh::backdrop { background: rgba(24, 25, 27, 0.42); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.sh-panel { display: flex; flex-direction: column; gap: 14px; padding: 22px clamp(20px, 5vw, 28px) 24px; }
+.sh-panel p { margin: 0; }
+.sh-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-right: -10px; }
+.sh-title { margin: 0; font: 600 22px / 1.4 var(--serif); letter-spacing: 0.04em; }
+.sh-notice { color: var(--sienna); }
+.sh-new { display: flex; gap: 8px; }
+.sh-new .select { flex: 1; min-width: 0; }
+
+.sh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sh-item { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px; border-radius: 14px; background: var(--paper); }
+.sh-item p { margin: 0; }
+.sh-url { width: 100%; min-width: 0; font-size: 13px; }
+.sh-item[data-expired] .sh-url { color: var(--ink-3); text-decoration: line-through; }
+.sh-item-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.sh-exp { color: var(--ink-3); }
+.sh-item-actions { display: flex; gap: 8px; margin-left: auto; }
+.sh-item[data-expired] .sh-exp { color: var(--sienna); }
+.sh-target { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 32px; color: var(--ink); text-decoration: none; }
+.sh-target:hover .sh-target-title { text-decoration: underline; text-underline-offset: 0.2em; }
+.sh-target-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 16px var(--serif); letter-spacing: 0.03em; }
+.sh-kind { flex: none; display: inline-flex; align-items: center; min-height: 20px; padding: 0 8px; border-radius: var(--r-pill); background: var(--mat); color: var(--ink-2); font-size: 12px; line-height: 1; }

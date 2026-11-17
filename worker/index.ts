@@ -17,6 +17,7 @@ import { media } from './routes/media';
 import { photos } from './routes/photos';
 import { pois } from './routes/pois';
 import { privacyZones } from './routes/privacyZones';
+import { shares } from './routes/shares';
 import { projects } from './routes/projects';
 import { site } from './routes/site';
 import { tags } from './routes/tags';
@@ -83,6 +84,7 @@ app.route('/api/themes', themes);
 app.route('/api/entries', entries);
 app.route('/api/projects', projects);
 app.route('/api/privacy-zones', privacyZones);
+app.route('/api/shares', shares);
 app.route('/api/admin', admin);
 app.route('/media', media);
 

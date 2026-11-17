@@ -42,7 +42,7 @@ sources:
 - `milestones`：按日期从早到晚，同一天按创建先后。
 - `photos`：项目里请求者能打开的记录（本人：自己的全部记录，含草稿和已归档）中，请求者能打开的照片，每张一次，不带笔记，顺序无意义。页面靠它显示记录里的照片，不必取作者的整个图库。
 
-`private` 且非本人 → 404。`unlisted` 凭 id 可以打开。
+`private` 且非本人 → 404。`unlisted` 凭 id 可以打开。持有这个项目的 [分享链接](/api/shares.md) 时，私密的项目也能打开，`photos`、统计和封面算上作者已完成的私密记录和其中的照片；这样读到的响应带 `Cache-Control: private, no-store`。
 
 项目里的记录用 `GET /api/entries?project=<id>` 取，见 [记录接口](/api/entries.md#get-apientries)。
 

@@ -165,25 +165,35 @@ export async function loadPhotoRow(db: D1Database, id: string): Promise<PhotoRow
 }
 
 /** Detail for `viewer`, or null when missing or `private` and not theirs. */
-export async function loadPhotoDetail(db: D1Database, id: string, viewer: string | null): Promise<PhotoDetail | null> {
+/** The photo as `viewer` may open it; `grant`: the owner a share link reaching this photo opens it for (lib/shares.ts). */
+export async function loadPhotoDetail(
+  db: D1Database,
+  id: string,
+  viewer: string | null,
+  grant: string | null = null
+): Promise<PhotoDetail | null> {
   const row = await loadPhotoRow(db, id);
-  if (!row || (row.visibility === 'private' && row.owner_id !== viewer)) return null;
+  if (!row || (row.visibility === 'private' && row.owner_id !== viewer && row.owner_id !== grant)) return null;
   return toDetail(db, row, viewer);
 }
 
-/** Summaries for explicit ids that `viewer` can open by id (public, unlisted, or their own). Order is unspecified. */
+/**
+ * Summaries for explicit ids that `viewer` can open by id (public, unlisted, or their own; with a share link's `grant`,
+ * that owner's too). Order is unspecified.
+ */
 export async function summariesByIds(
   db: D1Database,
   viewer: string | null,
   ids: string[],
-  withNote = false
+  withNote = false,
+  grant: string | null = null
 ): Promise<Map<string, PhotoSummary & { note: string | null }>> {
   const out = new Map<string, PhotoSummary & { note: string | null }>();
   const unique = [...new Set(ids)];
   if (!unique.length) return out;
   const q = new Sql();
   const list = q.p(JSON.stringify(unique));
-  const vis = photoById(q, viewer);
+  const vis = photoById(q, viewer, 'p', grant);
   const cols = withNote ? `${SUMMARY_COLS}, p.note` : SUMMARY_COLS;
   const res = await prepQ(
     db,

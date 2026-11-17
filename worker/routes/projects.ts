@@ -11,6 +11,7 @@ import { newId } from '../lib/ids';
 import { assertDays, parseMilestoneFields, parseProjectFields } from '../lib/projectInput';
 import { loadProjectDetail, selectProjects, toMilestone, type MilestoneRow } from '../lib/projects';
 import { requireUser, viewerId } from '../lib/session';
+import { grantFor, sharedCache } from '../lib/shares';
 import { nowIso, prep, prepInsert, prepQ, Sql } from '../lib/sql';
 import { projectList } from '../lib/visibility';
 
@@ -36,8 +37,11 @@ projects.get('/', async (c) => {
 });
 
 projects.get('/:id', async (c) => {
-  const detail = await loadProjectDetail(c.env.DB, paramId(c), await viewerId(c));
+  const id = paramId(c);
+  const grant = await grantFor(c, 'project', id);
+  const detail = await loadProjectDetail(c.env.DB, id, await viewerId(c), grant);
   if (!detail) throw notFound('项目不存在，或你没有权限查看');
+  if (grant) sharedCache(c);
   return c.json(detail);
 });
 
@@ -126,6 +130,7 @@ projects.delete('/:id', async (c) => {
   await db.batch([
     prep(db, 'DELETE FROM entry_projects WHERE project_id = ?1', row.id),
     prep(db, 'DELETE FROM milestones WHERE project_id = ?1', row.id),
+    prep(db, 'DELETE FROM share_links WHERE project_id = ?1', row.id),
     prep(db, 'DELETE FROM projects WHERE id = ?1', row.id)
   ]);
   return c.json({ ok: true });

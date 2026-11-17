@@ -19,6 +19,7 @@
 * [entry_projects](entry-projects.md) - 记录与项目的多对多关联，只能放进作者自己的项目
 * [milestones](milestones.md) - 项目的里程碑：到达或计划的日子，带这一阶段的总结
 * [privacy_zones](privacy-zones.md) - 隐私区域：落在其中的照片上传时强制隐藏位置
+* [share_links](share-links.md) - 分享链接：一条记录、一个合集或一个项目的私密地址，可删除，可设有效期
 * [settings](settings.md) - 站点级键值设置，目前只有注册方式
 * [place_cache](place-cache.md) - 地点数据源的应答缓存：周边地点、名称搜索和逆地理，带过期时间，每小时清理
 

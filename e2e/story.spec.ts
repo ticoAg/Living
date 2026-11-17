@@ -1,12 +1,12 @@
 // One continuous story on a fresh site: the owner registers with the owner invite, uploads and publishes the three
-// sample photos, gives them a place, keeps a few entries, then opens every page. Each step checks the page's key
-// elements and that nothing reached the console as an error. The session it ends with is saved for
-// regressions.spec.ts.
+// sample photos, gives them a place, keeps a few entries, shares one with a guest, then opens every page. Each step
+// checks the page's key elements and that nothing reached the console as an error. The session it ends with is saved
+// for regressions.spec.ts.
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OWNER, OWNER_STATE } from './env.ts';
-import { apiOf, expect, follow, rendered, test } from './support.ts';
+import { apiOf, cutOff, expect, follow, rendered, test, watch } from './support.ts';
 
 const FIXTURES = ['1-west-lake-1.jpg', '2-west-lake-2.jpg', '3-west-lake-3.jpg'].map((f) =>
   fileURLToPath(new URL(`fixtures/${f}`, import.meta.url))
@@ -21,7 +21,7 @@ interface ApiPhoto {
   takenAt: string | null;
 }
 
-test('owner story: register, upload, publish and visit every page', async ({ page, errors }) => {
+test('owner story: register, upload, publish and visit every page', async ({ page, errors, browser }) => {
   test.setTimeout(120_000);
   const api = apiOf(page.request);
   const clean = (where: string) => expect(errors.take(), `console errors on ${where}`).toEqual([]);
@@ -257,6 +257,20 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     clean('collections with entries');
   });
 
+  await test.step('an entry takes its place from its photos, and the place lists it', async () => {
+    await page.goto(`/e/${entryId}/edit`);
+    const place = page.getByRole('region', { name: '地点', exact: true });
+    await place.getByRole('group', { name: '照片里的地点' }).getByRole('button', { name: '断桥' }).click();
+    await expect(place.getByRole('button', { name: '去掉地点「断桥」' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: '已保存' })).toBeVisible({ timeout: 15_000 });
+    await follow(page.getByRole('link', { name: '查看', exact: true }));
+    await expect(page).toHaveURL(new RegExp(`/e/${entryId}$`));
+    await follow(page.locator('.er-meta').getByRole('link', { name: '断桥' }));
+    await expect(page).toHaveURL(new RegExp(`/place/${poi.id}$`));
+    await expect(page.getByRole('region', { name: '记录', exact: true }).locator('a.en-card')).toContainText(['西湖边的一个下午']);
+    clean('entry place');
+  });
+
   await test.step('projects: start one, keep each practice in it, mark a milestone', async () => {
     await follow(nav.getByRole('link', { name: '档案' }));
     await follow(page.getByRole('navigation', { name: '档案' }).getByRole('link', { name: '项目' }));
@@ -317,6 +331,65 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     await follow(nav.getByRole('link', { name: '今天' }));
     await expect(page.getByRole('region', { name: '进行中' }).getByRole('link', { name: /记一笔\s*：从零开始学书法/ })).toBeVisible();
     clean('projects');
+  });
+
+  await test.step('share links: a private entry opens for a guest, its private photo too, until the link is deleted', async () => {
+    // the quick note is private; it gets a photo nobody else may see
+    const { entries } = await api.get<{ entries: { id: string; excerpt: string | null }[] }>('/api/entries?mine=1');
+    const note = entries.find((e) => e.excerpt?.startsWith('湖边的风很大'));
+    const hidden = photos.find((p) => p.takenAt?.startsWith('2026-05-03'));
+    expect(note && hidden).toBeTruthy();
+    await api.patch(`/api/photos/${hidden?.id}`, { visibility: 'private' });
+    await api.patch(`/api/entries/${note?.id}`, { media: [{ photoId: hidden?.id, caption: null }] });
+
+    await page.goto(`/e/${note?.id}`);
+    await page.getByRole('button', { name: '分享', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '分享链接' });
+    await expect(dialog).toContainText('包括仅自己可见的');
+    await dialog.getByLabel('有效期').selectOption({ label: '30 天内有效' });
+    await dialog.getByRole('button', { name: '新建链接' }).click();
+    const address = dialog.getByRole('textbox', { name: /^链接/ });
+    await expect(address).toHaveValue(/\/s\/[A-Za-z0-9_-]{24}$/);
+    await expect(dialog).toContainText('前有效');
+    const link = new URL(await address.inputValue()).pathname;
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    const context = await browser.newContext({ storageState: undefined });
+    await cutOff(context);
+    const guest = await context.newPage();
+    const guestErrors = watch(guest);
+    // without the link the entry is not there, as for anyone
+    await guest.goto(`/e/${note?.id}`);
+    await expect(guest.getByText('记录不存在，或你没有权限查看')).toBeVisible();
+    guestErrors.take();
+    await guest.goto(link);
+    await expect(guest).toHaveURL(new RegExp(`/e/${note?.id}$`));
+    await expect(guest.locator('.er-body')).toContainText('湖边的风很大');
+    await expect(guest.locator('.er-figure')).toHaveCount(1);
+    await expect
+      .poll(() => guest.locator('.er-photo img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+      .toBe(true);
+    await follow(guest.locator('.er-photo').first());
+    await expect(guest).toHaveURL(new RegExp(`/p/${hidden?.id}$`));
+    await expect(guest.locator('h1.pho-title')).toBeVisible();
+    expect(guestErrors.take(), 'console errors of the guest').toEqual([]);
+
+    // deleting the link takes it all back at once
+    await page.goto('/settings#shares');
+    const shares = page.getByRole('region', { name: '分享链接' });
+    await expect(shares.getByRole('link', { name: /湖边的风很大/ })).toBeVisible();
+    await shares.getByRole('button', { name: '删除', exact: true }).click();
+    await shares.getByRole('button', { name: '确认删除' }).click();
+    await expect(shares.getByText('还没有分享链接。')).toBeVisible();
+    await guest.goto(`/e/${note?.id}`);
+    await expect(guest.getByText('记录不存在，或你没有权限查看')).toBeVisible();
+    await guest.goto(link);
+    await expect(guest.getByText('链接不存在或已失效')).toBeVisible();
+    await context.close();
+
+    await api.patch(`/api/photos/${hidden?.id}`, { visibility: 'public' });
+    clean('share links');
   });
 
   await test.step('Living', async () => {

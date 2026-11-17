@@ -16,11 +16,21 @@ import {
 } from './draft';
 
 const at = new Date(2026, 10, 16, 8, 30, 15);
+const place = { id: 'poi_lake', name: '西湖', category: 'scenic', city: '杭州', district: null };
 
 describe('emptyDraft', () => {
   it('is a private note of this moment', () => {
     const d = emptyDraft(at, '一句话');
-    expect(d).toMatchObject({ type: 'note', body: '一句话', date: '2026-11-16', time: '08:30', visibility: 'private', media: [] });
+    expect(d).toMatchObject({
+      type: 'note',
+      body: '一句话',
+      date: '2026-11-16',
+      time: '08:30',
+      visibility: 'private',
+      media: [],
+      poi: null
+    });
+    expect(payloadOf(d).poiId).toBeNull();
     expect(occurredAtOf(d)).toBe('2026-11-16T08:30:15');
   });
 
@@ -42,7 +52,8 @@ describe('draftFromEntry', () => {
       visibility: 'unlisted',
       media: [{ photoId: 'ph_a', caption: null, photo: photo('ph_a') }],
       tagIds: ['t_1'],
-      projectIds: ['pj_1']
+      projectIds: ['pj_1'],
+      poi: place
     });
     const d = draftFromEntry(e);
     expect(d).toMatchObject({ title: '长安的荔枝', date: '2026-11-16', time: '21:05', heldTime: '21:05:42' });
@@ -54,7 +65,8 @@ describe('draftFromEntry', () => {
       visibility: 'unlisted',
       media: [{ photoId: 'ph_a', caption: null }],
       tagIds: ['t_1'],
-      projectIds: ['pj_1']
+      projectIds: ['pj_1'],
+      poiId: 'poi_lake'
     });
   });
 
@@ -172,10 +184,17 @@ describe('parseBackup', () => {
     expect(parseBackup(JSON.stringify({ draft: { ...draft, media: [{ photoId: 1 }] }, at: 'x' }))).toBeNull();
     expect(parseBackup(JSON.stringify({ draft: { ...draft, tagIds: [1] }, at: 'x' }))).toBeNull();
     expect(parseBackup(JSON.stringify({ draft: { ...draft, projectIds: 'pj_1' }, at: 'x' }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ draft: { ...draft, poi: 'poi_lake' }, at: 'x' }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ draft: { ...draft, poi: { id: 'poi_lake' } }, at: 'x' }))).toBeNull();
   });
 
-  it('reads a copy kept before entries had projects as in none', () => {
-    const { projectIds: _gone, ...older } = draft;
-    expect(parseBackup(JSON.stringify({ draft: older, at: 'x' }))?.draft.projectIds).toEqual([]);
+  it('keeps the place it was given', () => {
+    const raw = JSON.stringify({ draft: { ...draft, poi: place }, at: 'x' });
+    expect(parseBackup(raw)?.draft.poi).toEqual(place);
+  });
+
+  it('reads a copy kept before entries had projects or places as in none', () => {
+    const { projectIds: _gone, poi: _none, ...older } = draft;
+    expect(parseBackup(JSON.stringify({ draft: older, at: 'x' }))?.draft).toMatchObject({ projectIds: [], poi: null });
   });
 });

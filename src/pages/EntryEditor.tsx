@@ -30,6 +30,7 @@ import {
   type Backup,
   type EntryDraft
 } from '../entries/draft';
+import EntryPlaceField from '../entries/EntryPlaceField';
 import Markdown from '../entries/Markdown';
 import { handoffBody } from '../entries/QuickCapture';
 import { SignedOut } from '../entries/ui';
@@ -171,6 +172,7 @@ function Editor({ user, initial, handoff, project, onCreated }: EditorProps) {
   }, []);
 
   const photoIds = useMemo(() => new Set(draft.media.map((m) => m.photoId)), [draft.media]);
+  const mediaPhotos = useMemo(() => draft.media.map((m) => m.photo), [draft.media]);
   const hiddenPhotos = draft.media.filter((m) => m.photo?.visibility === 'private').length;
   const line = statusLine(state);
   const bodyLeft = ENTRY_LIMITS.bodyMax - [...draft.body].length;
@@ -368,6 +370,8 @@ function Editor({ user, initial, handoff, project, onCreated }: EditorProps) {
           </ol>
         )}
       </section>
+
+      <EntryPlaceField value={draft.poi} photos={mediaPhotos} onChange={(poi) => set('poi', poi)} />
 
       <EntryProjects id={`${id}-projects`} value={draft.projectIds} onChange={(ids) => set('projectIds', ids)} />
 

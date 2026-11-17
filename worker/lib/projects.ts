@@ -49,12 +49,20 @@ export const toMilestone = (r: MilestoneRow): Milestone => ({
 /**
  * Summaries of the projects matching `where` (bound on `q`, alias `pj`). Counts and the cover only involve finished
  * entries `viewer` may open and, of their photos, those `viewer` may open: a project never shows more than its parts.
+ * `grant`: the owner a share link opens the project for (lib/shares.ts), whose content then counts in full.
  */
-export async function selectProjects(db: D1Database, viewer: string | null, q: Sql, where: string, limit = 500): Promise<ProjectSummary[]> {
+export async function selectProjects(
+  db: D1Database,
+  viewer: string | null,
+  q: Sql,
+  where: string,
+  limit = 500,
+  grant: string | null = null
+): Promise<ProjectSummary[]> {
   // finished entries of the project the viewer may open
-  const kept = `FROM entry_projects ep JOIN entries e ON e.id = ep.entry_id WHERE ep.project_id = pj.id AND e.status = 'published' AND ${entryById(q, viewer, 'e')}`;
+  const kept = `FROM entry_projects ep JOIN entries e ON e.id = ep.entry_id WHERE ep.project_id = pj.id AND e.status = 'published' AND ${entryById(q, viewer, 'e', grant)}`;
   const photos = `FROM entry_projects ep JOIN entries e ON e.id = ep.entry_id JOIN entry_media em ON em.entry_id = e.id JOIN photos p ON p.id = em.photo_id
-    WHERE ep.project_id = pj.id AND e.status = 'published' AND ${entryById(q, viewer, 'e')} AND ${photoById(q, viewer, 'p')}`;
+    WHERE ep.project_id = pj.id AND e.status = 'published' AND ${entryById(q, viewer, 'e', grant)} AND ${photoById(q, viewer, 'p', grant)}`;
   const res = await prepQ(
     db,
     `SELECT pj.id, pj.owner_id, u.handle AS owner_handle, pj.type, pj.title, pj.description, pj.start_date, pj.end_date, pj.status,
@@ -72,7 +80,9 @@ export async function selectProjects(db: D1Database, viewer: string | null, q: S
   const covers = await summariesByIds(
     db,
     viewer,
-    res.results.map((r) => r.cover_id).filter((x): x is string => Boolean(x))
+    res.results.map((r) => r.cover_id).filter((x): x is string => Boolean(x)),
+    false,
+    grant
   );
   return res.results.map((r) => {
     const cover = r.cover_id ? covers.get(r.cover_id) : undefined;
@@ -106,11 +116,17 @@ function withoutNote(p: PhotoSummary & { note: string | null }): PhotoSummary {
 /**
  * The project as `viewer` may open it, or null: missing, or private and not theirs. `photos` are the photos of its
  * entries that `viewer` may open, in entries `viewer` may open (the author: every entry of theirs in it, drafts too),
- * so a page can show the entries without asking for the author's whole library.
+ * so a page can show the entries without asking for the author's whole library. `grant`: the owner a share link
+ * opens it for (lib/shares.ts); then the project opens whatever its visibility, with its finished entries in full.
  */
-export async function loadProjectDetail(db: D1Database, id: string, viewer: string | null): Promise<ProjectDetail | null> {
+export async function loadProjectDetail(
+  db: D1Database,
+  id: string,
+  viewer: string | null,
+  grant: string | null = null
+): Promise<ProjectDetail | null> {
   const q = new Sql();
-  const summary = (await selectProjects(db, viewer, q, `pj.id = ${q.p(id)} AND ${projectById(q, viewer, 'pj')}`, 1))[0];
+  const summary = (await selectProjects(db, viewer, q, `pj.id = ${q.p(id)} AND ${projectById(q, viewer, 'pj', grant)}`, 1, grant))[0];
   if (!summary) return null;
 
   const qp = new Sql();
@@ -119,7 +135,7 @@ export async function loadProjectDetail(db: D1Database, id: string, viewer: stri
     prepQ(
       db,
       `SELECT em.photo_id FROM entry_projects ep JOIN entries e ON e.id = ep.entry_id JOIN entry_media em ON em.entry_id = e.id
-       WHERE ep.project_id = ${qp.p(id)} AND ${entryById(qp, viewer, 'e')}
+       WHERE ep.project_id = ${qp.p(id)} AND ${entryById(qp, viewer, 'e', grant)}
        ORDER BY e.occurred_at DESC, e.rowid DESC, em.position`,
       qp
     ).all<{ photo_id: string }>()
@@ -127,7 +143,9 @@ export async function loadProjectDetail(db: D1Database, id: string, viewer: stri
   const photos = await summariesByIds(
     db,
     viewer,
-    photoIds.results.map((r) => r.photo_id)
+    photoIds.results.map((r) => r.photo_id),
+    false,
+    grant
   );
   return { ...summary, milestones: milestones.results.map(toMilestone), photos: [...photos.values()].map(withoutNote) };
 }

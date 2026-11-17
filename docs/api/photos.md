@@ -23,7 +23,7 @@ tags: [api, photos]
 
 # GET /api/photos/:id
 
-`PhotoDetail`。`private` 且非本人 → 404；`unlisted` 可按 id 访问。`themes` 只列请求者能在列表里看到、直接收录这张照片的合集（经记录收录的不算）；`entries` 只列引用这张照片、请求者能在列表里看到的 [记录](/api/entries.md)（本人：全部），按发生时间倒序，每条带 `id`、`label`（标题，或正文第一行的纯文本，或类型名）和 `occurredAt`。
+`PhotoDetail`。`private` 且非本人 → 404，除非持有能到达这张照片的 [分享链接](/api/shares.md#能看到什么)（链接分享的记录里的照片，或合集、项目里显示的照片），这时响应带 `Cache-Control: private, no-store`；`unlisted` 可按 id 访问。`themes` 只列请求者能在列表里看到、直接收录这张照片的合集（经记录收录的不算）；`entries` 只列引用这张照片、请求者能在列表里看到的 [记录](/api/entries.md)（本人：全部），按发生时间倒序，每条带 `id`、`label`（标题，或正文第一行的纯文本，或类型名）和 `occurredAt`。
 
 # POST /api/photos（登录）
 

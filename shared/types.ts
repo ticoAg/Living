@@ -431,9 +431,14 @@ export interface EntrySummary {
   tagIds: string[];
   /** Projects it belongs to that the requester may see in lists: public ones, or all of one's own. */
   projectIds: string[];
+  /** Where it happened, as its author chose; shown to whoever may see the entry. */
+  poi: EntryPlace | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/** An entry's place: what a card or the reader shows of it, and the id the place page opens. */
+export type EntryPlace = Pick<Poi, 'id' | 'name' | 'category' | 'city' | 'district'>;
 
 /** `GET /api/entries`. */
 export interface EntryListResponse {
@@ -480,12 +485,53 @@ export interface CreateEntryBody {
   tagIds?: string[];
   /** One's own projects; other ids are dropped. */
   projectIds?: string[];
+  /** An existing place (`POST /api/pois` makes one from a search result); null or left out: none. */
+  poiId?: string | null;
 }
 
 /** `PATCH /api/entries/:id`: what is given changes; `media` and `tagIds` replace the whole list. */
 export interface UpdateEntryBody extends Partial<CreateEntryBody> {
   /** The revision this edit started from; when the entry has moved on, the answer is 409 and nothing changes. */
   revision?: number;
+}
+
+// ---- share links (docs/api/shares.md) -------------------------------------------------------------------------------
+
+/** What a share link can open: an entry, a collection (theme) or a project. */
+export const SHARE_KINDS = ['entry', 'theme', 'project'] as const;
+export type ShareKind = (typeof SHARE_KINDS)[number];
+
+/** Days a new link may run for; left out or null: until it is deleted. */
+export const SHARE_DAYS_MAX = 365;
+/** Links one item may have at a time, and one person in all. */
+export const SHARE_LIMITS = { perItem: 20, perOwner: 500 } as const;
+
+/** A share link as its owner sees it (`GET /api/shares`). The address to hand out is `/s/<token>`. */
+export interface ShareLink {
+  id: string;
+  token: string;
+  kind: ShareKind;
+  /** The shared entry, theme or project. */
+  targetId: string;
+  /** Its title as the owner sees it; an entry without one: the start of its text, or its type. */
+  targetTitle: string;
+  createdAt: string;
+  /** UTC; null: until deleted. A link past it opens nothing and is listed until deleted. */
+  expiresAt: string | null;
+}
+
+/** `POST /api/shares`. */
+export interface CreateShareBody {
+  kind: ShareKind;
+  id: string;
+  /** 1 to SHARE_DAYS_MAX; left out or null: until deleted. */
+  expiresInDays?: number | null;
+}
+
+/** `POST /api/shares/open`: the link works; the browser now holds it, and the item opens at its usual address. */
+export interface OpenShareResponse {
+  kind: ShareKind;
+  id: string;
 }
 
 // ---- projects (docs/api/projects.md) ----------------------------------------------------------------------------------

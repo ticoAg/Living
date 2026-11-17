@@ -9,6 +9,7 @@ import {
   VISIBILITIES,
   type CreateEntryBody,
   type EntryDetail,
+  type EntryPlace,
   type EntryType,
   type PhotoSummary,
   type Visibility
@@ -37,6 +38,8 @@ export interface EntryDraft {
   media: DraftMedia[];
   tagIds: string[];
   projectIds: string[];
+  /** where it happened; null for no place */
+  poi: EntryPlace | null;
 }
 
 /** What a request sets; `status` is the editor's actions' to set. */
@@ -55,7 +58,8 @@ export function emptyDraft(now = new Date(), body = '', start: Partial<Pick<Entr
     visibility: 'private',
     media: [],
     tagIds: [],
-    projectIds: start.projectIds ?? []
+    projectIds: start.projectIds ?? [],
+    poi: null
   };
 }
 
@@ -71,7 +75,8 @@ export function draftFromEntry(e: EntryDetail): EntryDraft {
     visibility: e.visibility,
     media: e.media.map((m) => ({ photoId: m.photoId, caption: m.caption ?? '', photo: m.photo })),
     tagIds: [...e.tagIds],
-    projectIds: [...e.projectIds]
+    projectIds: [...e.projectIds],
+    poi: e.poi
   };
 }
 
@@ -91,7 +96,8 @@ export function payloadOf(d: EntryDraft): EntryPayload {
     media: d.media.map((m) => ({ photoId: m.photoId, caption: m.caption.trim() || null })),
     tagIds: d.tagIds,
     // in the order the server answers with (the projects' creation), so choosing them in another order changes nothing
-    projectIds: [...d.projectIds].sort()
+    projectIds: [...d.projectIds].sort(),
+    poiId: d.poi?.id ?? null
   };
 }
 
@@ -156,6 +162,16 @@ export interface Backup {
 }
 
 const str = (v: unknown): v is string => typeof v === 'string';
+const strOrNull = (v: unknown): v is string | null => v === null || str(v);
+
+/** A stored place: null for none (or none kept), undefined when it is not one. */
+function placeOf(v: unknown): EntryPlace | null | undefined {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'object') return undefined;
+  const { id, name, category, city, district } = v as Record<string, unknown>;
+  if (!str(id) || !str(name) || !str(category) || !strOrNull(city) || !strOrNull(district)) return undefined;
+  return { id, name, category, city, district };
+}
 
 /** A stored backup read back, or null when it is missing or not one (another version, edited by hand). */
 export function parseBackup(raw: string | null): Backup | null {
@@ -182,7 +198,10 @@ export function parseBackup(raw: string | null): Backup | null {
     media.push({ photoId, caption, photo: photo && typeof photo === 'object' ? (photo as PhotoSummary) : null });
   }
   const projectIds = Array.isArray(d.projectIds) ? [...(d.projectIds as string[])] : [];
-  return { draft: { ...(d as unknown as EntryDraft), media, tagIds: [...(d.tagIds as string[])], projectIds }, at };
+  // nor a place, from before entries had places
+  const poi = placeOf(d.poi);
+  if (poi === undefined) return null;
+  return { draft: { ...(d as unknown as EntryDraft), media, tagIds: [...(d.tagIds as string[])], projectIds, poi }, at };
 }
 
 /** The storage slot of a backup: the author's, for an entry or (`new`) for one not yet created. */

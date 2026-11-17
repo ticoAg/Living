@@ -35,22 +35,29 @@ export interface EntryRow {
   tag_ids: string | null;
   /** comma-separated, in the order the projects were created; only projects the viewer may see in lists */
   project_ids: string | null;
+  poi_id: string | null;
+  poi_name: string | null;
+  poi_category: string | null;
+  poi_city: string | null;
+  poi_district: string | null;
   body?: string | null;
   revision?: number;
 }
 
-export const ENTRY_FROM = 'entries e JOIN users u ON u.id = e.owner_id';
+/** The entry with its author and its place (alias `epo`). */
+export const ENTRY_FROM = 'entries e JOIN users u ON u.id = e.owner_id LEFT JOIN pois epo ON epo.id = e.poi_id';
 
 /**
  * Columns of a summary. The body comes as its head only, enough for the excerpt; photo ids only name the photos
- * `viewer` may open (public, unlisted, or their own), in the entry's order; project ids only the projects `viewer`
- * may see in lists, as a photo page lists only themes it may advertise.
+ * `viewer` may open (public, unlisted, or their own; with a share link's `grant`, that owner's too), in the entry's
+ * order; project ids only the projects `viewer` may see in lists, as a photo page lists only themes it may advertise.
  */
-export function entryCols(q: Sql, viewer: string | null): string {
+export function entryCols(q: Sql, viewer: string | null, grant: string | null = null): string {
   return `e.id, e.owner_id, u.handle AS owner_handle, e.type, e.title, substr(e.body, 1, ${ENTRY_EXCERPT_MAX + 1}) AS body_head,
     e.occurred_at, e.visibility, e.status, e.created_at, e.updated_at,
+    e.poi_id, epo.name AS poi_name, epo.category AS poi_category, epo.city AS poi_city, epo.district AS poi_district,
     (SELECT group_concat(photo_id) FROM (SELECT em.photo_id FROM entry_media em JOIN photos p ON p.id = em.photo_id
-       WHERE em.entry_id = e.id AND ${photoById(q, viewer, 'p')} ORDER BY em.position)) AS photo_ids,
+       WHERE em.entry_id = e.id AND ${photoById(q, viewer, 'p', grant)} ORDER BY em.position)) AS photo_ids,
     (SELECT group_concat(et.tag_id) FROM entry_tags et WHERE et.entry_id = e.id) AS tag_ids,
     (SELECT group_concat(project_id) FROM (SELECT ep.project_id FROM entry_projects ep JOIN projects pj ON pj.id = ep.project_id
        WHERE ep.entry_id = e.id AND ${projectList(q, viewer, 'pj')} ORDER BY ep.project_id)) AS project_ids`;
@@ -74,17 +81,29 @@ export function toEntrySummary(r: EntryRow): EntrySummary {
     photoIds: ids(r.photo_ids),
     tagIds: ids(r.tag_ids),
     projectIds: ids(r.project_ids),
+    poi:
+      r.poi_id && r.poi_name !== null
+        ? { id: r.poi_id, name: r.poi_name, category: r.poi_category ?? '', city: r.poi_city, district: r.poi_district }
+        : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at
   };
 }
 
-/** The entry as `viewer` may open it (docs/api/entries.md), or null: missing, or not theirs and private or unfinished. */
-export async function loadEntryDetail(db: D1Database, id: string, viewer: string | null): Promise<EntryDetail | null> {
+/**
+ * The entry as `viewer` may open it (docs/api/entries.md), or null: missing, or not theirs and private or unfinished.
+ * `grant`: the owner a share link reaching this entry opens it for (lib/shares.ts); its photos then show in full.
+ */
+export async function loadEntryDetail(
+  db: D1Database,
+  id: string,
+  viewer: string | null,
+  grant: string | null = null
+): Promise<EntryDetail | null> {
   const q = new Sql();
   const row = await prepQ(
     db,
-    `SELECT ${entryCols(q, viewer)}, e.body, e.revision FROM ${ENTRY_FROM} WHERE e.id = ${q.p(id)} AND ${entryById(q, viewer)}`,
+    `SELECT ${entryCols(q, viewer, grant)}, e.body, e.revision FROM ${ENTRY_FROM} WHERE e.id = ${q.p(id)} AND ${entryById(q, viewer, 'e', grant)}`,
     q
   ).first<EntryRow>();
   if (!row) return null;
@@ -106,7 +125,9 @@ export async function loadEntryDetail(db: D1Database, id: string, viewer: string
   const photos = await summariesByIds(
     db,
     viewer,
-    media.results.map((m) => m.photo_id)
+    media.results.map((m) => m.photo_id),
+    false,
+    grant
   );
   const shown: EntryMedia[] = [];
   for (const m of media.results) {

@@ -22,6 +22,8 @@ export interface EntryFields {
   media?: MediaField[];
   tagIds?: string[];
   projectIds?: string[];
+  /** an existing place, or null for none; the route checks that it exists */
+  poiId?: string | null;
   /** PATCH only: the revision the edit started from */
   revision?: number;
 }
@@ -68,6 +70,10 @@ export function parseEntryFields(body: Body, create: boolean): EntryFields {
   if (has(body, 'projectIds')) {
     if (!Array.isArray(body.projectIds)) throw invalid('项目需要是数组');
     f.projectIds = strArray(body.projectIds, '项目', PROJECT_LIMITS.perEntry);
+  }
+  if (has(body, 'poiId')) {
+    if (body.poiId !== null && (typeof body.poiId !== 'string' || !ID_RE.test(body.poiId))) throw invalid('poiId 需要是地点 id 或 null');
+    f.poiId = body.poiId;
   }
   if (!create && has(body, 'revision')) {
     const rev = optNum(body.revision, 'revision', { int: true, min: 1 });

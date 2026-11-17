@@ -32,6 +32,8 @@ tags: [api, themes, collections]
 
 `pois`：照片条目和记录条目里的照片所在的地点，只算请求者看得到、位置未隐藏的照片，按第一次出现的条目顺序。
 
+持有这个合集的 [分享链接](/api/shares.md) 时，私密的合集也能打开，作者的私密照片和已完成的私密记录也算「看得到」，计数、封面、路线和地点随之计入；位置精度照旧。这样读到的响应带 `Cache-Control: private, no-store`。
+
 # POST /api/themes（登录）
 
 `CreateThemeBody` → 201 `{ "theme": ThemeDetail }`，id `th_<ulid>`。

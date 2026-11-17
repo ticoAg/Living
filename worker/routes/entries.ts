@@ -6,9 +6,10 @@ import { ENTRY_LIST_LIMIT, type EntryListResponse, type EntryStatus, type Sessio
 import type { AppEnv } from '../env';
 import { assertOwnPhotos, ENTRY_FROM, entryCols, loadEntryDetail, toEntrySummary, type EntryRow } from '../lib/entries';
 import { assertNotEmpty, parseEntryFields, type MediaField } from '../lib/entryInput';
-import { conflict, forbidden, listCache, notFound, paramId, readJson, unauthenticated, type Ctx } from '../lib/http';
+import { conflict, forbidden, invalid, listCache, notFound, paramId, readJson, unauthenticated, type Ctx } from '../lib/http';
 import { newId } from '../lib/ids';
 import { requireUser, viewerId } from '../lib/session';
+import { grantFor, sharedCache } from '../lib/shares';
 import { capped, nowIso, prep, prepInsert, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
 import { usableProjectIds } from '../lib/projects';
@@ -26,6 +27,7 @@ entries.get('/', async (c) => {
   const db = c.env.DB;
   const ownerHandle = c.req.query('owner');
   const projectId = c.req.query('project');
+  const poiId = c.req.query('poi');
   const mine = ['1', 'true'].includes(c.req.query('mine') ?? '');
   if (mine && !viewer) throw unauthenticated();
 
@@ -39,28 +41,36 @@ entries.get('/', async (c) => {
     ownerId = u.id;
   }
 
+  // a share link to the project opens its owner's finished entries in it, whatever their visibility (lib/shares.ts)
+  const grant = projectId ? await grantFor(c, 'project', projectId) : null;
+  const cache = () => (grant ? sharedCache(c) : listCache(c, viewer));
   if (projectId) {
     // a project's entries are shown with the project: none at all unless the viewer may open it
     const pq = new Sql();
     const open = await prepQ(
       db,
-      `SELECT 1 AS ok FROM projects pj WHERE pj.id = ${pq.p(projectId)} AND ${projectById(pq, viewer)}`,
+      `SELECT 1 AS ok FROM projects pj WHERE pj.id = ${pq.p(projectId)} AND ${projectById(pq, viewer, 'pj', grant)}`,
       pq
     ).first();
     if (!open) {
-      listCache(c, viewer);
+      cache();
       return c.json({ entries: [], truncated: false } satisfies EntryListResponse);
     }
   }
 
   const q = new Sql();
-  const cols = entryCols(q, viewer);
+  const cols = entryCols(q, viewer, grant);
   // Scoped lists show finished public entries plus all of the viewer's own; the unscoped list is everyone's public
   // ones. A project shows what the viewer could open by link, as a theme shows its unlisted photos.
   const where = [
-    projectId ? entryById(q, viewer) : ownerId || mine ? entryList(q, viewer) : `e.visibility = 'public' AND e.status = 'published'`
+    projectId
+      ? entryById(q, viewer, 'e', grant)
+      : ownerId || mine || poiId
+        ? entryList(q, viewer)
+        : `e.visibility = 'public' AND e.status = 'published'`
   ];
   if (mine) where.push(`e.owner_id = ${q.p(viewer)}`);
+  if (poiId) where.push(`e.poi_id = ${q.p(poiId)}`);
   if (ownerId) where.push(`e.owner_id = ${q.p(ownerId)}`);
   if (projectId) where.push(`EXISTS (SELECT 1 FROM entry_projects ep WHERE ep.entry_id = e.id AND ep.project_id = ${q.p(projectId)})`);
   const res = await prepQ(
@@ -72,13 +82,16 @@ entries.get('/', async (c) => {
   ).all<EntryRow>();
   const { rows, truncated } = capped(res.results, ENTRY_LIST_LIMIT);
 
-  listCache(c, viewer);
+  cache();
   return c.json({ entries: rows.map(toEntrySummary), truncated } satisfies EntryListResponse);
 });
 
 entries.get('/:id', async (c) => {
-  const detail = await loadEntryDetail(c.env.DB, paramId(c), await viewerId(c));
+  const id = paramId(c);
+  const grant = await grantFor(c, 'entry', id);
+  const detail = await loadEntryDetail(c.env.DB, id, await viewerId(c), grant);
   if (!detail) throw notFound('记录不存在，或你没有权限查看');
+  if (grant) sharedCache(c);
   return c.json(detail);
 });
 
@@ -116,6 +129,11 @@ function writeProjects(db: D1Database, entryId: string, projectIds: string[], re
   return out;
 }
 
+/** Any existing place will do, as for a photo (400 otherwise). */
+async function assertPlace(db: D1Database, poiId: string): Promise<void> {
+  if (!(await db.prepare('SELECT 1 AS ok FROM pois WHERE id = ?1').bind(poiId).first())) throw invalid('所选地点不存在');
+}
+
 function writeTags(db: D1Database, entryId: string, tagIds: string[], replace = false): D1PreparedStatement[] {
   const out = replace ? [prep(db, 'DELETE FROM entry_tags WHERE entry_id = ?1', entryId)] : [];
   if (tagIds.length) {
@@ -141,6 +159,7 @@ entries.post('/', async (c) => {
   const tagIds = f.tagIds ? await usableTagIds(db, user.id, f.tagIds) : [];
   // the author's own projects; others (someone else's, deleted meanwhile) are dropped
   const projectIds = f.projectIds ? await usableProjectIds(db, user.id, f.projectIds) : [];
+  if (f.poiId) await assertPlace(db, f.poiId);
 
   const id = newId.entry();
   const now = nowIso();
@@ -155,6 +174,7 @@ entries.post('/', async (c) => {
       // private unless the author chooses otherwise
       visibility: f.visibility ?? 'private',
       status: f.status ?? 'published',
+      poi_id: f.poiId ?? null,
       revision: 1,
       created_at: now,
       updated_at: now
@@ -212,6 +232,7 @@ entries.patch('/:id', async (c) => {
   }
   const tagIds = f.tagIds ? await usableTagIds(db, user.id, f.tagIds) : undefined;
   const projectIds = f.projectIds ? await usableProjectIds(db, user.id, f.projectIds) : undefined;
+  if (f.poiId) await assertPlace(db, f.poiId);
 
   const q = new Sql();
   const sets: string[] = [];
@@ -222,6 +243,7 @@ entries.patch('/:id', async (c) => {
   if (f.occurredAt) set('occurred_at', f.occurredAt);
   if (f.visibility) set('visibility', f.visibility);
   if (f.status) set('status', f.status);
+  if ('poiId' in f) set('poi_id', f.poiId ?? null);
 
   const statements: D1PreparedStatement[] = [];
   if (sets.length || f.media || tagIds || projectIds) {
@@ -246,6 +268,7 @@ entries.delete('/:id', async (c) => {
     prep(db, 'DELETE FROM entry_media WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_tags WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_projects WHERE entry_id = ?1', row.id),
+    prep(db, 'DELETE FROM share_links WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entries WHERE id = ?1', row.id)
   ]);
   return c.json({ ok: true });

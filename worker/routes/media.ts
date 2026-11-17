@@ -4,6 +4,7 @@ import type { AppEnv } from '../env';
 import { etagMatches, notFound, ID_RE, REFERRER_POLICY, type Ctx } from '../lib/http';
 import { mediaCacheKey } from '../lib/mediaCache';
 import { viewerId } from '../lib/session';
+import { grantFor } from '../lib/shares';
 import { parseJson } from '../lib/sql';
 
 export const media = new Hono<AppEnv>({ strict: false });
@@ -66,7 +67,10 @@ media.get('/v/:photoId/:file', async (c) => {
   if (!variants || !Object.values(variants).some((v) => v.key === key)) throw notFound('文件不存在');
 
   const isPrivate = row.visibility === 'private';
-  if (isPrivate && (await viewerId(c)) !== row.owner_id) throw notFound('文件不存在');
+  // a private photo: its owner, or a browser holding a share link to something that shows it (lib/shares.ts)
+  if (isPrivate && (await viewerId(c)) !== row.owner_id && (await grantFor(c, 'photo', photoId)) !== row.owner_id) {
+    throw notFound('文件不存在');
+  }
 
   const { res, full } = await serve(c, key, isPrivate ? PRIVATE_CACHE : PUBLIC_CACHE);
   if (!isPrivate && full) c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()).catch(() => {}));

@@ -9,6 +9,7 @@ import { VISIBILITIES } from '../lib/photoInput';
 import { summariesByIds } from '../lib/photos';
 import { poiCols, toPoi, type PoiRow } from '../lib/poi';
 import { requireUser, viewerId } from '../lib/session';
+import { grantFor, sharedCache } from '../lib/shares';
 import { nowIso, prep, prepQ, Sql } from '../lib/sql';
 import { has, isDate, isPlainObject, optDate, optEnum, optText, reqStr, strArray, type Body } from '../lib/validate';
 import { entryById, photoById, photoLocation, themeList } from '../lib/visibility';
@@ -49,17 +50,19 @@ const ENTRY_PHOTOS = `theme_items ti JOIN entries e ON e.id = ti.entry_id JOIN e
 
 /**
  * Theme summaries matching `where` (already bound on `q`). Counts and covers only involve what `viewer` can open: an
- * entry item counts when they may open the entry, and its photos when they may open those too.
+ * entry item counts when they may open the entry, and its photos when they may open those too. `grant`: the owner a
+ * share link opens the theme for (lib/shares.ts), whose photos and finished entries then count whatever their visibility.
  */
 async function selectThemes(
   db: D1Database,
   viewer: string | null,
   q: Sql,
   where: string,
-  limit = LIST_LIMIT
+  limit = LIST_LIMIT,
+  grant: string | null = null
 ): Promise<{ row: ThemeRow; summary: ThemeSummary }[]> {
-  const vis = photoById(q, viewer, 'p');
-  const evis = entryById(q, viewer, 'e');
+  const vis = photoById(q, viewer, 'p', grant);
+  const evis = entryById(q, viewer, 'e', grant);
   const res = await prepQ(
     db,
     `SELECT th.id, th.owner_id, u.handle AS owner_handle, th.kind, th.title, th.subtitle, th.intro, th.cover_photo_id, th.start_date,
@@ -83,7 +86,9 @@ async function selectThemes(
   const covers = await summariesByIds(
     db,
     viewer,
-    res.results.map((r) => r.cover_id ?? r.first_id).filter((x): x is string => Boolean(x))
+    res.results.map((r) => r.cover_id ?? r.first_id).filter((x): x is string => Boolean(x)),
+    false,
+    grant
   );
   return res.results.map((row) => {
     const cover = covers.get(row.cover_id ?? row.first_id ?? '');
@@ -123,18 +128,29 @@ interface ItemRow {
   day: string | null;
 }
 
-/** Full theme for `viewer`, or null when missing or private and not theirs. */
-export async function loadThemeDetail(db: D1Database, id: string, viewer: string | null): Promise<ThemeDetail | null> {
+/**
+ * Full theme for `viewer`, or null when missing or private and not theirs. `grant`: the owner a share link opens it
+ * for (lib/shares.ts); the theme then opens whatever its visibility, with all of that owner's photos and finished
+ * entries in it. Locations still follow the viewer's own rule.
+ */
+export async function loadThemeDetail(
+  db: D1Database,
+  id: string,
+  viewer: string | null,
+  grant: string | null = null
+): Promise<ThemeDetail | null> {
   const q = new Sql();
-  const found = (await selectThemes(db, viewer, q, `th.id = ${q.p(id)}`, 1))[0];
-  if (!found || (found.row.visibility === 'private' && found.row.owner_id !== viewer)) return null;
+  const found = (await selectThemes(db, viewer, q, `th.id = ${q.p(id)}`, 1, grant))[0];
+  if (!found) return null;
+  const owner = found.row.owner_id;
+  if (found.row.visibility === 'private' && owner !== viewer && owner !== grant) return null;
 
   // places in item order: of the photo items, and of the photos of entry items, where the viewer may see them
   const qp = new Sql();
   const tid = qp.p(id);
-  const poiVis = photoById(qp, viewer, 'p');
+  const poiVis = photoById(qp, viewer, 'p', grant);
   const poiLoc = photoLocation(qp, viewer, 'p');
-  const poiEntry = entryById(qp, viewer, 'e');
+  const poiEntry = entryById(qp, viewer, 'e', grant);
   const qe = new Sql();
   const [itemsRes, poisRes, entriesRes] = await Promise.all([
     db
@@ -154,8 +170,8 @@ export async function loadThemeDetail(db: D1Database, id: string, viewer: string
     ).all<PoiRow>(),
     prepQ(
       db,
-      `SELECT ${entryCols(qe, viewer)} FROM ${ENTRY_FROM}
-       WHERE e.id IN (SELECT entry_id FROM theme_items WHERE theme_id = ${qe.p(id)}) AND ${entryById(qe, viewer)}`,
+      `SELECT ${entryCols(qe, viewer, grant)} FROM ${ENTRY_FROM}
+       WHERE e.id IN (SELECT entry_id FROM theme_items WHERE theme_id = ${qe.p(id)}) AND ${entryById(qe, viewer, 'e', grant)}`,
       qe
     ).all<EntryRow>()
   ]);
@@ -168,7 +184,8 @@ export async function loadThemeDetail(db: D1Database, id: string, viewer: string
       ...itemsRes.results.map((i) => i.photo_id).filter((x): x is string => Boolean(x)),
       ...[...entries.values()].flatMap((e) => e.photoIds)
     ],
-    true
+    true,
+    grant
   );
   const entryOf = (entryId: string | null): ThemeEntry | null => {
     const e = entryId ? entries.get(entryId) : undefined;
@@ -214,8 +231,11 @@ themes.get('/', async (c) => {
 });
 
 themes.get('/:id', async (c) => {
-  const detail = await loadThemeDetail(c.env.DB, paramId(c), await viewerId(c));
+  const id = paramId(c);
+  const grant = await grantFor(c, 'theme', id);
+  const detail = await loadThemeDetail(c.env.DB, id, await viewerId(c), grant);
   if (!detail) throw notFound('合集不存在，或你没有权限查看');
+  if (grant) sharedCache(c);
   return c.json(detail);
 });
 
@@ -481,6 +501,10 @@ themes.delete('/:id', async (c) => {
   const user = await requireUser(c);
   const db = c.env.DB;
   const row = await ownedTheme(c, user, paramId(c));
-  await db.batch([prep(db, 'DELETE FROM theme_items WHERE theme_id = ?1', row.id), prep(db, 'DELETE FROM themes WHERE id = ?1', row.id)]);
+  await db.batch([
+    prep(db, 'DELETE FROM theme_items WHERE theme_id = ?1', row.id),
+    prep(db, 'DELETE FROM share_links WHERE theme_id = ?1', row.id),
+    prep(db, 'DELETE FROM themes WHERE id = ?1', row.id)
+  ]);
   return c.json({ ok: true });
 });

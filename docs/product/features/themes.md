@@ -49,7 +49,7 @@ area: themes
 
 # 隐私
 
-合集公开不会公开其中的私密照片和记录，见 [隐私](/product/features/privacy.md#合集)。
+合集公开不会公开其中的私密照片和记录，见 [隐私](/product/features/privacy.md#合集)。只想给几个人看，作者在阅读页点「分享」建 [分享链接](/product/features/sharing.md)，拿到的人能看到整本合集，包括仅自己可见的照片和记录。
 
 # 相关
 

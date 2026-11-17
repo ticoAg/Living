@@ -207,6 +207,9 @@ a.pho-strip-all:hover { color: var(--ink); }
 .plc-cap-title { grid-column: 1; font-size: 13px; font-weight: 500; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plc-cap-day { grid-column: 2; grid-row: 1; font-size: 11px; color: var(--ink-3); }
 .plc-cap-owner { grid-column: 1 / -1; font-size: 11px; line-height: 18px; color: var(--hydro); }
+.plc-entries { display: flex; flex-direction: column; gap: 16px; }
+.plc-entries .bw-h2 { padding: 0; border: 0; font-size: 20px; }
+.plc-entries .en-list { max-width: 760px; }
 .plc-near { padding-top: 32px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 18px; }
 .plc-near .bw-h2 { padding: 0; border: 0; font-size: 20px; }
 .plc-near ul { list-style: none; margin: 0 -10px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 4px 20px; }

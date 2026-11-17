@@ -1,6 +1,6 @@
 import { Link, useParams } from 'wouter';
 import { ENTRY_STATUS_LABELS, entryLabel, entryTypeLabel, hasTime, occurredDay } from '../../shared/entries';
-import type { EntryDetail } from '../../shared/types';
+import type { EntryDetail, EntryStatus } from '../../shared/types';
 import { LoadError, Loading } from '../browse/ui';
 import { useTagMap } from '../entries/api';
 import Markdown from '../entries/Markdown';
@@ -10,6 +10,7 @@ import { fmtLongDay, fmtTime } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 import { MY_PROJECTS, useProjectList } from '../projects/api';
+import ShareButton from '../shares/ShareButton';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import { VISIBILITY_LABEL } from '../themes/util';
 import '../styles/browse.css';
@@ -18,6 +19,13 @@ import '../styles/entries.css';
 // /e/:id — an entry to read: the projects it is in, its text as Markdown, its photos with their captions, the
 // collections holding it and its tags. Others see it only once it
 // is finished and not private; its photos are each shown or left out by their own visibility. Docs: /docs/product/features/entries.md
+
+/** A link to an entry opens only while it is finished. */
+const SHARE_NOTICE: Record<EntryStatus, string | undefined> = {
+  draft: '还是草稿：完成后链接才打得开。',
+  published: undefined,
+  archived: '已归档：链接暂时打不开，取消归档后恢复。'
+};
 
 function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
   const tags = useTagMap(own ? '/api/tags' : `/api/tags?owner=${encodeURIComponent(e.ownerHandle)}`);
@@ -51,6 +59,12 @@ function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
             {e.occurredAt.slice(0, 4)} · {day}
             {hasTime(e.occurredAt) && <span className="mono"> {fmtTime(e.occurredAt)}</span>}
           </span>
+          {e.poi && (
+            <Link href={`/place/${e.poi.id}`} className="er-place">
+              <Icon name="pin" size={15} />
+              {e.poi.name}
+            </Link>
+          )}
           {marks.map((m) => (
             <span key={m} className="en-mark">
               {m}
@@ -113,10 +127,13 @@ function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
             </div>
           )}
           {own && (
-            <Link href={`/e/${e.id}/edit`} className="btn btn-quiet">
-              <Icon name="edit" size={16} />
-              编辑
-            </Link>
+            <div className="row er-own">
+              <ShareButton kind="entry" id={e.id} notice={SHARE_NOTICE[e.status]} />
+              <Link href={`/e/${e.id}/edit`} className="btn btn-quiet">
+                <Icon name="edit" size={16} />
+                编辑
+              </Link>
+            </div>
           )}
         </footer>
       )}

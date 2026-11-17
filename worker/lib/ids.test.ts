@@ -132,7 +132,8 @@ describe('newId', () => {
     project: 'pj_',
     milestone: 'ms_',
     tag: 't_',
-    zone: 'pz_'
+    zone: 'pz_',
+    share: 'sl_'
   } as const;
 
   it('has a generator for every kind of record', () => {

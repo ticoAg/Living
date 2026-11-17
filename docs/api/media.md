@@ -9,7 +9,7 @@ tags: [api, media]
 `file` 为 `s.webp`、`m.webp`、`l.webp`（或 `.jpg`）。
 
 - 照片为 `public` 或 `unlisted`：任何人可读。响应 `Cache-Control: public, max-age=31536000, immutable`，并写入 Cache API（键为完整 URL），后续请求直接从边缘缓存返回。
-- `private`：只有所有者（会话）可读，`Cache-Control: private, no-store`；其他人 404。
+- `private`：所有者（会话）可读；持有能到达这张照片的 [分享链接](/api/shares.md#能看到什么) 的浏览器也可读。`Cache-Control: private, no-store`；其他人 404。
 - 带 `ETag`，支持 `If-None-Match` 返回 304。
 
 # GET /media/o/:ownerId/:file

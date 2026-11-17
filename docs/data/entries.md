@@ -6,6 +6,8 @@ tags: [data, d1, entries]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/migrations/0005_entries.sql
     title: 迁移文件
+  - resource: https://github.com/ticoAg/Living/blob/main/migrations/0008_shares_places.sql
+    title: 地点列的迁移
   - resource: https://github.com/ticoAg/Living/blob/main/shared/types.ts
     title: 接口类型
   - resource: https://github.com/ticoAg/Living/blob/main/shared/entries.ts
@@ -23,6 +25,7 @@ sources:
 | `occurred_at` | TEXT | 非空 | 发生时间，本地时间：`YYYY-MM-DD`（只知道日期）或 `YYYY-MM-DDTHH:mm:ss` |
 | `visibility` | TEXT | 非空，默认 `'private'`，取值 `public` `unlisted` `private` | 公开范围 |
 | `status` | TEXT | 非空，默认 `'published'`，取值 `draft` `published` `archived` | 状态，见 [可见性](#可见性) |
+| `poi_id` | TEXT | 可空，外键 → `pois.id`，删除时置空 | 发生的地点，作者选的；见 [地点](#地点) |
 | `revision` | INTEGER | 非空，默认 `1` | 版本号，每次修改加一；编辑器凭它发现别处保存过的修改 |
 | `created_at` | TEXT | 非空，默认当前 UTC 时间 | 写下它的时间 |
 | `updated_at` | TEXT | 非空，默认当前 UTC 时间 | 最近一次修改，包括照片和标签的改动，以及其中照片被删除 |
@@ -31,10 +34,13 @@ sources:
 
 - `entries_owner_occurred`（`owner_id`, `occurred_at`）：作者自己的时间线（`?mine=1`）和个人主页。
 - `entries_public_occurred`（`occurred_at`），部分索引，只含 `visibility = 'public' AND status = 'published'`：不限作者的公开列表。
+- `entries_poi`（`poi_id`），只含有地点的行：地点页上的记录（`GET /api/entries?poi=`）。
 
 # 关系
 
 - 作者 [users](/data/users.md)，删除用户时记录级联删除。
+- 地点 [pois](/data/pois.md)：可选；地点被删除时只清空这一列，记录保留。
+- 分享链接在 [share_links](/data/share-links.md)（`entry_id`），删除记录时一并删除。
 - 照片在 [entry_media](/data/entry-media.md)，标签在 [entry_tags](/data/entry-tags.md)，所属的项目在 [entry_projects](/data/entry-projects.md)，收录它的合集在 [theme_items](/data/theme-items.md)（`entry_id`）；删除记录时这四处的行级联删除，照片、标签、项目和合集本身不受影响。
 - 功能说明：[记录](/product/features/entries.md)、[今天](/product/features/today.md)、[档案](/product/features/archive.md)、[项目](/product/features/projects.md)；在内容模型里的位置见 [内容模型](/product/content-model.md)。接口：[记录接口](/api/entries.md)。
 
@@ -54,6 +60,14 @@ SQL 条件在 `worker/lib/visibility.ts` 的 `entryList`（列表与计数）和
 记录的公开范围不改变其中照片的公开范围：他人只看到自己有权打开的照片，其余的从 `photoIds` 和 `media` 中略去，见 [entry_media](/data/entry-media.md#可见性)。
 
 反过来，放进公开的项目或合集也不会让记录被看到：容器里只显示读者按上表能打开的记录。
+
+唯一的例外是作者建的 [分享链接](/data/share-links.md)：打开链接的人还能看到作者已完成的私密记录，限于链接所到达的那些；草稿和已归档的仍然看不到。
+
+# 地点
+
+- 作者在编辑器里选，可以不选；与照片的地点相互独立：记录的地点不改照片的地点，照片换了地点记录也不变。
+- 能看到记录的人都能看到它的地点（名称、类别、城市、区县）；记录没有位置精度一说。地点在作者的隐私区域内时，编辑器提醒，不自动隐藏。
+- 地点页按列表的规则（`entryList`）列出在这里的记录。
 
 # 规则
 
