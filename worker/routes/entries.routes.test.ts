@@ -8,6 +8,7 @@ import {
   type EntryStatus,
   type EntrySummary,
   type PhotoDetail,
+  type Poi,
   type ThemeDetail,
   type ThemeItem,
   type Visibility
@@ -433,5 +434,145 @@ describe('collections holding an entry', () => {
         { id: older, title: '早先的' }
       ]);
     }
+  });
+});
+
+describe('the place of an entry', () => {
+  let lake: Poi;
+  let bridge: Poi;
+  beforeEach(async () => {
+    const place = async (client: Client, body: Json): Promise<Poi> =>
+      expectStatus(await client.post('/api/pois', { lng: 120.15, city: '杭州市', ...body }), 201).poi;
+    lake = await place(alice, { name: '西湖', category: '湖', lat: 30.25, district: '西湖区' });
+    bridge = await place(alice, { name: '断桥', category: '桥', lat: 30.259 });
+  });
+  /** What an entry carries of its place (docs/api/entries.md): these five fields and nothing more. */
+  const placed = (p: Poi) => ({ id: p.id, name: p.name, category: p.category, city: p.city, district: p.district });
+  const ids = (items: { id: string }[]) => items.map((x) => x.id);
+
+  it('is null until its author picks a place, and then that place: its id, name, category, city and district', async () => {
+    expect((await create(alice, { body: 'x' })).poi).toBeNull();
+    expect((await create(alice, { body: 'x', poiId: null })).poi).toBeNull();
+    const e = await create(alice, { body: 'x', poiId: lake.id });
+    const expected = { id: lake.id, name: '西湖', category: '湖', city: '杭州市', district: '西湖区' };
+    expect(e.poi).toEqual(expected);
+    expect(expectStatus(await alice.get<EntryDetail>(`/api/entries/${e.id}`), 200).poi).toEqual(expected);
+    expect((await create(alice, { body: 'x', poiId: bridge.id })).poi).toEqual({
+      id: bridge.id,
+      name: '断桥',
+      category: '桥',
+      city: '杭州市',
+      district: null
+    });
+  });
+
+  it('may be any place there is, someone else’s too, and must be given by its id', async () => {
+    const theirs = expectStatus(await bob.post('/api/pois', { name: '孤山', category: '山', lat: 30.256, lng: 120.14 }), 201).poi as Poi;
+    expect((await create(alice, { body: 'x', poiId: theirs.id })).poi).toEqual(placed(theirs));
+    const before = await list(alice, 'mine=1');
+
+    const missing = await alice.post('/api/entries', { occurredAt: AT, body: 'x', poiId: 'poi_missing' });
+    expect(expectStatus(missing, 400)).toEqual({ error: 'invalid_input', message: '所选地点不存在' });
+    for (const poiId of [42, true, {}, [lake.id], '', 'poi missing']) {
+      const res = await alice.post('/api/entries', { occurredAt: AT, body: 'x', poiId });
+      expect(res.status, JSON.stringify(poiId)).toBe(400);
+      expect(res.body.error).toBe('invalid_input');
+    }
+    expect(await list(alice, 'mine=1')).toEqual(before);
+  });
+
+  it('is set, changed and cleared with PATCH, each time moving the revision on, and kept when not given', async () => {
+    const e = await create(alice, { body: 'x' });
+    const edit = async (body: Json) => expectStatus(await alice.patch(`/api/entries/${e.id}`, body), 200).entry as EntryDetail;
+    const steps: [Json, Poi | null][] = [
+      [{ poiId: lake.id }, lake],
+      [{ poiId: bridge.id }, bridge],
+      [{ title: '标题' }, bridge],
+      [{ poiId: null }, null]
+    ];
+    for (const [i, [body, poi]] of steps.entries()) {
+      const after = await edit(body);
+      expect(after.poi, JSON.stringify(body)).toEqual(poi && placed(poi));
+      expect(after.revision, JSON.stringify(body)).toBe(i + 2);
+    }
+    expect(expectStatus(await alice.get<EntryDetail>(`/api/entries/${e.id}`), 200)).toMatchObject({ poi: null, revision: 5 });
+  });
+
+  it('is not changed by a PATCH naming a place that is not there, or no place id at all', async () => {
+    const e = await create(alice, { body: 'x', poiId: lake.id });
+    const missing = await alice.patch(`/api/entries/${e.id}`, { poiId: 'poi_missing' });
+    expect(expectStatus(missing, 400)).toEqual({ error: 'invalid_input', message: '所选地点不存在' });
+    for (const poiId of [42, '', { id: bridge.id }]) {
+      expect((await alice.patch(`/api/entries/${e.id}`, { poiId })).status, JSON.stringify(poiId)).toBe(400);
+    }
+    const now = expectStatus(await alice.get<EntryDetail>(`/api/entries/${e.id}`), 200);
+    expect([now.poi, now.revision]).toEqual([placed(lake), 1]);
+  });
+
+  it('shows to whoever may see the entry, even a place of the author’s own in one of their privacy zones', async () => {
+    // a place alice made, that no photo uses, inside a privacy zone of hers: shown all the same
+    expectStatus(await alice.post('/api/privacy-zones', { name: '家', lat: 30.25, lng: 120.15, radius: 500 }), 201);
+    const shown = await create(alice, { body: '公开的', visibility: 'public', poiId: lake.id });
+    const linked = await create(alice, { body: '仅链接', visibility: 'unlisted', poiId: lake.id });
+    for (const viewer of [bob, anon]) {
+      for (const e of [shown, linked]) {
+        expect(expectStatus(await viewer.get<EntryDetail>(`/api/entries/${e.id}`), 200).poi, e.body ?? '').toEqual(placed(lake));
+      }
+      expect((await list(viewer, 'owner=alice')).map((e) => e.poi)).toEqual([placed(lake)]);
+      expect((await list(viewer)).map((e) => e.poi)).toEqual([placed(lake)]);
+    }
+  });
+
+  it('lists with poi= the entries at that place: finished public ones for others, all of one’s own, latest first', async () => {
+    const VIS: Visibility[] = ['public', 'unlisted', 'private'];
+    const STATUS: EntryStatus[] = ['published', 'draft', 'archived'];
+    const made: { id: string; owner: Client; visibility: Visibility; status: EntryStatus; occurredAt: string }[] = [];
+    const add = async (owner: Client, visibility: Visibility, status: EntryStatus) => {
+      // a different day for each, written down out of order
+      const occurredAt = `2026-04-${10 + ((made.length * 7) % 13)}`;
+      const e = await create(owner, { body: `${visibility}/${status}`, visibility, status, occurredAt, poiId: lake.id });
+      made.push({ id: e.id, owner, visibility, status, occurredAt });
+    };
+    for (const visibility of VIS) for (const status of STATUS) await add(alice, visibility, status);
+    await add(bob, 'public', 'published');
+    await add(bob, 'private', 'draft');
+    // elsewhere, and nowhere
+    await create(alice, { body: '断桥', visibility: 'public', poiId: bridge.id });
+    await create(alice, { body: '没有地点', visibility: 'public' });
+
+    const latestFirst = (cells: typeof made) => [...cells].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).map((c) => c.id);
+    /** The documented rule: others see finished public entries; one's own, all of them. */
+    const seenBy = (viewer: Client) => made.filter((c) => c.owner === viewer || (c.visibility === 'public' && c.status === 'published'));
+    const at = async (viewer: Client, query = '') => ids(await list(viewer, `poi=${lake.id}${query}`));
+    for (const viewer of [alice, bob, anon]) expect(await at(viewer)).toEqual(latestFirst(seenBy(viewer)));
+    expect(latestFirst(seenBy(anon))).toHaveLength(2);
+    // with other parameters, what both give
+    expect(await at(alice, '&mine=1')).toEqual(latestFirst(made.filter((c) => c.owner === alice)));
+    expect(await at(anon, '&owner=bob')).toEqual(latestFirst(seenBy(anon).filter((c) => c.owner === bob)));
+    for (const e of await list(alice, `poi=${lake.id}`)) expect(e.poi).toEqual(placed(lake));
+    expect(expectStatus(await anon.get(`/api/entries?poi=${bridge.id}`), 200).entries).toHaveLength(1);
+    expect(expectStatus(await anon.get('/api/entries?poi=poi_missing'), 200)).toEqual({ entries: [], truncated: false });
+  });
+
+  it('comes with the entry wherever it is listed: an author’s entries, a project’s, and a collection’s entry items', async () => {
+    const p = expectStatus(
+      await alice.post('/api/projects', { title: '游湖', startDate: '2026-03-01', visibility: 'public' }),
+      201
+    ).project;
+    const e = await create(alice, { body: 'x', visibility: 'public', poiId: lake.id, projectIds: [p.id] });
+    const t = await collection('西湖', 'public', [holding(e)]);
+    for (const viewer of [alice, bob, anon]) {
+      expect((await list(viewer, 'owner=alice')).map((x) => x.poi)).toEqual([placed(lake)]);
+      expect((await list(viewer, `project=${p.id}`)).map((x) => x.poi)).toEqual([placed(lake)]);
+      const [item] = expectStatus(await viewer.get<ThemeDetail>(`/api/themes/${t}`), 200).items;
+      expect(item.kind === 'entry' ? item.entry?.poi : item).toEqual(placed(lake));
+    }
+    expect((await list(alice, 'mine=1')).map((x) => x.poi)).toEqual([placed(lake)]);
+  });
+
+  it('stays when its entry is deleted', async () => {
+    const e = await create(alice, { body: 'x', poiId: lake.id });
+    expectStatus(await alice.del(`/api/entries/${e.id}`), 200);
+    expect(expectStatus(await alice.get(`/api/pois/${lake.id}`), 200).poi).toMatchObject({ id: lake.id, name: '西湖' });
   });
 });
