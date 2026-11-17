@@ -14,8 +14,15 @@ describe('searchTerms', () => {
     expect(searchTerms('"a   b"')).toEqual(['a b']);
   });
 
-  it('keeps an unclosed quote as part of the word', () => {
-    expect(searchTerms('"west lake')).toEqual(['"west', 'lake']);
+  it('reads a quote not yet closed as a phrase to the end, since a query is searched while it is typed', () => {
+    expect(searchTerms('"west lake')).toEqual(['west lake']);
+    expect(searchTerms('断桥 「残雪')).toEqual(['断桥', '残雪']);
+    expect(searchTerms('"西湖" “断桥 残')).toEqual(['西湖', '断桥 残']);
+    // a quote with nothing in it is no word
+    expect(searchTerms('"')).toEqual([]);
+    expect(searchTerms('西湖 ""')).toEqual(['西湖']);
+    // within a word a quote is just a character
+    expect(searchTerms('5"屏 a"b')).toEqual(['5"屏', 'a"b']);
   });
 
   it('drops a word given twice, A–Z case aside', () => {

@@ -7,8 +7,11 @@ import { SEARCH_LIMITS } from './limits';
 /** Lower-cases A–Z only, as SQLite's LIKE and lower() do: what matches in the database is found here too. */
 export const asciiLower = (s: string): string => s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
 
-/** A phrase in straight or curly quotes or in 「」 is one word; otherwise words are split at any space, ideographic ones included. */
-const WORD = /"([^"]+)"|“([^”]+)”|「([^」]+)」|(\S+)/gu;
+/**
+ * A phrase in straight or curly quotes or in 「」 is one word, and a quote not yet closed runs to the end (a query is
+ * searched while it is typed); otherwise words are split at any space, ideographic ones included.
+ */
+const WORD = /"([^"]*)(?:"|$)|“([^”]*)(?:”|$)|「([^」]*)(?:」|$)|(\S+)/gu;
 
 /**
  * The words of a query, in order, each once (A–Z case aside); [] when it has none. More than

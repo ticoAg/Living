@@ -605,6 +605,10 @@ describe('what an export holds', () => {
     expect(await own(bob)).toEqual(byBytes([`${made} false`, `${shot} true`, `${written} true`, `${his} true`]));
     expect((await rowsOf(alice, 'places')).find((r) => r.id === both)).toMatchObject({ name: '塔', aliases: ['Leifeng Pagoda', '雷峰塔'] });
     expect((await rowsOf(alice, 'places')).find((r) => r.id === shot)).toMatchObject({ name: '湖', own: false });
+    // only who made a place sees its aliases, as in GET /api/pois/:id
+    expectStatus(await bob.patch(`/api/pois/${shot}`, { aliases: ['West Lake'] }), 200);
+    expect((await rowsOf(alice, 'places')).find((r) => r.id === shot)).toMatchObject({ aliases: [] });
+    expect((await rowsOf(bob, 'places')).find((r) => r.id === shot)).toMatchObject({ aliases: ['West Lake'] });
     expect((await rowsOf(alice, 'places')).find((r) => r.id === 'poi_osm1')).toMatchObject({
       source: 'osm',
       sourceId: 'node/1',

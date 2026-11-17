@@ -140,7 +140,9 @@ describe('GET /api/search', () => {
       ['西湖　断桥\t苏堤\n白堤', ['西湖', '断桥', '苏堤', '白堤']],
       ['"West  Lake" 断桥', ['West Lake', '断桥']],
       ['“断桥 残雪” 「三潭 印月」', ['断桥 残雪', '三潭 印月']],
-      ['West west WEST 西湖 西湖', ['West', '西湖']]
+      ['West west WEST 西湖 西湖', ['West', '西湖']],
+      // a quote not yet closed, as it is being typed
+      ['断桥 "West La', ['断桥', 'West La']]
     ];
     for (const [q, terms] of cases) expect((await search(alice, q)).terms, q).toEqual(terms);
   });
@@ -385,13 +387,15 @@ describe('entries', () => {
     });
   });
 
-  it('come with a word in the title first, then the latest first', async () => {
+  it('come with a word in the title first, then the latest first, titled or not', async () => {
     const older = await entry(alice, { title: '西湖', occurredAt: '2024-01-01' });
     const oldest = await entry(alice, { title: '去西湖', body: '断桥', occurredAt: '2023-01-01' });
     const latest = await entry(alice, { body: '西湖', occurredAt: '2026-01-01T09:00:00' });
     const later = await entry(alice, { body: '西湖', occurredAt: '2025-06-01' });
     const meanwhile = await entry(alice, { body: '在西湖', occurredAt: '2025-07-01' });
-    expect(await found(alice, '西湖', 'entries')).toEqual([older.id, oldest.id, latest.id, meanwhile.id, later.id]);
+    // a title without the word sorts by time like no title at all
+    const walk = await entry(alice, { title: '散步', body: '西湖', occurredAt: '2020-01-01' });
+    expect(await found(alice, '西湖', 'entries')).toEqual([older.id, oldest.id, latest.id, meanwhile.id, later.id, walk.id]);
   });
 });
 
@@ -413,13 +417,14 @@ describe('photos', () => {
     expect(lake[1]).not.toHaveProperty('note');
   });
 
-  it('come with a word in the title first, then the latest taken first', async () => {
+  it('come with a word in the title first, then the latest taken first, titled or not', async () => {
     const older = await upload(alice, { title: '西湖', takenAt: '2024-01-01T10:00:00' });
     const oldest = await upload(alice, { title: '西湖边', note: '雪', takenAt: '2023-01-01T10:00:00' });
     const latest = await upload(alice, { note: '西湖', takenAt: '2026-01-01T10:00:00' });
     const earlier = await upload(alice, { note: '西湖', takenAt: '2025-01-01T10:00:00' });
     const between = await upload(alice, { note: '在西湖', takenAt: '2025-06-01T10:00:00' });
-    expect(await found(alice, '西湖', 'photos')).toEqual([older.id, oldest.id, latest.id, between.id, earlier.id]);
+    const walk = await upload(alice, { title: '湖边', note: '西湖', takenAt: '2020-01-01T10:00:00' });
+    expect(await found(alice, '西湖', 'photos')).toEqual([older.id, oldest.id, latest.id, between.id, earlier.id, walk.id]);
   });
 });
 
@@ -519,6 +524,39 @@ describe('collections', () => {
     expect(got[caption.id].cover).not.toHaveProperty('note');
   });
 
+  it('show the cover the collections list shows: the chosen photo, else the first photo, an entry’s included', async () => {
+    const [a, b, c] = [await upload(alice), await upload(alice), await upload(alice)];
+    const withPhotos = await entry(alice, { body: 'x', media: showing(b, c) });
+    const chosen = await collection(alice, { title: '西湖一', coverPhotoId: c.id }, [{ kind: 'photo', photoId: a.id }]);
+    const photoFirst = await collection(alice, { title: '西湖二' }, [
+      { kind: 'text', text: '先说几句' },
+      { kind: 'photo', photoId: a.id },
+      { kind: 'entry', entryId: withPhotos.id }
+    ]);
+    const entryFirst = await collection(alice, { title: '西湖三' }, [
+      { kind: 'entry', entryId: withPhotos.id },
+      { kind: 'photo', photoId: a.id }
+    ]);
+    const words = await collection(alice, { title: '西湖四' }, [{ kind: 'text', text: '只有字' }]);
+    // by position, whatever the order of the items' ids
+    const reordered = await collection(alice, { title: '西湖五' });
+    await insert('theme_items', [
+      { id: 'it_z', theme_id: reordered.id, position: 0, kind: 'entry', photo_id: null, entry_id: withPhotos.id },
+      { id: 'it_a', theme_id: reordered.id, position: 1, kind: 'photo', photo_id: a.id, entry_id: null }
+    ]);
+
+    const got = Object.fromEntries((await hits(alice, '西湖', 'themes')).map((h) => [h.id, h.cover]));
+    expect(got).toEqual({
+      [chosen.id]: await summary(alice, c),
+      [photoFirst.id]: await summary(alice, a),
+      [entryFirst.id]: await summary(alice, b),
+      [words.id]: null,
+      [reordered.id]: await summary(alice, b)
+    });
+    const listed = expectStatus(await alice.get('/api/themes?mine=1'), 200).themes as Json[];
+    for (const t of listed) expect(got[t.id as string]?.id ?? null, t.title as string).toBe((t.cover as Json | null)?.id ?? null);
+  });
+
   it('come with a word in the title first', async () => {
     const titled = await collection(alice, { title: '西湖' });
     const introduced = await collection(alice, { title: '散步', intro: '西湖' });
@@ -544,10 +582,19 @@ describe('places', () => {
     const hit = { id: lake, name: '西湖', category: '湖', city: '杭州市', district: null, photoCount: 1, entryCount: 2 };
     expect(await hits(alice, '西湖', 'places')).toEqual([hit, { ...hit, id: home, name: '西湖边的家', photoCount: 0, entryCount: 0 }]);
     for (const q of ['west', '钱塘', 'LAKE']) expect(await hits(alice, q, 'places'), q).toEqual([hit]);
+    // each alias on its own: not the brackets, quotes and commas of the JSON that holds them
+    for (const q of ['[', ']', ',', 'Lake","钱塘']) expect(await hits(alice, q, 'places'), q).toEqual([]);
     expect(await hits(bob, '西湖', 'places')).toEqual([
       { ...hit, photoCount: 3, entryCount: 0 },
       { ...hit, id: bobs, name: '西湖南线', photoCount: 1, entryCount: 0 }
     ]);
+
+    // an alias is found by what it says, a backslash too (which its JSON doubles); aliases that are no JSON are none
+    const study = await place(alice, '书房', ['a\\b']);
+    expect(await found(alice, 'a\\b', 'places')).toEqual([study]);
+    await insert('pois', [{ id: 'poi_bad', name: '坏的', lat: 30, lng: 120, created_by: alice.me.id, aliases: '["断桥' }]);
+    expect(await found(alice, '断桥', 'places')).toEqual([]);
+    expect(await found(alice, '坏的', 'places')).toEqual(['poi_bad']);
   });
 
   it('come most used first, and count every match beyond the 20 they give', async () => {

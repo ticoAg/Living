@@ -65,6 +65,9 @@ const allWords = (w: Words, exprs: (pattern: string) => string[]) => w.likes.map
 /** Some word is in `expr`. */
 const anyWord = (w: Words, expr: string) => `(${w.likes.map((l) => like(expr, l)).join(' OR ')})`;
 
+/** ORDER BY term: hits with a word in `expr` first. No title (NULL) counts as no word, not as last of all. */
+const wordFirst = (w: Words, expr: string) => `coalesce(${anyWord(w, expr)}, 0) DESC`;
+
 /** 1-based position of the earliest word in `expr`, or NULL (one-argument min() would be the aggregate). */
 function firstPos(w: Words, expr: string): string {
   const each = w.lows.map((l) => `coalesce(nullif(instr(lower(${expr}), ${l}), 0), ${NOWHERE})`);
@@ -118,7 +121,7 @@ function entriesSql(w: Words, v: string, limit: number): string {
       COUNT(*) OVER () AS total
     FROM entries e
     WHERE e.owner_id = ${v} AND ${allWords(w, (l) => [like('e.title', l), like('e.body', l), caption(l)])}
-    ORDER BY ${anyWord(w, 'e.title')} DESC, e.occurred_at DESC, e.rowid DESC LIMIT ${limit}`;
+    ORDER BY ${wordFirst(w, 'e.title')}, e.occurred_at DESC, e.rowid DESC LIMIT ${limit}`;
 }
 
 type PhotoHitRow = PhotoRow & { snip: string | null; total: number };
@@ -130,7 +133,7 @@ function photosSql(w: Words, v: string, limit: number): string {
     FROM ${PHOTO_FROM}
     WHERE p.owner_id = ${v} AND (p.title IS NOT NULL OR p.note IS NOT NULL)
       AND ${allWords(w, (l) => [like('p.title', l), like('p.note', l)])}
-    ORDER BY ${anyWord(w, 'p.title')} DESC, p.taken_at DESC, p.rowid DESC LIMIT ${limit}`;
+    ORDER BY ${wordFirst(w, 'p.title')}, p.taken_at DESC, p.rowid DESC LIMIT ${limit}`;
 }
 
 interface ProjectHitRow {
@@ -156,7 +159,7 @@ function projectsSql(w: Words, v: string, limit: number): string {
       COUNT(*) OVER () AS total
     FROM projects pj
     WHERE pj.owner_id = ${v} AND ${allWords(w, (l) => [like('pj.title', l), like('pj.description', l), milestone(l)])}
-    ORDER BY ${anyWord(w, 'pj.title')} DESC, pj.updated_at DESC, pj.id DESC LIMIT ${limit}`;
+    ORDER BY ${wordFirst(w, 'pj.title')}, pj.updated_at DESC, pj.id DESC LIMIT ${limit}`;
 }
 
 interface ThemeHitRow {
@@ -174,14 +177,24 @@ interface ThemeHitRow {
 
 function themesSql(w: Words, v: string, limit: number): string {
   const item = (l: string) => `EXISTS (SELECT 1 FROM theme_items ti WHERE ti.theme_id = th.id AND ${like('ti.text', l)})`;
-  return `SELECT th.id, th.kind, th.title, th.subtitle, th.visibility, th.start_date, th.end_date, th.cover_photo_id,
+  // the cover as the collections list picks it for its owner (routes/themes.ts): the chosen one, else the first photo,
+  // an entry's included
+  const first = `(SELECT x.pid FROM (
+      SELECT ti.photo_id AS pid, ti.position AS pos, ti.id AS iid, -1 AS sub FROM theme_items ti
+        WHERE ti.theme_id = th.id AND ti.photo_id IS NOT NULL
+      UNION ALL
+      SELECT em.photo_id, ti.position, ti.id, em.position FROM theme_items ti JOIN entry_media em ON em.entry_id = ti.entry_id
+        WHERE ti.theme_id = th.id
+    ) x ORDER BY x.pos, x.iid, x.sub LIMIT 1)`;
+  return `SELECT th.id, th.kind, th.title, th.subtitle, th.visibility, th.start_date, th.end_date,
+      coalesce(th.cover_photo_id, ${first}) AS cover_photo_id,
       coalesce(${around(w, 'th.intro')},
         (SELECT ${around(w, 'ti.text')} FROM theme_items ti WHERE ti.theme_id = th.id AND ${anyWord(w, 'ti.text')} ORDER BY ti.position LIMIT 1),
         ${head('th.intro')}) AS snip,
       COUNT(*) OVER () AS total
     FROM themes th
     WHERE th.owner_id = ${v} AND ${allWords(w, (l) => [like('th.title', l), like('th.subtitle', l), like('th.intro', l), item(l)])}
-    ORDER BY ${anyWord(w, 'th.title')} DESC, th.updated_at DESC, th.id DESC LIMIT ${limit}`;
+    ORDER BY ${wordFirst(w, 'th.title')}, th.updated_at DESC, th.id DESC LIMIT ${limit}`;
 }
 
 interface PlaceHitRow {
@@ -196,11 +209,14 @@ interface PlaceHitRow {
 }
 
 function placesSql(w: Words, v: string, limit: number): string {
+  // each alias on its own, not the JSON text that holds them (whose quotes and commas would match)
+  const alias = (l: string) =>
+    `EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(po.aliases) THEN po.aliases END) a WHERE a.type = 'text' AND ${like('a.value', l)})`;
   return `SELECT *, COUNT(*) OVER () AS total FROM (
       SELECT po.id, po.name, po.category, po.city, po.district, po.created_by,
         (SELECT COUNT(*) FROM photos p WHERE p.poi_id = po.id AND p.owner_id = ${v}) AS photo_count,
         (SELECT COUNT(*) FROM entries e WHERE e.poi_id = po.id AND e.owner_id = ${v}) AS entry_count
-      FROM pois po WHERE ${allWords(w, (l) => [like('po.name', l), like('po.aliases', l)])}
+      FROM pois po WHERE ${allWords(w, (l) => [like('po.name', l), alias(l)])}
     ) WHERE photo_count + entry_count > 0 OR created_by = ${v}
     ORDER BY photo_count + entry_count DESC, name, id LIMIT ${limit}`;
 }

@@ -122,7 +122,7 @@ sources:
 | `projects` | [projects](/data/projects.md) 的列，按开始日期排。加上 `milestones`（[milestones](/data/milestones.md)，按日期）和 `file` |
 | `collections` | [themes](/data/themes.md) 的列。加上 `items`（[theme_items](/data/theme-items.md)，按顺序）和 `file` |
 | `tags` | [tags](/data/tags.md)：预置标签（`ownerId` 为 `null`）和自己的标签，`parentId` 是上级 |
-| `places` | [pois](/data/pois.md)：`aliases` 是数组，`own` 表示是这个账号建的 |
+| `places` | [pois](/data/pois.md)：`own` 表示是这个账号建的；`aliases` 是数组，只有自己建的地点才有，别人建的为 `[]`（[地点接口](/api/pois.md) 也只把别名给能编辑的人） |
 | `privacyZones` | [privacy_zones](/data/privacy-zones.md) |
 | `shareLinks` | [share_links](/data/share-links.md)，不含 token：拿到导出的人打不开这些链接 |
 | `files` | 这次导出的全部文件（不含 living.json 自己）。下次导出到同一个文件夹时，据此删掉不再有的文件 |

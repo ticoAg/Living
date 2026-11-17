@@ -33,6 +33,7 @@ import {
 import type { AppEnv } from '../env';
 import { ID_RE, invalid, notFound, unauthenticated } from '../lib/http';
 import { viewerId } from '../lib/session';
+import { parseAliases } from '../lib/poi';
 import { parseJson, prepQ, Sql } from '../lib/sql';
 
 export const exporter = new Hono<AppEnv>({ strict: false });
@@ -272,7 +273,8 @@ const PARTS: { [P in ExportPart]: PartSpec<unknown> } = {
     map: (r): ExportPlace => ({
       id: str(r.id),
       name: str(r.name),
-      aliases: (parseJson<unknown>(r.aliases as string | null) as string[] | null)?.filter((a) => typeof a === 'string') ?? [],
+      // as GET /api/pois/:id: only who made a place sees its aliases
+      aliases: r.own === 1 ? parseAliases(r.aliases as string | null) : [],
       category: str(r.category),
       city: opt(r.city),
       district: opt(r.district),
