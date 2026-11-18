@@ -40,6 +40,13 @@ describe('emptyDraft', () => {
     expect(payloadOf(d).projectIds).toEqual(['pj_1']);
     expect(payloadOf({ ...d, projectIds: ['pj_2', 'pj_1'] }).projectIds).toEqual(['pj_1', 'pj_2']);
   });
+
+  it('starts on another day for the whole day, and on today at this moment', () => {
+    const past = emptyDraft(at, '', { date: '2026-03-02' });
+    expect(past).toMatchObject({ date: '2026-03-02', time: '', heldTime: '' });
+    expect(payloadOf(past).occurredAt).toBe('2026-03-02');
+    expect(emptyDraft(at, '', { date: '2026-11-16' })).toMatchObject({ date: '2026-11-16', time: '08:30' });
+  });
 });
 
 describe('draftFromEntry', () => {

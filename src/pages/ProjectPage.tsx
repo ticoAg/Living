@@ -15,6 +15,7 @@ import { usePaged } from '../lib/usePaged';
 import { projectEntriesPath, useProject } from '../projects/api';
 import MilestoneForm from '../projects/MilestoneForm';
 import { countsText, spanText } from '../projects/ProjectCard';
+import Rhythm from '../projects/Rhythm';
 import { courseOf, firstAndLatest, type Stage } from '../projects/stages';
 import ShareButton from '../shares/ShareButton';
 import { occurredDay } from '../../shared/entries';
@@ -25,7 +26,7 @@ import '../styles/entries.css';
 import '../styles/projects.css';
 
 // /projects/:id — a project as a course of time: how long it has run and what it holds, its first work beside its
-// latest, its stages between milestones with the works of each, and its entries. Others see what they could open by
+// latest, its rhythm, its stages between milestones with the works of each, and its entries. Others see what they could open by
 // link: a public project shows none of its private entries or photos. Docs: /docs/product/features/projects.md
 
 /** entries rendered at first, and added as the end comes near */
@@ -169,6 +170,8 @@ function Page({ project: p, photoById, own }: { project: ProjectDetail; photoByI
           </div>
         </section>
       )}
+
+      <Rhythm project={p} entries={entries} today={today} own={own} />
 
       {(staged || own) && (
         <section className="pj-sec" aria-labelledby="pj-stages">

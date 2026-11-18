@@ -16,6 +16,8 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 |---|---|---|
 | `/today` | `src/pages/Today.tsx` | entries |
 | `/archive` | `src/pages/Archive.tsx` | entries |
+| `/archive/calendar` | `src/pages/Calendar.tsx` | entries |
+| `/archive/:year` | `src/pages/YearReview.tsx` | entries |
 | `/entries/new` `/e/:id/edit` | `src/pages/EntryEditor.tsx` | entries |
 | `/e/:id` | `src/pages/EntryReader.tsx` | entries |
 | `/projects` | `src/pages/Projects.tsx` | projects |
@@ -52,7 +54,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 - 其他渲染错误显示「出错了」和「刷新」按钮。
 - `React.lazy` 一旦失败会一直抛同一个错误，所以恢复靠整页跳转，不在页面内重试；预取失败不会让 `lazy` 失败，渲染时会重新请求。
 
-分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品和列表顺序在 `src/projects/stages.ts`；分享链接的请求、地址和有效期文字在 `src/shares/api.ts`，记录、合集、项目页上的「分享」对话框是 `src/shares/ShareButton.tsx`，设置里的列表复用同一个 `ShareItem.tsx`。
+分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品、节奏和列表顺序在 `src/projects/stages.ts`；日历的周、每天的格子、颜色深浅、连续天数和按月计数在 `src/review/calendar.ts`，小月历和按月的柱子是 `src/review/HeatMonth.tsx`、`MonthBars.tsx`，日期的加减在 `shared/days.ts`（Worker 也用它划定日期范围）；分享链接的请求、地址和有效期文字在 `src/shares/api.ts`，记录、合集、项目页上的「分享」对话框是 `src/shares/ShareButton.tsx`，设置里的列表复用同一个 `ShareItem.tsx`。
 
 # 共享模块（改动需要协调）
 
@@ -93,7 +95,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 
 登录后页眉右侧有搜索按钮，在任何页面按 `/`（不在输入框里时）也能打开 [搜索](/product/features/search.md)，已经在搜索页时把光标放进搜索框（`src/search/shortcut.ts`）。
 
-登录后图库、地图、索引合为「图库」一个分区，三个页面顶部用 `src/browse/LibraryTabs.tsx` 的「照片 / 地图 / 索引」切换；照片页和地点页也算在图库里。档案的时间线和项目同样是一个分区，顶部用 `src/entries/ArchiveTabs.tsx` 的「时间线 / 项目」切换；项目页、项目的新建与编辑，已有记录的阅读和编辑页都算在档案里，新建记录算在今天里。分区数不变，手机底栏的拍照按钮仍在正中。
+登录后图库、地图、索引合为「图库」一个分区，三个页面顶部用 `src/browse/LibraryTabs.tsx` 的「照片 / 地图 / 索引」切换；照片页和地点页也算在图库里。档案的时间线、日历和项目同样是一个分区，顶部用 `src/entries/ArchiveTabs.tsx` 的「时间线 / 日历 / 项目」切换，年度回顾算在日历里；项目页、项目的新建与编辑，已有记录的阅读和编辑页都算在档案里，新建记录算在今天里。分区数不变，手机底栏的拍照按钮仍在正中。
 
 # 设计令牌
 

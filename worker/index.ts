@@ -21,6 +21,7 @@ import { privacyZones } from './routes/privacyZones';
 import { shares } from './routes/shares';
 import { projects } from './routes/projects';
 import { search } from './routes/search';
+import { review } from './routes/review';
 import { site } from './routes/site';
 import { tags } from './routes/tags';
 import { themes } from './routes/themes';
@@ -89,6 +90,7 @@ app.route('/api/privacy-zones', privacyZones);
 app.route('/api/shares', shares);
 app.route('/api/search', search);
 app.route('/api/export', exporter);
+app.route('/api/review', review);
 app.route('/api/admin', admin);
 app.route('/media', media);
 

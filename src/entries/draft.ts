@@ -45,16 +45,21 @@ export interface EntryDraft {
 /** What a request sets; `status` is the editor's actions' to set. */
 export type EntryPayload = Required<Omit<CreateEntryBody, 'status'>>;
 
-/** A new entry: a note of this moment, for the author alone; `start` for one begun from a project. */
-export function emptyDraft(now = new Date(), body = '', start: Partial<Pick<EntryDraft, 'type' | 'projectIds'>> = {}): EntryDraft {
+/**
+ * A new entry: a note of this moment, for the author alone. `start` for one begun from a project, or on another day
+ * (the calendar's empty days): a day other than today is the whole day, its time unknown.
+ */
+export function emptyDraft(now = new Date(), body = '', start: Partial<Pick<EntryDraft, 'type' | 'projectIds' | 'date'>> = {}): EntryDraft {
   const at = localDateTime(now);
+  const date = start.date ?? at.slice(0, 10);
+  const timed = date === at.slice(0, 10);
   return {
     type: start.type ?? 'note',
     title: '',
     body,
-    date: at.slice(0, 10),
-    time: at.slice(11, 16),
-    heldTime: at.slice(11),
+    date,
+    time: timed ? at.slice(11, 16) : '',
+    heldTime: timed ? at.slice(11) : '',
     visibility: 'private',
     media: [],
     tagIds: [],

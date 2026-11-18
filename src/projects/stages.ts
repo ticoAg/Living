@@ -4,6 +4,7 @@
 import { daysSpanned } from '../../shared/projects';
 import { occurredDay } from '../../shared/entries';
 import type { EntrySummary, Milestone, PhotoSummary, ProjectSummary } from '../../shared/types';
+import { monthsBetween, rhythm } from '../review/calendar';
 
 /**
  * How long it has run: day N of a project still open, or the days a completed one took (to its end date, else to its
@@ -17,6 +18,38 @@ export function projectSpan(
   const last = !ended ? today : p.endDate && p.endDate <= today ? p.endDate : p.lastOccurredAt ? occurredDay(p.lastOccurredAt) : today;
   if (last < p.startDate) return null;
   return { days: daysSpanned(p.startDate, last), ended };
+}
+
+export interface Rhythm {
+  /** the days it was worked on */
+  days: ReadonlySet<string>;
+  longest: number;
+  current: number;
+  /** days a week it was worked on, over its span */
+  perWeek: number;
+  /** `YYYY-MM` of every month of its span */
+  months: string[];
+}
+
+/**
+ * How a project has been kept up, from the days of its entries: read over its span, from its start (or an earlier
+ * entry) to today while it goes on, or to its end once completed (its end date, else its latest entry), and on to any
+ * entry dated later. Null without entries.
+ */
+export function rhythmOf(
+  p: Pick<ProjectSummary, 'startDate' | 'endDate' | 'status'>,
+  entries: readonly EntrySummary[],
+  today: string
+): Rhythm | null {
+  if (entries.length === 0) return null;
+  const days = new Set(entries.map((e) => occurredDay(e.occurredAt)));
+  const sorted = [...days].sort();
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const from = first < p.startDate ? first : p.startDate;
+  const end = p.status === 'completed' ? (p.endDate && p.endDate <= today ? p.endDate : last) : today;
+  const to = last > end ? last : end;
+  return { days, ...rhythm(days, from, to, today), months: monthsBetween(from, to) };
 }
 
 const STATUS_ORDER: Record<ProjectSummary['status'], number> = { active: 0, paused: 1, completed: 2 };

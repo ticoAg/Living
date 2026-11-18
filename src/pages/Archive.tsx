@@ -168,7 +168,7 @@ function Body() {
               <Fragment key={d.day}>
                 {firstOfYear && (
                   <h2 id={`ar-y${year}`} className="ar-year mono">
-                    {year}
+                    <Link href={`/archive/${year}`}>{year}</Link>
                   </h2>
                 )}
                 <section className="ar-day" aria-labelledby={`ar-d${d.day}`}>

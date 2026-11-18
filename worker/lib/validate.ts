@@ -1,3 +1,4 @@
+import { endOfDay, isDay } from '../../shared/days';
 import { invalid } from './http';
 
 export type Body = Record<string, unknown>;
@@ -99,10 +100,19 @@ export function strArray(v: unknown, label: string, maxItems: number, maxLen = 6
 }
 
 /** `YYYY-MM-DD` that is a real calendar date. */
-export function isDate(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(`${s}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+export const isDate = isDay;
+
+/**
+ * A list's `from` and `to` days (YYYY-MM-DD, both inclusive, either may be left out) as bounds on a local date-time
+ * column, day-only ('2026-11-16') or timed ('2026-11-16T09:30:00'): `>= from` and `< until`, just past `to`.
+ */
+export function dayRange(from: string | undefined, to: string | undefined): { from: string | null; until: string | null } {
+  const f = from || null;
+  const t = to || null;
+  if (f !== null && !isDay(f)) throw invalid('from 的格式应为 YYYY-MM-DD');
+  if (t !== null && !isDay(t)) throw invalid('to 的格式应为 YYYY-MM-DD');
+  if (f && t && t < f) throw invalid('to 不能早于 from');
+  return { from: f, until: t ? endOfDay(t) : null };
 }
 
 export function optDate(v: unknown, label: string): string | null {

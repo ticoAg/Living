@@ -349,11 +349,66 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     await expect(page.getByRole('region', { name: '最初与最近' }).getByRole('figure')).toHaveCount(2);
     await expect(page.getByText('2 条记录 · 2 天 · 3 张照片')).toBeVisible();
     await expect(page.getByRole('region', { name: '记录' }).locator('a.en-card')).toHaveCount(2);
+    // two days running: its rhythm
+    await expect(page.getByRole('region', { name: '节奏' })).toContainText('最长连续 2 天');
 
     // Today offers the next practice
     await follow(nav.getByRole('link', { name: '今天' }));
     await expect(page.getByRole('region', { name: '进行中' }).getByRole('link', { name: /记一笔\s*：从零开始学书法/ })).toBeVisible();
     clean('projects');
+  });
+
+  await test.step('calendar: this month opens on today, another on its latest day; the arrows walk the days', async () => {
+    await follow(nav.getByRole('link', { name: '档案' }));
+    await follow(page.getByRole('navigation', { name: '档案' }).getByRole('link', { name: '日历' }));
+    await expect(page.getByRole('heading', { level: 1, name: '日历' })).toBeVisible();
+    await expect(page.getByRole('region', { name: /今天/ }).locator('a.en-card').filter({ hasText: '湖边的风很大' })).toBeVisible();
+
+    await page.goto('/archive/calendar?month=2026-05');
+    const grid = page.getByRole('group', { name: '2026年5月' });
+    const cell = (d: number) => grid.getByRole('button', { name: new RegExp(`^5月${d}日 `) });
+    await expect(cell(3)).toHaveAttribute('aria-pressed', 'true');
+    await expect(cell(3)).toHaveAccessibleName(/1 条记录 · 1 张照片/);
+    await expect(page.getByRole('region', { name: /^5月3日 / })).toContainText('横画练了一页');
+    await cell(2).click();
+    await expect(page).toHaveURL(/month=2026-05&day=2026-05-02$/);
+    const day = page.getByRole('region', { name: /^5月2日 / });
+    await expect(day.locator('a.en-card').filter({ hasText: '第一次临帖' })).toBeVisible();
+    await expect(day.locator('a.en-card').filter({ hasText: '西湖边的一个下午' })).toBeVisible();
+    await page.keyboard.press('ArrowRight');
+    await expect(cell(3)).toBeFocused();
+    await expect(page).toHaveURL(/day=2026-05-03$/);
+    await page.keyboard.press('ArrowDown');
+    await expect(cell(10)).toBeFocused();
+    // an empty day is filled in afterwards, on that day and for the whole of it
+    await expect(page.getByText('这一天没有内容')).toBeVisible();
+    await follow(page.getByRole('link', { name: '补记' }));
+    await expect(page).toHaveURL(/\/entries\/new\?date=2026-05-10$/);
+    await expect(page.getByLabel('日期', { exact: true })).toHaveValue('2026-05-10');
+    await expect(page.getByLabel('时间', { exact: true })).toHaveValue('');
+    clean('calendar');
+  });
+
+  await test.step('the year in review: its days month by month, its projects and places', async () => {
+    await page.goto('/archive/calendar?month=2026-05');
+    await follow(page.getByRole('link', { name: '2026年' }));
+    await expect(page).toHaveURL(/\/archive\/2026$/);
+    await expect(page.getByRole('heading', { level: 1, name: '2026' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: '档案' }).getByRole('link', { name: '日历' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    const may = page.getByRole('region', { name: '5月', exact: true });
+    await expect(may.getByRole('heading', { level: 3 })).toContainText('3 条 · 3 张');
+    const project = page.getByRole('region', { name: '项目' }).getByRole('listitem').filter({ hasText: '从零开始学书法' });
+    await expect(project).toContainText('2 条记录 · 2 天');
+    await expect(project).toContainText('临完第一页');
+    await expect(page.getByRole('region', { name: '地点' }).getByRole('link', { name: '断桥' })).toBeVisible();
+    // a day of it opens on the calendar
+    await follow(may.getByRole('link', { name: '5月2日：2 条记录 · 2 张照片' }));
+    await expect(page).toHaveURL(/\/archive\/calendar\?month=2026-05&day=2026-05-02$/);
+    await expect(page.getByRole('region', { name: /^5月2日 / }).locator('a.en-card')).toHaveCount(2);
+    clean('year in review');
   });
 
   await test.step('share links: a private entry opens for a guest, its private photo too, until the link is deleted', async () => {
@@ -417,6 +472,8 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
 
   await test.step('search: the owner finds her own words from any page with /', async () => {
     await page.goto('/today');
+    // the text handed to the editor earlier with 写长文 is not left in the box
+    await expect(page.getByLabel('记一笔')).toHaveValue('');
     // the key works once the page knows who is signed in, as the header's search button shows
     await expect(page.getByRole('link', { name: '搜索', exact: true })).toBeVisible();
     await page.keyboard.press('/');

@@ -119,4 +119,21 @@ describe('invalidate', () => {
     prefetch('/api/photos');
     expect(api).toHaveBeenCalledTimes(4);
   });
+
+  it('drops what is counted from the paths too: a change to entries or photos leaves the review stale', async () => {
+    const { prefetch, invalidate, peek } = await fresh();
+    api.mockResolvedValue({});
+    for (const p of ['/api/review', '/api/review/2026', '/api/entries?mine=1', '/api/users/ada']) prefetch(p);
+    await settle();
+    invalidate('/api/users/');
+    expect(peek('/api/review/2026')).toBeDefined();
+    invalidate('/api/entries?');
+    expect(peek('/api/entries?mine=1')).toBeUndefined();
+    expect(peek('/api/review')).toBeUndefined();
+    expect(peek('/api/review/2026')).toBeUndefined();
+    prefetch('/api/review/2026');
+    await settle();
+    invalidate('/api/photos/');
+    expect(peek('/api/review/2026')).toBeUndefined();
+  });
 });

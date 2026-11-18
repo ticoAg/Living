@@ -60,7 +60,23 @@ export function peek(path: string): Readonly<Entry> | undefined {
   return cache.get(path);
 }
 
+/**
+ * Answers counted from others: a path invalidated under one of `from` invalidates every path under `path` too, so the
+ * pages that write entries, photos and the rest need not know what is counted from them.
+ */
+const DERIVED: readonly { path: string; from: readonly string[] }[] = [
+  // the year in review counts one's entries, photos, projects, collections, places and tags
+  { path: '/api/review', from: ['/api/entries', '/api/photos', '/api/projects', '/api/themes', '/api/pois', '/api/tags'] }
+];
+
 export function invalidate(prefix: string) {
+  for (const d of DERIVED) {
+    if (d.from.some((f) => prefix.startsWith(f))) drop(d.path);
+  }
+  drop(prefix);
+}
+
+function drop(prefix: string) {
   for (const key of Array.from(cache.keys())) {
     if (key.startsWith(prefix)) {
       if (listeners.get(key)?.size) {

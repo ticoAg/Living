@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { Milestone, PhotoSummary } from '../../shared/types';
 import { entry, photo } from '../test-utils';
-import { byStatusAndTouch, courseOf, firstAndLatest, projectSpan, touchedDay } from './stages';
+import { byStatusAndTouch, courseOf, firstAndLatest, projectSpan, rhythmOf, touchedDay } from './stages';
 
 const milestone = (id: string, date: string, title = id): Milestone => ({
   id,
@@ -139,5 +139,40 @@ describe('ordering projects', () => {
       p('same-day-later', 'active', '2026-11-10T12:00:00Z')
     ];
     expect([...list].sort(byStatusAndTouch).map((x) => x.id)).toEqual(['same-day-later', 'new', 'old', 'rest', 'done']);
+  });
+});
+
+describe('rhythmOf', () => {
+  const p = { startDate: '2026-10-01', endDate: null, status: 'active' as const };
+  const on = (...days: string[]) => days.map((d, i) => entry(`e${i}`, { occurredAt: d }));
+
+  it('reads an open project from its start to today', () => {
+    const r = rhythmOf(p, on('2026-10-01', '2026-10-02', '2026-10-03', '2026-11-15', '2026-11-16T07:00:00'), '2026-11-16')!;
+    expect(r).toMatchObject({ longest: 3, current: 2, months: ['2026-10', '2026-11'] });
+    expect([...r.days].sort()).toEqual(['2026-10-01', '2026-10-02', '2026-10-03', '2026-11-15', '2026-11-16']);
+    // 5 days over the 47 days from 1 October to 16 November
+    expect(r.perWeek).toBeCloseTo(5 / (47 / 7));
+  });
+
+  it('reads a completed one to its end date, else to its latest entry', () => {
+    const entries = on('2026-10-01', '2026-10-08');
+    expect(rhythmOf({ ...p, status: 'completed', endDate: '2026-10-14' }, entries, '2026-11-16')!.perWeek).toBe(1);
+    expect(rhythmOf({ ...p, status: 'completed' }, entries, '2026-11-16')!.months).toEqual(['2026-10']);
+    // an end date still ahead is not reached yet: the latest entry closes it
+    expect(rhythmOf({ ...p, status: 'completed', endDate: '2027-01-01' }, entries, '2026-11-16')!.months).toEqual(['2026-10']);
+  });
+
+  it('reaches back to an entry before the start, and on to one dated later', () => {
+    expect(rhythmOf(p, on('2026-08-30', '2026-12-02'), '2026-11-16')!.months).toEqual([
+      '2026-08',
+      '2026-09',
+      '2026-10',
+      '2026-11',
+      '2026-12'
+    ]);
+  });
+
+  it('is nothing without entries', () => {
+    expect(rhythmOf(p, [], '2026-11-16')).toBeNull();
   });
 });

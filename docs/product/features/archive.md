@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: 档案
-description: 自己的全部记录和照片排成一条按天的时间线，可以按类型、标签筛选，按年份跳转，也能找回已归档的记录。
+description: 自己的全部记录和照片排成一条按天的时间线，可以按类型、标签筛选，按年份跳转，也能找回已归档的记录；旁边是日历和项目。
 tags: [record, entries, browse]
 route: "/archive"
 area: entries
@@ -14,11 +14,11 @@ area: entries
 
 # 规则
 
-- 只有登录后可用，只显示自己的内容，不论公开范围和状态。顶部的「时间线」「项目」在档案的两页之间切换，[项目](/product/features/projects.md) 另见。
+- 只有登录后可用，只显示自己的内容，不论公开范围和状态。顶部的「时间线」「日历」「项目」在档案的三页之间切换，[日历与年度回顾](/product/features/calendar.md)、[项目](/product/features/projects.md) 另见。
 - 时间线按天倒序。记录放在发生的那天，照片放在拍摄的那天；一天之内按时间倒序，只有日期的记录排在当天最后。已经放进当天某条记录的照片不再单独出现。
 - 草稿也在时间线里，带「草稿」标记，点开直接继续写；已归档的默认不显示。
 - **筛选**：类型（全部、出现过的记录类型、照片）、已归档、[多层级标签](/product/features/hierarchical-tags.md)。标签同时筛记录和照片，各按自己的标签。筛选条件写在地址里，刷新和收藏后保留。
-- **年份**：列出时间线涉及的年份，点击跳到那一年。
+- **年份**：列出时间线涉及的年份，点击跳到那一年。时间线里每年的标题是链接，打开这一年的 [回顾](/product/features/calendar.md#年度回顾)。
 - 每次先显示最近 14 天有内容的日子，滚动到底部时继续加载。
 - 没有拍摄时间的照片放在最后的「没有拍摄时间」。
 - 什么都没有时引导去记一笔或上传照片；筛选后为空时可以一键清除筛选。
@@ -26,4 +26,4 @@ area: entries
 
 # 相关
 
-- [今天](/product/features/today.md)、[记录](/product/features/entries.md)、[项目](/product/features/projects.md)、[图库](/product/features/gallery.md)
+- [今天](/product/features/today.md)、[记录](/product/features/entries.md)、[日历与年度回顾](/product/features/calendar.md)、[项目](/product/features/projects.md)、[图库](/product/features/gallery.md)

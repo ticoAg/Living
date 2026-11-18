@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
+import { isDay } from '../../shared/days';
 import { ENTRY_STATUS_LABELS, ENTRY_TYPE_LABELS, entryLabel } from '../../shared/entries';
 import { entryTypeFor } from '../../shared/projects';
 import { ENTRY_LIMITS } from '../../shared/limits';
@@ -93,16 +94,21 @@ interface EditorProps {
   handoff: string;
   /** a new entry's project, when it is written from the project's page */
   project: ProjectDetail | null;
+  /** the day a new entry starts on, when not today */
+  startDate: string | null;
   onCreated: (entry: EntryDetail) => void;
 }
 
-function Editor({ user, initial, handoff, project, onCreated }: EditorProps) {
+function Editor({ user, initial, handoff, project, startDate, onCreated }: EditorProps) {
   const id = useId();
   const [, navigate] = useLocation();
   const [draft, setDraft] = useState<EntryDraft>(() =>
     initial
       ? draftFromEntry(initial)
-      : emptyDraft(new Date(), handoff, project ? { projectIds: [project.id], type: entryTypeFor(project.type) } : {})
+      : emptyDraft(new Date(), handoff, {
+          ...(project ? { projectIds: [project.id], type: entryTypeFor(project.type) } : {}),
+          ...(startDate ? { date: startDate } : {})
+        })
   );
   // a copy kept on this device that the server does not have: offered once, as the editor opens
   const [offer, setOffer] = useState<Backup | null>(() => {
@@ -516,9 +522,12 @@ export default function EntryEditor() {
   // read once per editor: later changes to the cached copy are this editor's own saves
   const { data, error, reload } = useApi<EntryDetail>(id && user ? `/api/entries/${encodeURIComponent(id)}` : null);
   const [handoff] = useState(() => handoffBody(history.state));
-  // /entries/new?project=… starts the entry in that project, as the kind of entry the project keeps
+  // /entries/new?project=… starts the entry in that project, as the kind of entry the project keeps; ?date=YYYY-MM-DD
+  // on that day
   const query = useQuery();
   const projectId = id ? null : query.get('project');
+  const dateParam = id ? null : query.get('date');
+  const startDate = dateParam && isDay(dateParam) ? dateParam : null;
   const project = useApi<ProjectDetail>(projectId && user ? projectPath(projectId) : null);
 
   if (loading) return <Loading />;
@@ -564,6 +573,7 @@ export default function EntryEditor() {
       initial={id ? (data ?? null) : null}
       handoff={id ? '' : handoff}
       project={project.data?.ownerId === user.id ? project.data : null}
+      startDate={startDate}
       onCreated={(e) => {
         adopt(e.id);
         setCached(`/api/entries/${e.id}`, e);

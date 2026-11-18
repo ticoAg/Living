@@ -21,7 +21,7 @@ import { grantFor, sharedCache } from '../lib/shares';
 import { capped, nowIso, parseJson, prep, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
 import { readUploadForm, resolveUpload, savePhoto, storeFiles, uploadFiles, type Upload } from '../lib/upload';
-import { has, optBool, optEnum, optFocus, optTakenAt, optText, strArray } from '../lib/validate';
+import { dayRange, has, optBool, optEnum, optFocus, optTakenAt, optText, strArray } from '../lib/validate';
 import { photoById, photoList, photoLocation } from '../lib/visibility';
 import type { SessionUser } from '../../shared/types';
 
@@ -40,6 +40,8 @@ photos.get('/', async (c) => {
   const idsParam = c.req.query('ids');
   const wantMine = ['1', 'true'].includes(c.req.query('mine') ?? '');
   if (wantMine && !viewer) throw unauthenticated();
+  // photos without a capture time are on no day, so a range leaves them out
+  const range = dayRange(c.req.query('from'), c.req.query('to'));
 
   let ids: string[] | null = null;
   if (idsParam !== undefined) {
@@ -72,6 +74,8 @@ photos.get('/', async (c) => {
   if (ownerId) where.push(`p.owner_id = ${q.p(ownerId)}`);
   if (poi) where.push(`p.poi_id = ${q.p(poi)}`, photoLocation(q, viewer));
   if (ids) where.push(`p.id IN (SELECT value FROM json_each(${q.p(JSON.stringify(ids))}))`);
+  if (range.from) where.push(`p.taken_at >= ${q.p(range.from)}`);
+  if (range.until) where.push(`p.taken_at < ${q.p(range.until)}`);
 
   const res = await prepQ(
     db,

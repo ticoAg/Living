@@ -18,6 +18,7 @@ tags: [api, photos]
 | `mine=1` | 请求者自己的全部照片（需登录） |
 | `poi=<id>` | 该地点的可见照片（可与 `owner` 组合） |
 | `ids=<id,id,…>` | 指定照片（最多 200 张），只返回可见的 |
+| `from=YYYY-MM-DD`、`to=YYYY-MM-DD` | 拍摄日期在这一段里的，含两端；没有拍摄时间的照片不在任何一天，给了其中一个就不返回它们。格式和出错时同 [记录列表](/api/entries.md#get-apientries) |
 
 `PhotoSummary.tagIds` 为直接标签；`hasNote` 表示有笔记；坐标和 `district` 按 [位置精度](/api/conventions.md#位置精度对非所有者) 处理。`province`、`city`、`district` 是逆地理编码得到的省、市、区县，[地图](/product/features/map.md) 用它们把照片合成图集；查过但没有省份的读作 `null`，见 [photos](/data/photos.md#省市区县)。
 

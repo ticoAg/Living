@@ -1,5 +1,11 @@
 # Directory Update Log
 
+## 2026-11-18
+* **Creation**: 第四阶段：[日历与年度回顾](/product/features/calendar.md)。档案多了「日历」标签页（`/archive/calendar`）：一个月一张表，每天铺一张照片、画几个点表示几条记录，选一天在旁边看那天的全部，空着的日子可以「补记」（编辑器的 `/entries/new?date=`，见 [记录](/product/features/entries.md#写)）；方向键换日子。年度回顾（`/archive/<年份>`）：记录、照片、天数、最长连续、地点和字数，十二个小月历按每天的多少上色，收藏、项目、合集、常去的地点和常用的标签；时间线里每年的标题打开那一年的回顾。
+* **Creation**: [回顾接口](/api/review.md)：`GET /api/review` 列出有内容的年份，`GET /api/review/:year` 在服务器上汇总一年，只算自己的、不算已归档的记录。[记录](/api/entries.md#get-apientries) 和 [照片](/api/photos.md#get-apiphotos) 列表加上 `from`、`to`，日历按月读取，不受 5000 条上限的影响。不加表和索引，见 [数据演进](/data/evolution.md#日历与回顾)。
+* **Update**: [项目](/product/features/projects.md#节奏) 页加上「节奏」：最长和现在连续几天、平均每周几天、最近六个月每天的小月历，超过六个月的项目再加每个月的记录数；只算已完成的记录。[路线图](/product/roadmap.md)、[档案](/product/features/archive.md)、[前端结构](/architecture/frontend.md) 随之更新。
+* **Update**: 修正两处：[今天](/product/features/today.md) 的「写长文」把文字交给编辑器后，随手记框里不再留着这段文字；[搜索](/product/features/search.md) 的 `/` 键在页眉出现搜索按钮时就能用，不再漏掉刚加载完时按下的那一次。
+
 ## 2026-11-17
 * **Creation**: 第四阶段：[搜索](/product/features/search.md)。`/search` 在自己的档案里找字，记录、照片、项目、合集、地点和标签分组列出，各带总数，片段里标出找到的字；页眉的放大镜或在任何页面按 `/` 打开。只搜自己的内容，包括草稿和仅自己可见的，见 [搜索接口](/api/search.md)。按字匹配（`LIKE`），不建 FTS5：D1 导出不支持虚拟表，理由见 [数据演进](/data/evolution.md#搜索)；迁移 `0009_search.sql` 加部分索引 `photos_owner_text`（[photos](/data/photos.md#索引)）。保留用户名加入 search。
 * **Creation**: [导出](/product/features/export.md)：设置里把自己的整个档案导出为 Markdown（记录、项目、合集各一个文件，带 frontmatter）、living.json 和照片原文件。下载 zip（每个约 1 GB，可分几个），或在 Chrome、Edge 里导出到文件夹，再次导出只下载新的照片、清理删去的文件；原文件缺了用大图代替。浏览器拼装，Worker 按页读出，见 [导出接口](/api/export.md)（含 [导出文件的格式](/api/export.md#导出的文件)）。

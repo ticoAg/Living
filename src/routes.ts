@@ -1,4 +1,5 @@
 import { lazy, type ComponentType } from 'react';
+import { dayOf, monthSpan, parseMonth } from '../shared/days';
 import { prefetch } from './lib/useApi';
 
 // Page modules are split per route. Without help each first visit waits for its chunk, then for its data,
@@ -26,6 +27,8 @@ function page(load: Loader): Page {
 
 export const Today = page(() => import('./pages/Today'));
 export const Archive = page(() => import('./pages/Archive'));
+export const Calendar = page(() => import('./pages/Calendar'));
+export const YearReview = page(() => import('./pages/YearReview'));
 export const EntryReader = page(() => import('./pages/EntryReader'));
 export const EntryEditor = page(() => import('./pages/EntryEditor'));
 export const Projects = page(() => import('./pages/Projects'));
@@ -71,6 +74,8 @@ const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   [/^\/$/, Explore, () => BROWSE],
   [/^\/today$/, Today, () => ARCHIVE],
   [/^\/archive$/, Archive, () => ARCHIVE],
+  [/^\/archive\/calendar$/, Calendar, () => []],
+  [/^\/archive\/(\d{4})$/, YearReview, (m) => [`/api/review/${m[1]}`, '/api/review']],
   [/^\/entries\/new$/, EntryEditor, () => []],
   [/^\/e\/([^/]+)\/edit$/, EntryEditor, (m) => [`/api/entries/${enc(dec(m[1]))}`]],
   [/^\/e\/([^/]+)$/, EntryReader, (m) => [`/api/entries/${enc(dec(m[1]))}`]],
@@ -113,6 +118,14 @@ export function warm(url: URL, data: boolean): void {
       const list = paths(m);
       // the theme list depends on ?mine=1 and the session, so only the public list is warmed
       if (pg === Themes && !url.search.includes('mine=1')) list.push('/api/themes');
+      // the calendar reads the month in its address, this one by default
+      if (pg === Calendar) {
+        const now = new Date();
+        const { from, to } = monthSpan(
+          parseMonth(url.searchParams.get('month')) ?? dayOf(now.getFullYear(), now.getMonth() + 1, 1).slice(0, 7)
+        );
+        list.push(`/api/entries?mine=1&from=${from}&to=${to}`, `/api/photos?mine=1&from=${from}&to=${to}`, '/api/tags');
+      }
       list.forEach(prefetch);
     }
     return;
@@ -132,6 +145,8 @@ const IDLE = [
   Living,
   Today,
   Archive,
+  Calendar,
+  YearReview,
   EntryReader,
   Projects,
   ProjectPage

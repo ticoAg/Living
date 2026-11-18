@@ -53,7 +53,7 @@ const ENTRY_PHOTOS = `theme_items ti JOIN entries e ON e.id = ti.entry_id JOIN e
  * entry item counts when they may open the entry, and its photos when they may open those too. `grant`: the owner a
  * share link opens the theme for (lib/shares.ts), whose photos and finished entries then count whatever their visibility.
  */
-async function selectThemes(
+export async function selectThemes(
   db: D1Database,
   viewer: string | null,
   q: Sql,

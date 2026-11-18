@@ -935,6 +935,77 @@ export interface ExportShareLink {
   expiresAt: string | null;
 }
 
+// ---- review (回顾) ---------------------------------------------------------------------------------------------
+// One's own archive by the calendar: the days that hold something, and a year looked back on. Only the signed-in
+// owner's entries (archived ones aside) and photos. Docs: /docs/api/review.md
+
+/** How many of a year's top places and tags a review lists. */
+export const REVIEW_TOP = 10;
+/** How many favourite photos a review shows. */
+export const REVIEW_FAVORITES = 24;
+
+/** `GET /api/review`: the years that hold anything, latest first. */
+export interface ReviewYearsResponse {
+  years: { year: number; entries: number; photos: number }[];
+}
+
+/** One day of a year: the entries that happened on it and the photos taken on it. */
+export interface ReviewDay {
+  /** YYYY-MM-DD */
+  day: string;
+  entries: number;
+  photos: number;
+}
+
+export interface ReviewPlace extends EntryPlace {
+  photos: number;
+  entries: number;
+}
+
+export interface ReviewTag {
+  id: string;
+  name: string;
+  color: string | null;
+  photos: number;
+  entries: number;
+}
+
+/** A project with entries in the year, or a milestone dated in it. */
+export interface ReviewProject {
+  id: string;
+  title: string;
+  type: ProjectType;
+  status: ProjectStatus;
+  visibility: Visibility;
+  /** its entries that happened in the year, and on how many days */
+  entries: number;
+  days: number;
+  /** its milestones dated in the year, by date */
+  milestones: Pick<Milestone, 'id' | 'title' | 'date'>[];
+}
+
+/** `GET /api/review/:year`. */
+export interface YearReview {
+  year: number;
+  /** the days that hold anything, in order */
+  days: ReviewDay[];
+  /** characters of the titles and bodies written, Markdown included */
+  chars: number;
+  /** how many entries of each type, most first */
+  types: { type: EntryType; count: number }[];
+  /** the places most used, at most REVIEW_TOP of `placeCount` */
+  places: ReviewPlace[];
+  placeCount: number;
+  /** the tags most used, at most REVIEW_TOP */
+  tags: ReviewTag[];
+  /** most entries first */
+  projects: ReviewProject[];
+  /** collections dated in the year, or made in it when undated; latest first */
+  collections: ThemeSummary[];
+  /** favourite photos taken in the year, in time order, at most REVIEW_FAVORITES */
+  favorites: PhotoSummary[];
+}
+
 export interface PrivacyZone {
   id: string;
   name: string;

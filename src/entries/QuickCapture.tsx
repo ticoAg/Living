@@ -103,6 +103,8 @@ export default function QuickCapture({ userId }: { userId: string }) {
           onClick={() => {
             const body = text;
             setText('');
+            // the page goes before the effect that stores the empty box would run: the editor has the text now
+            store(key, '');
             navigate('/entries/new', { state: { livingEntryBody: body } satisfies Handoff });
           }}
         >

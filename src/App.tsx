@@ -6,6 +6,7 @@ import ReLogin from './components/ReLogin';
 import { SessionProvider } from './lib/session';
 import {
   Archive,
+  Calendar,
   EntryEditor,
   EntryReader,
   Explore,
@@ -31,7 +32,8 @@ import {
   ThemeReader,
   Themes,
   Today,
-  Upload
+  Upload,
+  YearReview
 } from './routes';
 
 // Route table. Each page module is owned by one area (see /docs/architecture/frontend.md):
@@ -51,6 +53,8 @@ function Routes() {
       <Route path="/" component={Explore} />
       <Route path="/today" component={Today} />
       <Route path="/archive" component={Archive} />
+      <Route path="/archive/calendar" component={Calendar} />
+      <Route path={/^\/archive\/(?<year>\d{4})$/} component={YearReview} />
       {/* one route for both, so the editor of a new entry stays as it is when the entry's first save moves it to
           the entry's own address */}
       <Route path={/^\/(?:entries\/new|e\/(?<id>[^/]+)\/edit)$/} component={EntryEditor} />

@@ -287,6 +287,8 @@ test.describe('phone width', () => {
     ['tag manager', '/studio/tags', '标签'],
     ['today', '/today', '今天'],
     ['archive', '/archive', '档案'],
+    ['calendar', '/archive/calendar?month=2026-05&day=2026-05-02', '日历'],
+    ['year in review', '/archive/2026', '2026'],
     ['search', '/search?q=%E8%A5%BF%E6%B9%96', '搜索'],
     ['settings', '/settings', '设置']
   ] as const) {
