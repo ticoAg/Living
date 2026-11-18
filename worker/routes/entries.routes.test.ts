@@ -178,6 +178,70 @@ describe('GET /api/entries', () => {
     expect(pub.headers.get('cache-control')).toBe('public, max-age=30');
     expect((await alice.get('/api/entries?mine=1')).headers.get('cache-control')).toBe('private, no-store');
   });
+
+  it('says how long the body is in code points, Markdown as written, 0 without one, wherever an entry is summed up', async () => {
+    // 2 + 1 + 2 + 1 + 1 + 1: the emoji is one character; the line break and the Markdown count
+    const long = await create(alice, { title: '标题不算', body: '**断桥**\n😀', visibility: 'public' });
+    const none = await create(alice, { title: '只有标题', body: null, visibility: 'public' });
+    const words = await create(alice, { body: 'a'.repeat(ENTRY_EXCERPT_MAX * 3), visibility: 'public' });
+    const chars = (es: EntrySummary[]) => Object.fromEntries(es.map((e) => [e.id, e.chars]));
+    const want = { [long.id]: 8, [none.id]: 0, [words.id]: ENTRY_EXCERPT_MAX * 3 };
+    expect(chars(await list(alice, 'mine=1'))).toEqual(want);
+    expect(chars(await list(anon, 'owner=alice'))).toEqual(want);
+    expect([long.chars, none.chars, words.chars]).toEqual([8, 0, ENTRY_EXCERPT_MAX * 3]);
+    expect(expectStatus(await anon.get(`/api/entries/${long.id}`), 200).chars).toBe(8);
+    const t = await collection('合集', 'public', [holding(long)]);
+    const item = (expectStatus(await anon.get(`/api/themes/${t}`), 200) as ThemeDetail).items[0] as Extract<ThemeItem, { kind: 'entry' }>;
+    expect(item.entry?.chars).toBe(8);
+  });
+});
+
+describe('type= on GET /api/entries', () => {
+  const types = (es: EntrySummary[]) => es.map((e) => e.type);
+  beforeEach(async () => {
+    // one of each, a minute apart, the article the latest; and bob's public article
+    const made = ['note', 'reading', 'practice', 'creation', 'trip', 'article'];
+    for (const [i, type] of made.entries()) {
+      await create(alice, { type, body: type, visibility: 'public', occurredAt: `2026-11-16T08:0${i}:00` });
+    }
+    await create(alice, { type: 'article', body: '草稿', visibility: 'public', status: 'draft', occurredAt: '2026-11-16T09:00:00' });
+    await create(alice, { type: 'article', body: '私密', occurredAt: '2026-11-16T09:01:00' });
+    await create(bob, { type: 'article', body: 'bob', visibility: 'public', occurredAt: '2026-11-16T09:02:00' });
+  });
+
+  it('keeps the entries of the types named, one or several, comma-separated, each counted once', async () => {
+    expect(types(await list(anon, 'owner=alice&type=article'))).toEqual(['article']);
+    expect(types(await list(anon, 'owner=alice&type=creation,article'))).toEqual(['article', 'creation']);
+    expect(types(await list(anon, 'owner=alice&type=article,article'))).toEqual(['article']);
+    expect(types(await list(anon, 'owner=alice&type=note,reading,practice,trip'))).toEqual(['trip', 'practice', 'reading', 'note']);
+  });
+
+  it('narrows what the viewer may see, and no more: every list the same way', async () => {
+    // alice sees her draft and private articles too; anyone else her finished public one
+    expect((await list(alice, 'mine=1&type=article')).map((e) => e.excerpt)).toEqual(['私密', '草稿', 'article']);
+    expect((await list(alice, 'owner=alice&type=article')).map((e) => e.excerpt)).toEqual(['私密', '草稿', 'article']);
+    expect((await list(bob, 'owner=alice&type=article')).map((e) => e.excerpt)).toEqual(['article']);
+    // the unscoped list is everyone's finished public entries
+    expect((await list(anon, 'type=article')).map((e) => e.excerpt)).toEqual(['bob', 'article']);
+    // with a day range
+    expect(await list(anon, 'owner=alice&type=article&from=2026-11-17')).toEqual([]);
+    expect(types(await list(anon, 'owner=alice&type=article,note&to=2026-11-16'))).toEqual(['article', 'note']);
+  });
+
+  it('is no filter at all when empty', async () => {
+    expect(await list(anon, 'owner=alice&type=')).toEqual(await list(anon, 'owner=alice'));
+  });
+
+  it('refuses a type it does not know, a trailing comma, and the wrong case', async () => {
+    for (const type of ['poem', 'article,', ',article', 'Article', 'article;note', 'article, note']) {
+      const res = await anon.get(`/api/entries?owner=alice&type=${encodeURIComponent(type)}`);
+      expect(res.status, type).toBe(400);
+      expect(res.body, type).toMatchObject({
+        error: 'invalid_input',
+        message: 'type 只能是 note / article / reading / practice / creation / trip，可以用逗号隔开几个'
+      });
+    }
+  });
 });
 
 describe('who sees an entry', () => {

@@ -113,6 +113,10 @@ h1, h2, h3 { text-wrap: balance; }
 .site-header { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgba(24, 25, 27, 0.07); }
 .site-header::before { content: ''; position: absolute; z-index: -1; inset: 0; background: rgba(247, 246, 243, 0.82); -webkit-backdrop-filter: saturate(1.6) blur(16px); backdrop-filter: saturate(1.6) blur(16px); }
 .site-header-inner { max-width: var(--max); min-height: var(--header-h); margin: 0 auto; padding: 0 var(--gutter); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 0 16px; }
+/* the visitor view's bar, under the header (components/VisitorView.tsx) */
+.vv-bar { position: sticky; top: var(--header-h); z-index: 19; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 12px; min-height: 40px; padding: 0 var(--gutter); border-bottom: 1px solid rgba(43, 95, 134, 0.16); background: var(--hydro-wash); color: var(--hydro-ink); font-size: 13.5px; }
+.vv-exit { display: inline-flex; align-items: center; min-height: 40px; padding: 0 10px; color: var(--hydro-ink); font-weight: 500; text-decoration: underline; text-underline-offset: 0.25em; }
+.vv-exit:hover { color: var(--ink); }
 .wordmark { justify-self: start; display: flex; align-items: center; min-height: 44px; font: 500 17px var(--latin); letter-spacing: 0.36em; color: var(--ink); text-decoration: none; }
 .wordmark:hover { color: var(--ink); }
 .site-nav { display: flex; align-items: center; gap: 2px; }

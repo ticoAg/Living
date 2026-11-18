@@ -1,0 +1,56 @@
+/* Showcase: a person's works and articles, on their profile and on pages of their own (/@handle/works, /articles).
+   Tokens and controls come from base.css. */
+
+/* ---- a shelf on the profile ---------------------------------------------------------------------- */
+
+.sc-shelf { display: flex; flex-direction: column; gap: 18px; padding-top: 32px; }
+.sc-shelf-text { gap: 0; max-width: 880px; }
+.sc-bar { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
+.sc-h2 { margin: 0; font: 600 22px var(--serif); letter-spacing: 0.06em; }
+/* grow the hit area to 44px without growing the line */
+.sc-all { display: inline-flex; align-items: center; min-height: 44px; margin: -12px -10px; padding: 0 10px; color: var(--ink-2); font-size: 14px; white-space: nowrap; }
+.sc-all:hover { color: var(--ink); }
+
+/* ---- works ----------------------------------------------------------------------------------------- */
+
+/* two across on a phone, four elsewhere: the profile's eight fill whole rows either way */
+.sc-works { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 16px; }
+@media (min-width: 720px) { .sc-works { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 30px 20px; } }
+.sc-work { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: var(--ink); text-decoration: none; }
+.sc-work:hover { color: var(--ink); }
+.sc-work:focus-visible { outline: 2px solid var(--hydro); outline-offset: 4px; border-radius: var(--r-img); }
+.sc-work > .img, .sc-work-text { width: 100%; border-radius: var(--r-img); }
+.sc-work > .img > img { transition: opacity 0.5s ease, transform 0.9s var(--ease); }
+@media (hover: hover) { .sc-work:hover > .img > img { transform: scale(1.035); } }
+/* a work without a photo the viewer may see: the start of its text on a mat, fading out at the foot */
+.sc-work-text { position: relative; display: block; box-sizing: border-box; aspect-ratio: 4 / 5; padding: 18px 16px; overflow: hidden; background: var(--mat); color: var(--ink-2); }
+.sc-work-text::after { content: ''; position: absolute; inset: auto 0 0; height: 40%; background: linear-gradient(to bottom, transparent, var(--mat)); }
+.sc-work-text .md { font-family: var(--serif); font-size: 14px; line-height: 1.85; }
+.sc-work-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font: 600 16px / 1.4 var(--serif); letter-spacing: 0.04em; overflow-wrap: anywhere; }
+.sc-work-meta { display: flex; flex-wrap: wrap; gap: 0 10px; margin-top: -4px; font-size: 12px; color: var(--ink-3); }
+.sc-work-meta em, .sc-article-meta em { font-style: normal; color: var(--sienna); }
+
+/* ---- articles -------------------------------------------------------------------------------------- */
+
+.sc-articles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.sc-articles > li + li { border-top: 1px solid var(--rule); }
+.sc-article { display: flex; flex-direction: column; gap: 6px; padding: 18px 0; color: var(--ink); text-decoration: none; }
+.sc-article:hover { color: var(--ink); }
+.sc-article:focus-visible { outline: 2px solid var(--hydro); outline-offset: 2px; border-radius: 4px; }
+.sc-article-title { font: 600 19px / 1.45 var(--serif); letter-spacing: 0.03em; overflow-wrap: anywhere; transition: color 0.15s; }
+.sc-article:hover .sc-article-title { color: var(--hydro-ink); }
+.sc-article-text.md { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--ink-2); font-size: 14.5px; }
+.sc-article-meta { display: flex; flex-wrap: wrap; gap: 0 14px; font-size: 12.5px; color: var(--ink-3); }
+
+/* ---- the pages ------------------------------------------------------------------------------------- */
+
+.sc-page { display: flex; flex-direction: column; }
+.sc-page-text { max-width: 880px; }
+.sc-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 30px 0 26px; }
+.sc-head h1 { margin: 0; display: flex; align-items: baseline; gap: 14px; }
+.sc-who { display: inline-flex; align-items: center; min-height: 44px; margin: 0 -10px; padding: 0 10px; color: var(--ink-2); font-size: 14px; }
+.sc-who:hover { color: var(--ink); }
+.sc-count { font: 400 18px var(--latin); font-variant-numeric: lining-nums tabular-nums; color: var(--ink-3); }
+.sc-year { margin: 30px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--rule); color: var(--ink-3); font: 400 26px var(--latin); letter-spacing: 0.04em; }
+.sc-page section:first-of-type > .sc-year { margin-top: 0; }
+.sc-more { align-self: center; margin-top: 32px; }

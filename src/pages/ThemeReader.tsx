@@ -11,6 +11,7 @@ import { useSession } from '../lib/session';
 import Markdown from '../entries/Markdown';
 import Prose from '../themes/Prose';
 import ShareButton from '../shares/ShareButton';
+import VisitorLink from '../components/VisitorLink';
 import ThemeCard from '../themes/ThemeCard';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import { buildReaderModel, type Block } from '../themes/model';
@@ -219,6 +220,7 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
             </Link>
           )}
           {isOwner && <ShareButton kind="theme" id={theme.id} />}
+          {isOwner && <VisitorLink href={`/t/${theme.id}`} />}
           {isOwner && (
             <Link href={editHref} className="btn btn-quiet">
               <Icon name="edit" size={16} />

@@ -25,6 +25,8 @@ export interface EntryRow {
   title: string | null;
   /** the first ENTRY_EXCERPT_MAX + 1 code points of the body */
   body_head: string | null;
+  /** code points in the body */
+  chars: number;
   occurred_at: string;
   visibility: Visibility;
   status: EntryStatus;
@@ -54,7 +56,7 @@ export const ENTRY_FROM = 'entries e JOIN users u ON u.id = e.owner_id LEFT JOIN
  */
 export function entryCols(q: Sql, viewer: string | null, grant: string | null = null): string {
   return `e.id, e.owner_id, u.handle AS owner_handle, e.type, e.title, substr(e.body, 1, ${ENTRY_EXCERPT_MAX + 1}) AS body_head,
-    e.occurred_at, e.visibility, e.status, e.created_at, e.updated_at,
+    coalesce(length(e.body), 0) AS chars, e.occurred_at, e.visibility, e.status, e.created_at, e.updated_at,
     e.poi_id, epo.name AS poi_name, epo.category AS poi_category, epo.city AS poi_city, epo.district AS poi_district,
     (SELECT group_concat(photo_id) FROM (SELECT em.photo_id FROM entry_media em JOIN photos p ON p.id = em.photo_id
        WHERE em.entry_id = e.id AND ${photoById(q, viewer, 'p', grant)} ORDER BY em.position)) AS photo_ids,
@@ -75,6 +77,7 @@ export function toEntrySummary(r: EntryRow): EntrySummary {
     title: r.title,
     excerpt,
     hasMore,
+    chars: r.chars,
     occurredAt: r.occurred_at,
     visibility: r.visibility,
     status: r.status,

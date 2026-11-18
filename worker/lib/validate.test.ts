@@ -8,6 +8,7 @@ import {
   optBool,
   optColor,
   optDate,
+  enumList,
   optEnum,
   optFocus,
   optHeading,
@@ -202,6 +203,29 @@ describe('optEnum', () => {
 
   it('does not accept null: callers map it to undefined first', () => {
     expect(invalidMessage(() => optEnum(null, '公开范围', values))).toBe('公开范围需要是 public / unlisted / private 之一');
+  });
+});
+
+describe('enumList', () => {
+  const KINDS = ['a', 'bb', 'c'] as const;
+
+  it('is no filter when absent or empty', () => {
+    expect(enumList(undefined, 'kind', KINDS)).toBeNull();
+    expect(enumList('', 'kind', KINDS)).toBeNull();
+  });
+
+  it('keeps each listed word once, in the order first given', () => {
+    expect(enumList('bb', 'kind', KINDS)).toEqual(['bb']);
+    expect(enumList('c,a,c,bb,a', 'kind', KINDS)).toEqual(['c', 'a', 'bb']);
+  });
+
+  it('refuses any other word, an empty one between commas, spaces and another case, naming the choices', () => {
+    for (const v of ['d', 'a,', ',a', 'a,,c', 'a, c', 'A', 'b']) {
+      expect(
+        invalidMessage(() => enumList(v, 'kind', KINDS)),
+        v
+      ).toBe('kind 只能是 a / bb / c，可以用逗号隔开几个');
+    }
   });
 });
 

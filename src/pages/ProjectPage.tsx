@@ -18,6 +18,7 @@ import { countsText, spanText } from '../projects/ProjectCard';
 import Rhythm from '../projects/Rhythm';
 import { courseOf, firstAndLatest, type Stage } from '../projects/stages';
 import ShareButton from '../shares/ShareButton';
+import VisitorLink from '../components/VisitorLink';
 import { occurredDay } from '../../shared/entries';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import { fmtRange, VISIBILITY_LABEL } from '../themes/util';
@@ -145,6 +146,7 @@ function Page({ project: p, photoById, own }: { project: ProjectDetail; photoByI
               记一笔
             </Link>
             <ShareButton kind="project" id={p.id} />
+            <VisitorLink href={`/projects/${p.id}`} iconSize={18} />
             <Link href={`/projects/${p.id}/edit`} className="btn btn-quiet">
               <Icon name="edit" size={18} />
               编辑

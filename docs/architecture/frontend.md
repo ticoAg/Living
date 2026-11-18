@@ -25,6 +25,8 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `/projects/:id` | `src/pages/ProjectPage.tsx` | projects |
 | `/` | `src/pages/Explore.tsx` | browse |
 | `/@:handle` | `src/pages/Profile.tsx` | browse |
+| `/@:handle/works` | `src/pages/Works.tsx` | showcase |
+| `/@:handle/articles` | `src/pages/Articles.tsx` | showcase |
 | `/p/:id` | `src/pages/Photo.tsx` | browse |
 | `/place/:id` | `src/pages/Place.tsx` | browse |
 | `/map` | `src/pages/MapPage.tsx` | browse |
@@ -54,7 +56,15 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 - 其他渲染错误显示「出错了」和「刷新」按钮。
 - `React.lazy` 一旦失败会一直抛同一个错误，所以恢复靠整页跳转，不在页面内重试；预取失败不会让 `lazy` 失败，渲染时会重新请求。
 
-分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品、节奏和列表顺序在 `src/projects/stages.ts`；日历的周、每天的格子、颜色深浅、连续天数和按月计数在 `src/review/calendar.ts`，小月历和按月的柱子是 `src/review/HeatMonth.tsx`、`MonthBars.tsx`，日期的加减在 `shared/days.ts`（Worker 也用它划定日期范围）；分享链接的请求、地址和有效期文字在 `src/shares/api.ts`，记录、合集、项目页上的「分享」对话框是 `src/shares/ShareButton.tsx`，设置里的列表复用同一个 `ShareItem.tsx`。
+分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品、节奏和列表顺序在 `src/projects/stages.ts`；日历的周、每天的格子、颜色深浅、连续天数和按月计数在 `src/review/calendar.ts`，小月历和按月的柱子是 `src/review/HeatMonth.tsx`、`MonthBars.tsx`，日期的加减在 `shared/days.ts`（Worker 也用它划定日期范围）；分享链接的请求、地址和有效期文字在 `src/shares/api.ts`，记录、合集、项目页上的「分享」对话框是 `src/shares/ShareButton.tsx`，设置里的列表复用同一个 `ShareItem.tsx`；[作品与文章](/product/features/showcase.md) 的分组、按年份分段、字数和封面照片在 `src/showcase/showcase.ts`，作品的格子和按批请求封面在 `WorkTile.tsx`、`WorkGrid.tsx`，文章的一行在 `ArticleRow.tsx`，个人主页也用它们。
+
+## 访客视角
+
+地址带 `?as=visitor` 时，`src/App.tsx` 把路由包进 `src/components/VisitorView.tsx`，页眉留在外面：
+
+- `VisitorContext`（`src/lib/visitor.ts`）为真，`useApi(path)` 改用缓存键 `visitor:` + path，请求不带 Cookie、不读浏览器缓存（`api()` 的 `anonymous`）。同一个地址自己读和访客读分开缓存；失效、`forget`、`setCached` 一个地址时，它的访客副本一并丢掉，改完再看访客视角不会是旧的。访客请求的 401 不当作会话过期。
+- `AsVisitor`（`src/lib/session.tsx`）让里面的页面看到「没有登录」：`own`、编辑、分享这些都按访客算。
+- 里面的 wouter `Router` 用 `hrefs` 和 `aroundNav` 给访客也能打开的页面（`withVisitor`）的链接和跳转加上 `?as=visitor`，去别的页面就离开访客视角；横栏的「退出」在这个 `Router` 外面，去掉参数回到自己的视角。悬停预取（`src/routes.ts`）对带 `?as=visitor` 的链接也按访客的缓存键预取。
 
 # 共享模块（改动需要协调）
 
@@ -65,13 +75,14 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `shared/entries.ts` | 记录类型与状态的名字、列表摘要的截取、记录的纯文本名字（照片页的所属记录、浏览器标签页的标题用） |
 | `shared/projects.ts` | 项目类型与状态的名字、从项目新写的记录的类型（`entryTypeFor`）、两个本地日期之间的天数 |
 | `shared/limits.ts` | 输入上限：照片、合集、合集条目、记录、标签、账号（含用户名格式 `HANDLE_RE`）、隐私区域、邀请码、地点搜索与地区名；地点编辑的 `POI_LIMITS` 留在 `shared/types.ts`，在这里再导出。Worker 的校验和表单的 `maxLength`、提示文案、发送前检查都引用它，不另写数字 |
-| `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()`；`/api/auth/*` 以外的 401 经 `onSessionLost` 通知会话层 |
-| `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`、`forget(path)`（删除后丢掉，不再显示也不重取）。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢 |
+| `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()`；`/api/auth/*` 以外的 401 经 `onSessionLost` 通知会话层；`anonymous` 以访客身份请求（不带 Cookie、不读浏览器缓存） |
+| `src/lib/visitor.ts` | [访客视角](#访客视角)：`VisitorContext`、`withVisitor` / `withoutVisitor`（哪些页面保持访客视角）、`isVisitorSearch` |
+| `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`、`forget(path)`（删除后丢掉，不再显示也不重取）。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢。访客视角里用 `visitorKey(path)` 另存一份 |
 | `src/lib/chunks.ts` | 分块失效的识别与一次性整页重新加载，见 [分块失效与错误](#分块失效与错误) |
 | `src/lib/scroll.ts` | 按历史记录恢复滚动位置；页面经 `useScrollTop` 调用 |
 | `src/lib/usePaged.ts`、`shown.ts` | 长列表分段渲染：先渲染一页，接近底部时再接一页，数量记在 `history.state` |
 | `src/lib/deviceDrafts.ts` | 记录在本机暂存的前缀；退出登录时清除 |
-| `src/lib/session.tsx` | `useSession()`：当前用户、站点信息、退出。请求遇到 401 时向服务端确认，会话确已失效就标记 `expired`（页眉显示未登录，页面保留原用户以免表单被卸载）并打开 `src/components/ReLogin.tsx` 的重新登录对话框，见 [账号](/product/features/accounts.md#会话过期) |
+| `src/lib/session.tsx` | `useSession()`：当前用户、站点信息、退出；`AsVisitor` 让里面的页面看到没有登录（访客视角）。请求遇到 401 时向服务端确认，会话确已失效就标记 `expired`（页眉显示未登录，页面保留原用户以免表单被卸载）并打开 `src/components/ReLogin.tsx` 的重新登录对话框，见 [账号](/product/features/accounts.md#会话过期) |
 | `src/lib/tags.ts` | 标签树、子孙展开、按标签筛选、包含计数 |
 | `src/lib/format.ts` | 日期、时段、距今、距离、度分秒；浏览器本地的今天 `localDay()` 和此刻 `localDateTime()` |
 | `src/components/Img.tsx` | 响应式图片 + ThumbHash 占位 |
@@ -84,6 +95,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/components/Header.tsx` | 站点页眉与导航（见 [导航](#导航)）：字标在左，四个分区居中（当前分区是一枚衬底色的胶囊），登录后的搜索按钮、上传按钮和账户菜单在右；手机上（≤640px）页眉一行（字标、上传、账户），四个分区移到底部固定栏，每项是图标加名字，登录后栏的正中是拍照按钮 |
 | `src/components/CaptureButton.tsx` | 手机底栏的拍照按钮：打开页面内相机（`src/studio/CameraSheet.tsx`，按需加载），拍下的照片连同手机定位交给上传队列；系统相机作为备选，见 [拍照](/product/features/upload.md#拍照) |
 | `src/components/ErrorBoundary.tsx` | 路由外的错误边界：分块失效时重新加载，其他错误显示「出错了」 |
+| `src/components/VisitorView.tsx`、`VisitorLink.tsx` | 访客视角的横栏和外壳；作者页面上的「访客视角」按钮 |
 | `src/styles/base.css` | 设计令牌与通用控件（按钮、标签片、色块、分段、输入框） |
 
 # 导航

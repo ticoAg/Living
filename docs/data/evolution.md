@@ -25,7 +25,7 @@ sources:
 | 一：记录 | [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md) | 已建（`0005_entries.sql`） |
 | 二：项目 | [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md) | 已建（`0006_projects.sql`），见 [项目](#项目) |
 | 三：合集与媒体 | 合集（[themes](/data/themes.md) 原地演进，[theme_items](/data/theme-items.md) 加入记录条目）、[users](/data/users.md) 的新照片默认公开范围、[share_links](/data/share-links.md)、[entries](/data/entries.md) 的地点 | 已建（`0007_collections.sql`、`0008_shares_places.sql`），见 [合集](#合集)、[照片的默认可见性](#照片的默认可见性)、[分享链接](#分享链接)、[记录的地点](#记录的地点)；新媒体按需要再加，见 [媒体](#媒体) |
-| 四：完整档案 | 搜索用的部分索引 `photos_owner_text`（[photos](/data/photos.md#索引)）；导出、日历和回顾不加表 | 搜索与导出已做（`0009_search.sql`），见 [搜索](#搜索)、[导出与备份](#导出与备份)；日历、年度回顾和项目的节奏已做，见 [日历与回顾](#日历与回顾) |
+| 四：完整档案 | 搜索用的部分索引 `photos_owner_text`（[photos](/data/photos.md#索引)）；导出、日历、回顾、作品与文章不加表 | 搜索与导出已做（`0009_search.sql`），见 [搜索](#搜索)、[导出与备份](#导出与备份)；日历、年度回顾和项目的节奏已做，见 [日历与回顾](#日历与回顾)；作品与文章已做，见 [作品与文章](#作品与文章) |
 
 产品上的边界见 [内容模型](/product/content-model.md)，分阶段的范围见 [路线图](/product/roadmap.md)。
 
@@ -113,6 +113,14 @@ sources:
 - 日期都是本地钟表时间的字符串（`YYYY-MM-DD` 或 `YYYY-MM-DDTHH:MM:SS`），按字典序比较即按时间比较。一段日期的上界写成 `<最后一天>~`：`~` 排在数字和 `T` 之后，这一天的所有值（只有日期的、带时刻的）都在它前面，下一天在它后面，不用推算下一天，也不会在 9999 年越界（`shared/days.ts` 的 `endOfDay`）。
 - 汇总在服务器上算，不在浏览器里从列表算：列表各有 5000 条的上限，早年的内容会被截掉。
 - 项目的节奏在浏览器里算：项目页本来就读了项目的全部记录。
+
+# 作品与文章
+
+不加表，也不加列：[作品与文章](/product/features/showcase.md) 就是类型为 `creation`、`article` 的已完成记录，公开与否仍是记录自己的 `visibility`。
+
+- 记录列表加上 `type=` 筛选，作品页和文章页只读这一种类型的记录；列表摘要加上 `chars`（`length(body)`，正文的码点数），文章的字数不用读出整个正文。
+- 不另设「精选」或展示顺序的字段：先按发生时间从新到旧，真有需要再加。
+- 访客视角是前端的事：同样的接口，请求不带 Cookie，见 [前端分区](/architecture/frontend.md#访客视角)。
 
 # 导出与备份
 

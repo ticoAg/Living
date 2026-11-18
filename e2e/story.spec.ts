@@ -561,6 +561,67 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     clean('export to a folder');
   });
 
+  await test.step('works and articles: first on the profile, each on a page of its own, then the profile as a visitor sees it', async () => {
+    const { entry: work } = await api.post<{ entry: { id: string } }>('/api/entries', {
+      type: 'creation',
+      status: 'published',
+      visibility: 'public',
+      title: '晨雾',
+      body: '水彩，四开。',
+      occurredAt: '2026-05-04',
+      media: [{ photoId: photos[0].id }]
+    });
+    for (const [title, visibility, day] of [
+      ['画了一年水彩之后', 'public', '2026-05-05'],
+      ['只写给自己', 'private', '2026-05-06']
+    ]) {
+      await api.post('/api/entries', {
+        type: 'article',
+        status: 'published',
+        visibility,
+        title,
+        body: '第一段。\n\n第二段。',
+        occurredAt: day
+      });
+    }
+
+    await page.goto(`/@${OWNER.handle}`);
+    const works = page.getByRole('region', { name: '作品' });
+    await expect(works.getByRole('link', { name: /^晨雾，2026\.05\.04$/ }).locator('img')).toBeVisible();
+    const articles = page.getByRole('region', { name: '文章' });
+    await expect(articles.getByRole('link')).toHaveCount(2);
+    await expect(articles.getByRole('link').first()).toHaveAccessibleName('只写给自己，2026.05.06，10 字，仅自己可见');
+    await expect(articles.getByRole('link').last()).toHaveAccessibleName('画了一年水彩之后，2026.05.05，10 字');
+    // the other entries keep their own section
+    await expect(page.getByRole('region', { name: '记录' })).not.toContainText('晨雾');
+    await page.goto(`/@${OWNER.handle}/articles`);
+    await expect(page.getByRole('heading', { level: 1, name: /^文章/ })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: '2026' })).toBeVisible();
+    await expect(page.locator('a.sc-article')).toHaveCount(2);
+    await follow(page.getByRole('link', { name: OWNER.name, exact: true }));
+    await expect(page).toHaveURL(new RegExp(`/@${OWNER.handle}$`));
+    clean('works and articles');
+
+    await follow(page.getByRole('link', { name: '访客视角' }));
+    await expect(page).toHaveURL(new RegExp(`/@${OWNER.handle}\\?as=visitor$`));
+    await expect(page.getByRole('status').filter({ hasText: '访客看到的样子' })).toBeVisible();
+    await expect(articles.getByRole('link')).toHaveCount(1);
+    await expect(articles.getByRole('link')).toHaveAccessibleName('画了一年水彩之后，2026.05.05，10 字');
+    await expect(page.getByRole('link', { name: '访客视角' })).toHaveCount(0);
+    // the header still shows who is signed in
+    await expect(nav.getByRole('link', { name: '今天' })).toBeVisible();
+    // links inside the view keep it
+    await follow(works.getByRole('link', { name: /^晨雾/ }));
+    await expect(page).toHaveURL(new RegExp(`/e/${work.id}\\?as=visitor$`));
+    await expect(page.getByRole('heading', { level: 1, name: '晨雾' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '编辑' })).toHaveCount(0);
+    await follow(page.getByRole('link', { name: '退出', exact: true }));
+    await expect(page).toHaveURL(new RegExp(`/e/${work.id}$`));
+    await expect(page.getByRole('link', { name: '编辑' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: '访客看到的样子' })).toHaveCount(0);
+    clean('the visitor view');
+  });
+
   await test.step('Living', async () => {
     await page.goto('/living');
     await expect(page.getByLabel('Living 全屏轮播')).toBeVisible();

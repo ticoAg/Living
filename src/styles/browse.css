@@ -81,10 +81,11 @@
 .prof-name { font-size: clamp(30px, 3.4vw, 46px); letter-spacing: 0.04em; }
 .prof-handle { margin: 8px 0 0; font-size: 14px; color: var(--ink-2); }
 .prof-bio { margin: 12px 0 0; max-width: 56ch; line-height: 1.8; color: var(--ink-2); }
+.prof-own { margin: 16px 0 0; }
 .prof-counts { margin: 0; display: flex; gap: 28px; align-items: baseline; }
 .prof-num { font: 500 40px / 1 var(--latin); font-variant-numeric: lining-nums tabular-nums; }
 .prof-unit { margin-left: 6px; font-size: 14px; color: var(--ink-2); }
-.prof-themes { padding-top: 28px; }
+.prof-themes { display: flex; flex-direction: column; gap: 18px; padding-top: 32px; }
 .prof-themes ul { list-style: none; margin: 0; padding: 0 0 6px; display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x proximity; }
 .prof-themes li { flex: none; scroll-snap-align: start; }
 .prof-theme { display: flex; flex-direction: column; gap: 8px; width: 208px; }

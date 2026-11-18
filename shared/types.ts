@@ -418,6 +418,8 @@ export interface EntrySummary {
   excerpt: string | null;
   /** The body goes on past `excerpt`. */
   hasMore: boolean;
+  /** How long the body is, in code points (Markdown as written); 0 without one. */
+  chars: number;
   /**
    * When it happened, local wall-clock time like a photo's `takenAt`: `YYYY-MM-DD` when only the day is known,
    * else `YYYY-MM-DDTHH:mm:ss`. When it was written down is `createdAt`.

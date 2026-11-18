@@ -2,7 +2,14 @@
 // author says otherwise. Contract: /docs/api/entries.md
 
 import { Hono } from 'hono';
-import { ENTRY_LIST_LIMIT, type EntryListResponse, type EntryStatus, type SessionUser, type Visibility } from '../../shared/types';
+import {
+  ENTRY_LIST_LIMIT,
+  ENTRY_TYPES,
+  type EntryListResponse,
+  type EntryStatus,
+  type SessionUser,
+  type Visibility
+} from '../../shared/types';
 import type { AppEnv } from '../env';
 import { assertOwnPhotos, ENTRY_FROM, entryCols, loadEntryDetail, toEntrySummary, type EntryRow } from '../lib/entries';
 import { assertNotEmpty, parseEntryFields, type MediaField } from '../lib/entryInput';
@@ -13,7 +20,7 @@ import { grantFor, sharedCache } from '../lib/shares';
 import { capped, nowIso, prep, prepInsert, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
 import { usableProjectIds } from '../lib/projects';
-import { dayRange } from '../lib/validate';
+import { dayRange, enumList } from '../lib/validate';
 import { entryById, entryList, projectById } from '../lib/visibility';
 
 export const entries = new Hono<AppEnv>({ strict: false });
@@ -32,6 +39,7 @@ entries.get('/', async (c) => {
   const mine = ['1', 'true'].includes(c.req.query('mine') ?? '');
   if (mine && !viewer) throw unauthenticated();
   const range = dayRange(c.req.query('from'), c.req.query('to'));
+  const types = enumList(c.req.query('type'), 'type', ENTRY_TYPES);
 
   let ownerId: string | null = null;
   if (ownerHandle) {
@@ -77,6 +85,7 @@ entries.get('/', async (c) => {
   if (projectId) where.push(`EXISTS (SELECT 1 FROM entry_projects ep WHERE ep.entry_id = e.id AND ep.project_id = ${q.p(projectId)})`);
   if (range.from) where.push(`e.occurred_at >= ${q.p(range.from)}`);
   if (range.until) where.push(`e.occurred_at < ${q.p(range.until)}`);
+  if (types) where.push(`e.type IN (${types.map((t) => q.p(t)).join(', ')})`);
   const res = await prepQ(
     db,
     // Latest first. A day-only time ('2026-11-16') sorts after the timed entries of that day; ties by insertion order.

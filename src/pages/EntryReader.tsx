@@ -11,6 +11,7 @@ import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 import { MY_PROJECTS, useProjectList } from '../projects/api';
 import ShareButton from '../shares/ShareButton';
+import VisitorLink from '../components/VisitorLink';
 import { useDocumentTitle, useScrollTop } from '../themes/hooks';
 import { VISIBILITY_LABEL } from '../themes/util';
 import '../styles/browse.css';
@@ -129,6 +130,7 @@ function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
           {own && (
             <div className="row er-own">
               <ShareButton kind="entry" id={e.id} notice={SHARE_NOTICE[e.status]} />
+              <VisitorLink href={`/e/${e.id}`} />
               <Link href={`/e/${e.id}/edit`} className="btn btn-quiet">
                 <Icon name="edit" size={16} />
                 编辑

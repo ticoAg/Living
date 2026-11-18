@@ -1,11 +1,14 @@
 import { Suspense } from 'react';
-import { Route, Switch, useLocation } from 'wouter';
+import { Route, Switch, useLocation, useSearch } from 'wouter';
 import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import ReLogin from './components/ReLogin';
+import VisitorView from './components/VisitorView';
 import { SessionProvider } from './lib/session';
+import { isVisitorSearch } from './lib/visitor';
 import {
   Archive,
+  Articles,
   Calendar,
   EntryEditor,
   EntryReader,
@@ -33,6 +36,7 @@ import {
   Themes,
   Today,
   Upload,
+  Works,
   YearReview
 } from './routes';
 
@@ -40,6 +44,7 @@ import {
 // entries — Today, Archive, EntryReader, EntryEditor
 // projects — Projects, ProjectPage, ProjectForm
 // browse — Explore, Profile, Photo, Place, MapPage, IndexPage
+// showcase — Works, Articles
 // living — Living
 // studio — Upload, PhotoEdit, PlaceEdit, TagsManager, Login, Register, Settings
 // themes — Themes, ThemeReader, ThemeEditor
@@ -66,6 +71,8 @@ function Routes() {
       {/* wouter reads "@:handle" as a literal segment, and static assets redirect /@x to /%40x;
           a RegExp route captures the handle in either form */}
       <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/?$/i} component={Profile} />
+      <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/works\/?$/i} component={Works} />
+      <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/articles\/?$/i} component={Articles} />
       <Route path="/p/:id" component={Photo} />
       <Route path="/place/:id" component={Place} />
       <Route path="/map" component={MapPage} />
@@ -92,16 +99,21 @@ function Routes() {
 export default function App() {
   const [path] = useLocation();
   const immersive = path.startsWith('/living');
+  const visitor = isVisitorSearch(useSearch());
+  // the header stays outside: an error in a page (or its chunk) still leaves the navigation
+  const pages = (
+    <ErrorBoundary resetKey={path}>
+      {/* the fallback fades in late: a chunk that arrives quickly never flashes it */}
+      <Suspense fallback={<p className="loading loading-late">加载中</p>}>
+        <Routes />
+      </Suspense>
+    </ErrorBoundary>
+  );
   return (
     <SessionProvider>
       {!immersive && <Header />}
-      {/* the header stays outside: an error in a page (or its chunk) still leaves the navigation */}
-      <ErrorBoundary resetKey={path}>
-        {/* the fallback fades in late: a chunk that arrives quickly never flashes it */}
-        <Suspense fallback={<p className="loading loading-late">加载中</p>}>
-          <Routes />
-        </Suspense>
-      </ErrorBoundary>
+      {/* ?as=visitor: the pages as someone not signed in sees them; the header still shows who is */}
+      {visitor ? <VisitorView>{pages}</VisitorView> : pages}
       <ReLogin />
     </SessionProvider>
   );

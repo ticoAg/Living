@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { api } from './api';
+import { useVisitor } from './visitor';
 
 // Minimal shared GET cache: components asking for the same path share one request and one result.
 // Call `invalidate(prefix)` after a mutation to refetch every cached path that starts with `prefix`.
@@ -8,6 +9,9 @@ import { api } from './api';
 // reads it mounts, or when the tab becomes visible again while one is mounted. There is no polling: the lists
 // (/api/photos, /api/tags, /api/pois) are read in full each time, and D1's free tier counts every row read.
 // A failed request is kept until the next mount (or `reload`) asks again.
+//
+// Inside the visitor view (lib/visitor.ts) each path is cached under its visitor key and asked for without cookies.
+// Invalidating, forgetting or replacing a path drops its visitor copy too, so the view never shows what was changed.
 
 export const STALE_MS = 5 * 60_000;
 
@@ -19,6 +23,10 @@ interface Entry {
   at?: number;
 }
 const cache = new Map<string, Entry>();
+
+const VISITOR = 'visitor:';
+/** The cache key of `path` as a visitor asks for it. */
+export const visitorKey = (path: string): string => VISITOR + path;
 const listeners = new Map<string, Set<() => void>>();
 
 function notify(path: string) {
@@ -28,7 +36,7 @@ function notify(path: string) {
 function load(path: string): Promise<void> {
   const entry = cache.get(path) ?? {};
   if (entry.promise) return entry.promise;
-  const promise = api<unknown>(path)
+  const promise = (path.startsWith(VISITOR) ? api<unknown>(path.slice(VISITOR.length), { anonymous: true }) : api<unknown>(path))
     .then((data) => {
       cache.set(path, { data, at: Date.now() });
     })
@@ -78,7 +86,7 @@ export function invalidate(prefix: string) {
 
 function drop(prefix: string) {
   for (const key of Array.from(cache.keys())) {
-    if (key.startsWith(prefix)) {
+    if (key.startsWith(prefix) || key.startsWith(VISITOR + prefix)) {
       if (listeners.get(key)?.size) {
         // keep showing the previous data while the refetch runs
         const prev = cache.get(key);
@@ -99,12 +107,15 @@ export function prefetch(path: string) {
 /** Drop a cached path, read or not: what it held is gone (a deleted entry), and nothing should show it again. */
 export function forget(path: string) {
   cache.delete(path);
+  cache.delete(VISITOR + path);
 }
 
 /** Seed or replace a cached value without a request (e.g. after a mutation returns the new object). */
 export function setCached<T>(path: string, data: T) {
   cache.set(path, { data, at: Date.now() });
   notify(path);
+  // what a visitor sees of it may have changed too
+  drop(VISITOR + path);
 }
 
 /** Back on a tab after a while: refresh what the mounted components show, if it has gone stale. */
@@ -127,21 +138,23 @@ function subscribe(path: string, fn: () => void): () => void {
 const noSubscription = () => () => {};
 
 export function useApi<T>(path: string | null): { data: T | undefined; error: unknown; loading: boolean; reload: () => void } {
+  const visitor = useVisitor();
+  const key = path && visitor ? VISITOR + path : path;
   // useSyncExternalStore reads the entry again right after it subscribes. A result that lands between the render and
   // the subscription is therefore not missed: a link's prefetch often finishes while its lazy page still waits in
   // Suspense, and a plain effect subscription then left the page on its loading state for good.
-  const sub = useCallback((fn: () => void) => (path ? subscribe(path, fn) : noSubscription()), [path]);
-  const entry = useSyncExternalStore(sub, () => (path ? cache.get(path) : undefined));
+  const sub = useCallback((fn: () => void) => (key ? subscribe(key, fn) : noSubscription()), [key]);
+  const entry = useSyncExternalStore(sub, () => (key ? cache.get(key) : undefined));
   useEffect(() => {
-    if (path) revalidate(path);
-  }, [path]);
+    if (key) revalidate(key);
+  }, [key]);
   const reload = useCallback(() => {
-    if (path) invalidate(path);
-  }, [path]);
+    if (key) invalidate(key);
+  }, [key]);
   return {
     data: entry?.data as T | undefined,
     error: entry?.error,
-    loading: !!path && !!entry?.promise && entry.data === undefined && !entry.error,
+    loading: !!key && !!entry?.promise && entry.data === undefined && !entry.error,
     reload
   };
 }

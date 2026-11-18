@@ -1,6 +1,7 @@
 import { lazy, type ComponentType } from 'react';
 import { dayOf, monthSpan, parseMonth } from '../shared/days';
-import { prefetch } from './lib/useApi';
+import { prefetch, visitorKey } from './lib/useApi';
+import { isVisitorSearch } from './lib/visitor';
 
 // Page modules are split per route. Without help each first visit waits for its chunk, then for its data,
 // with the Suspense fallback in between. Two things close that gap:
@@ -36,6 +37,8 @@ export const ProjectPage = page(() => import('./pages/ProjectPage'));
 export const ProjectForm = page(() => import('./pages/ProjectForm'));
 export const Explore = page(() => import('./pages/Explore'));
 export const Profile = page(() => import('./pages/Profile'));
+export const Works = page(() => import('./pages/Works'));
+export const Articles = page(() => import('./pages/Articles'));
 export const Photo = page(() => import('./pages/Photo'));
 export const Place = page(() => import('./pages/Place'));
 export const MapPage = page(() => import('./pages/MapPage'));
@@ -84,6 +87,13 @@ const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   [/^\/projects\/([^/]+)\/edit$/, ProjectForm, (m) => [`/api/projects/${enc(dec(m[1]))}`]],
   [/^\/projects\/([^/]+)$/, ProjectPage, (m) => [`/api/projects/${enc(dec(m[1]))}`, `/api/entries?project=${enc(dec(m[1]))}`]],
   [/^\/(?:@|%40)([^/]+)\/?$/i, Profile, (m) => [`/api/users/${enc(dec(m[1]))}`]],
+  // the lists are asked for by the canonical handle, which links write
+  [/^\/(?:@|%40)([^/]+)\/works\/?$/i, Works, (m) => [`/api/users/${enc(dec(m[1]))}`, `/api/entries?owner=${enc(dec(m[1]))}&type=creation`]],
+  [
+    /^\/(?:@|%40)([^/]+)\/articles\/?$/i,
+    Articles,
+    (m) => [`/api/users/${enc(dec(m[1]))}`, `/api/entries?owner=${enc(dec(m[1]))}&type=article`]
+  ],
   [/^\/p\/([^/]+)$/, Photo, (m) => [`/api/photos/${enc(dec(m[1]))}`, '/api/photos']],
   [
     /^\/place\/([^/]+)$/,
@@ -126,7 +136,9 @@ export function warm(url: URL, data: boolean): void {
         );
         list.push(`/api/entries?mine=1&from=${from}&to=${to}`, `/api/photos?mine=1&from=${from}&to=${to}`, '/api/tags');
       }
-      list.forEach(prefetch);
+      // in the visitor view (lib/visitor.ts) the page asks as a visitor
+      const visitor = isVisitorSearch(url.search);
+      list.forEach((p) => prefetch(visitor ? visitorKey(p) : p));
     }
     return;
   }

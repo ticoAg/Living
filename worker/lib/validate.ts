@@ -80,6 +80,18 @@ export function optEnum<T extends string>(v: unknown, label: string, values: rea
   return v as T;
 }
 
+/**
+ * A query parameter (`label`, its name) naming some of `values`, comma-separated, each counted once: absent or empty →
+ * null (no filter); any other word is a 400.
+ */
+export function enumList<T extends string>(v: string | undefined, label: string, values: readonly T[]): T[] | null {
+  if (!v) return null;
+  const out = [...new Set(v.split(','))];
+  if (out.some((x) => !(values as readonly string[]).includes(x)))
+    throw invalid(`${label} 只能是 ${values.join(' / ')}，可以用逗号隔开几个`);
+  return out as T[];
+}
+
 export function optBool(v: unknown, label: string): boolean | undefined {
   if (v === undefined) return undefined;
   if (typeof v !== 'boolean') throw invalid(`${label}需要是 true 或 false`);

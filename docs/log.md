@@ -1,6 +1,9 @@
 # Directory Update Log
 
 ## 2026-11-18
+* **Creation**: 第四阶段：[作品与文章](/product/features/showcase.md)。个人主页最先展示已完成的「创作」（作品：第一张照片排成格子，最新 8 件）和「文章」（标题、开头两行、日期和字数，最新 5 篇），之后才是合集、项目、其余的记录和照片；`/@handle/works`、`/@handle/articles` 列出全部，文章按年份分组。公开与否仍按每条记录的公开范围，作者看到的不公开的那些标着「仅链接可见」「仅自己可见」。不加表，见 [数据演进](/data/evolution.md#作品与文章)。
+* **Creation**: [访客视角](/product/features/showcase.md#访客视角)：作者在自己的主页、记录、合集和项目页上点「访客视角」（`?as=visitor`），页面不带登录信息重新读取，看到的就是没登录的人看到的；在里面点到访客也能打开的页面仍是访客视角，「退出」回到自己的视角。共享缓存为它另存一份，改动后不会显示旧的，见 [前端分区](/architecture/frontend.md#访客视角)。
+* **Update**: [记录接口](/api/entries.md#get-apientries) 的列表加上 `type=`（几个类型用逗号隔开，别的词返回 400）和摘要的 `chars`（正文的码点数）。个人主页的合集一节加上标题。[账号](/product/features/accounts.md)、[记录](/product/features/entries.md)、[隐私](/product/features/privacy.md#记录)、[路线图](/product/roadmap.md)、[前端分区](/architecture/frontend.md) 随之更新。
 * **Creation**: 第四阶段：[日历与年度回顾](/product/features/calendar.md)。档案多了「日历」标签页（`/archive/calendar`）：一个月一张表，每天铺一张照片、画几个点表示几条记录，选一天在旁边看那天的全部，空着的日子可以「补记」（编辑器的 `/entries/new?date=`，见 [记录](/product/features/entries.md#写)）；方向键换日子。年度回顾（`/archive/<年份>`）：记录、照片、天数、最长连续、地点和字数，十二个小月历按每天的多少上色，收藏、项目、合集、常去的地点和常用的标签；时间线里每年的标题打开那一年的回顾。
 * **Creation**: [回顾接口](/api/review.md)：`GET /api/review` 列出有内容的年份，`GET /api/review/:year` 在服务器上汇总一年，只算自己的、不算已归档的记录。[记录](/api/entries.md#get-apientries) 和 [照片](/api/photos.md#get-apiphotos) 列表加上 `from`、`to`，日历按月读取，不受 5000 条上限的影响。不加表和索引，见 [数据演进](/data/evolution.md#日历与回顾)。
 * **Update**: [项目](/product/features/projects.md#节奏) 页加上「节奏」：最长和现在连续几天、平均每周几天、最近六个月每天的小月历，超过六个月的项目再加每个月的记录数；只算已完成的记录。[路线图](/product/roadmap.md)、[档案](/product/features/archive.md)、[前端结构](/architecture/frontend.md) 随之更新。

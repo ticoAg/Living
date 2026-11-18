@@ -128,6 +128,7 @@ export function entry(id: string, over: Partial<EntrySummary> = {}): EntrySummar
     title: null,
     excerpt: '今天',
     hasMore: false,
+    chars: 2,
     occurredAt: '2026-11-16T09:00:00',
     visibility: 'private',
     status: 'published',
