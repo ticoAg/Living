@@ -120,6 +120,9 @@ export interface PhotoSummary {
  */
 export const PHOTO_LIST_LIMIT = 5000;
 
+/** Ids one `GET /api/photos?ids=` may name; more are asked for in parts. */
+export const PHOTO_IDS_LIMIT = 200;
+
 /** `GET /api/photos`. */
 export interface PhotoListResponse {
   photos: PhotoSummary[];
@@ -433,14 +436,16 @@ export interface EntrySummary {
   tagIds: string[];
   /** Projects it belongs to that the requester may see in lists: public ones, or all of one's own. */
   projectIds: string[];
-  /** Where it happened, as its author chose; shown to whoever may see the entry. */
-  poi: EntryPlace | null;
+  /** Where it happened, as its author chose; shown to whoever may see the entry, with where it is on the map. */
+  poi: LocatedPlace | null;
   createdAt: string;
   updatedAt: string;
 }
 
 /** An entry's place: what a card or the reader shows of it, and the id the place page opens. */
 export type EntryPlace = Pick<Poi, 'id' | 'name' | 'category' | 'city' | 'district'>;
+/** An entry's place as the entry carries it: with its position, where the map puts the entry. */
+export type LocatedPlace = EntryPlace & Pick<Poi, 'lat' | 'lng'>;
 
 /** `GET /api/entries`. */
 export interface EntryListResponse {

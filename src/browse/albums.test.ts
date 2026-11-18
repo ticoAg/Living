@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vite-plus/test';
-import type { PhotoSummary, Poi } from '../../shared/types';
-import { photo, poi } from '../test-utils';
+import type { EntrySummary, PhotoSummary, Poi } from '../../shared/types';
+import { entry, photo, poi } from '../test-utils';
 import {
   albumOf,
   anchorOf,
   areaOfRef,
+  buildEntryIndex,
   buildIndex,
   coversOf,
   describe as describeAlbum,
@@ -50,9 +51,9 @@ const LIBRARY: PhotoSummary[] = [
 ];
 
 const index = (photos: PhotoSummary[] = LIBRARY, pois: ReadonlyMap<string, Poi> = POIS) => buildIndex(photos, pois);
-const ids = (a: Album) => a.spots.map((s) => s.photo.id).sort();
-const find = (albums: Album[], id: string) => albums.find((a) => a.spots.some((s) => s.photo.id === id)) as Album;
-const labels = (albums: Album[]) => albums.map((a) => a.label).sort();
+const ids = (a: Album) => a.spots.map((s) => s.id).sort();
+const find = (albums: Album[], id: string) => albums.find((a) => a.spots.some((s) => s.id === id)) as Album;
+const labels = (albums: readonly Album<unknown>[]) => albums.map((a) => a.label).sort();
 
 describe('levelAt and layoutZoom', () => {
   it('give each zoom its level: province, city from 6, county from 9, place from 12, photo from 16', () => {
@@ -93,7 +94,7 @@ describe('buildIndex', () => {
       photo('missing-place', { poiId: 'poi_gone' }),
       at('fav', 30, 120, { favorite: true, takenAt: '2020-01-01T00:00:00' })
     ]);
-    expect(idx.spots.map((s) => s.photo.id)).toEqual(['fav', 'by-place', 'a']);
+    expect(idx.spots.map((s) => s.id)).toEqual(['fav', 'by-place', 'a']);
     const byPlace = idx.byId.get('by-place');
     expect(byPlace).toMatchObject({ lat: DUANQIAO.lat, lng: DUANQIAO.lng, city: '杭州市', county: '西湖区' });
   });
@@ -236,7 +237,7 @@ describe('layoutAt', () => {
     const idx = index();
     for (let z = 0; z <= 18; z++) {
       const all = layoutAt(idx, z).flatMap(ids);
-      expect(all.sort(), String(z)).toEqual(idx.spots.map((s) => s.photo.id).sort());
+      expect(all.sort(), String(z)).toEqual(idx.spots.map((s) => s.id).sort());
     }
   });
 
@@ -247,7 +248,7 @@ describe('layoutAt', () => {
 });
 
 describe('describe', () => {
-  const spots = (idx: AlbumIndex, ...want: string[]) => idx.spots.filter((s) => want.includes(s.photo.id));
+  const spots = (idx: AlbumIndex, ...want: string[]) => idx.spots.filter((s) => want.includes(s.id));
 
   it('needs at least half of the photos to know their unit', () => {
     const idx = index([
@@ -378,7 +379,119 @@ describe('coversOf', () => {
   it('shows only matching photos while any match, and all of them when none do', () => {
     const idx = index();
     const bridge = albumOf(idx, 'pl:poi_dq') as Album;
-    expect(coversOf(bridge.spots, (p) => p.id === 'dq1').map((p) => p.id)).toEqual(['dq1']);
+    expect(coversOf(bridge.spots, (s) => s.id === 'dq1').map((p) => p.id)).toEqual(['dq1']);
     expect(coversOf(bridge.spots, () => false).map((p) => p.id)).toEqual(['dq3', 'dq2', 'dq1']);
+  });
+});
+
+// ---- entries ----------------------------------------------------------------------------------------------------
+
+const located = (id: string, over: Partial<EntrySummary>) => entry(id, { visibility: 'public', ...over });
+const PLACED = (p: Poi) => ({ id: p.id, name: p.name, category: p.category, city: p.city, district: p.district, lat: p.lat, lng: p.lng });
+const PHOTOS = new Map(LIBRARY.map((p) => [p.id, p]));
+const entryIndex = (entries: EntrySummary[], photos: ReadonlyMap<string, PhotoSummary> = PHOTOS) =>
+  buildEntryIndex(entries, photos, POIS, index().spots);
+
+describe('buildEntryIndex', () => {
+  it('puts an entry at its own place, before any of its photos', () => {
+    const idx = entryIndex([located('e1', { poi: PLACED(BAIDI), photoIds: ['nb1'] })]);
+    const [s] = idx.spots;
+    expect([s.lat, s.lng, s.poi?.id, s.city, s.county]).toEqual([BAIDI.lat, BAIDI.lng, 'poi_bd', '杭州市', '西湖区']);
+  });
+
+  it('without a place, puts it where the first of its photos with a position is: its coordinates, else its place', () => {
+    const nowhere = photo('nowhere');
+    const byPlace = photo('by-place', { poiId: 'poi_dq', province: '浙江省', city: '杭州市' });
+    const photos = new Map([...PHOTOS, ['nowhere', nowhere], ['by-place', byPlace]]);
+    const idx = entryIndex(
+      [
+        located('coords', { photoIds: ['nowhere', 'nb1', 'dq1'], occurredAt: '2026-11-16T10:00:00' }),
+        located('place', { photoIds: ['by-place', 'nb1'], occurredAt: '2026-11-16T09:00:00' })
+      ],
+      photos
+    );
+    const [coords, place] = idx.spots;
+    expect([coords.id, coords.lat, coords.lng, coords.province, coords.city, coords.county, coords.poi]).toEqual([
+      'coords',
+      29.8683,
+      121.544,
+      '浙江省',
+      '宁波市',
+      '海曙区',
+      null
+    ]);
+    expect([place.id, place.lat, place.lng, place.poi?.id, place.city, place.county]).toEqual([
+      'place',
+      DUANQIAO.lat,
+      DUANQIAO.lng,
+      'poi_dq',
+      '杭州市',
+      '西湖区'
+    ]);
+  });
+
+  it('takes a photo’s own coordinates over its place’s, keeping the place to group it by', () => {
+    const near = photo('near', { lat: 30.2601, lng: 120.1502, poiId: 'poi_dq', province: '浙江省', city: '杭州市', district: '西湖区' });
+    const idx = entryIndex([located('e', { photoIds: ['near'] })], new Map([['near', near]]));
+    expect([idx.spots[0].lat, idx.spots[0].lng, idx.spots[0].poi?.id]).toEqual([30.2601, 120.1502, 'poi_dq']);
+  });
+
+  it('leaves out an entry with neither a place nor a photo shown with a position, and photos it is not shown', () => {
+    const idx = entryIndex([
+      located('bare', {}),
+      located('unplaced', { photoIds: ['nowhere-to-be-seen'] }),
+      located('kept', { poi: PLACED(DUANQIAO), photoIds: ['dq1', 'not-shown'] })
+    ]);
+    expect(idx.spots.map((s) => s.id)).toEqual(['kept']);
+    expect(idx.spots[0].covers.map((p) => p.id)).toEqual(['dq1']);
+  });
+
+  it('orders them newest first, and takes the province of a place’s city from the hints', () => {
+    const idx = entryIndex([
+      located('old', { poi: PLACED(DUANQIAO), occurredAt: '2025-01-01' }),
+      located('new', { poi: PLACED(BAIDI), occurredAt: '2026-11-16T09:00:00' })
+    ]);
+    expect(idx.spots.map((s) => [s.id, s.province])).toEqual([
+      ['new', '浙江省'],
+      ['old', '浙江省']
+    ]);
+    // without the photos to tell, the city's province stays unknown
+    expect(buildEntryIndex([located('e', { poi: PLACED(DUANQIAO) })], PHOTOS, POIS).spots[0].province).toBe('');
+  });
+
+  it('lays entries out as photos are: by place, county and city, a single entry named by its title', () => {
+    const idx = entryIndex([
+      located('a', { poi: PLACED(DUANQIAO), title: '湖边' }),
+      located('b', { poi: PLACED(BAIDI) }),
+      located('c', { photoIds: ['nb1'] })
+    ]);
+    expect(labels(layoutAt(idx, 7))).toEqual(['宁波', '杭州']);
+    // the two places are close enough to merge into their county here; the entry without a place is a spot of its own
+    expect(labels(layoutAt(idx, 13))).toEqual(['', '西湖区']);
+    expect(albumOf(idx, 'ph:a')?.name).toBe('湖边');
+    // one without a title is called by the start of its text, as its card is
+    expect(albumOf(idx, 'ph:b')?.name).toBe('今天');
+    expect(albumOf(idx, 'pl:poi_dq')?.spots.map((s) => s.id)).toEqual(['a']);
+  });
+});
+
+describe('coversOf for entries', () => {
+  const idx = entryIndex([
+    located('three', { poi: PLACED(DUANQIAO), photoIds: ['dq1', 'dq2', 'dq3'], occurredAt: '2026-11-16T10:00:00' }),
+    located('none', { poi: PLACED(DUANQIAO), occurredAt: '2026-11-16T09:00:00' }),
+    located('shares', { poi: PLACED(BAIDI), photoIds: ['dq1', 'bd1'], occurredAt: '2026-11-16T08:00:00' })
+  ]);
+
+  it('turns through a single entry’s photos', () => {
+    expect(coversOf([idx.byId.get('three') as (typeof idx.spots)[number]], () => true).map((p) => p.id)).toEqual(['dq1', 'dq2', 'dq3']);
+  });
+
+  it('takes a photo of each entry first, one not shown yet, then the rest, each photo once', () => {
+    expect(coversOf(idx.spots, () => true).map((p) => p.id)).toEqual(['dq1', 'bd1', 'dq2', 'dq3']);
+    expect(coversOf(idx.spots, () => true, 2).map((p) => p.id)).toEqual(['dq1', 'bd1']);
+  });
+
+  it('has none for entries without photos', () => {
+    expect(coversOf(idx.spots, (s) => s.id === 'none')).toEqual([]);
   });
 });

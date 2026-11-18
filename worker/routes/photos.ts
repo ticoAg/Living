@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { PHOTO_LIMITS } from '../../shared/limits';
 import { distance } from '../../shared/geo';
 import {
+  PHOTO_IDS_LIMIT,
   PHOTO_LIST_LIMIT,
   type GeoPrivacy,
   type PhotoListResponse,
@@ -27,7 +28,6 @@ import type { SessionUser } from '../../shared/types';
 
 export const photos = new Hono<AppEnv>({ strict: false });
 
-const IDS_LIMIT = 200;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 // ---- list -----------------------------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ photos.get('/', async (c) => {
           .filter(Boolean)
       )
     ];
-    if (ids.length > IDS_LIMIT) throw invalid(`一次最多指定 ${IDS_LIMIT} 张照片`);
+    if (ids.length > PHOTO_IDS_LIMIT) throw invalid(`一次最多指定 ${PHOTO_IDS_LIMIT} 张照片`);
   }
 
   let ownerId: string | null = null;

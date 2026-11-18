@@ -17,6 +17,8 @@ import {
 
 const at = new Date(2026, 10, 16, 8, 30, 15);
 const place = { id: 'poi_lake', name: '西湖', category: 'scenic', city: '杭州', district: null };
+/** the place as an entry carries it, with its position */
+const located = { ...place, lat: 30.25, lng: 120.15 };
 
 describe('emptyDraft', () => {
   it('is a private note of this moment', () => {
@@ -60,7 +62,7 @@ describe('draftFromEntry', () => {
       media: [{ photoId: 'ph_a', caption: null, photo: photo('ph_a') }],
       tagIds: ['t_1'],
       projectIds: ['pj_1'],
-      poi: place
+      poi: located
     });
     const d = draftFromEntry(e);
     expect(d).toMatchObject({ title: '长安的荔枝', date: '2026-11-16', time: '21:05', heldTime: '21:05:42' });

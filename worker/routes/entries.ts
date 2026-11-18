@@ -21,7 +21,7 @@ import { capped, nowIso, prep, prepInsert, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
 import { usableProjectIds } from '../lib/projects';
 import { dayRange, enumList } from '../lib/validate';
-import { entryById, entryList, projectById } from '../lib/visibility';
+import { entryById, entryList, photoById, photoLocation, projectById } from '../lib/visibility';
 
 export const entries = new Hono<AppEnv>({ strict: false });
 
@@ -38,6 +38,7 @@ entries.get('/', async (c) => {
   const poiId = c.req.query('poi');
   const mine = ['1', 'true'].includes(c.req.query('mine') ?? '');
   if (mine && !viewer) throw unauthenticated();
+  const located = ['1', 'true'].includes(c.req.query('located') ?? '');
   const range = dayRange(c.req.query('from'), c.req.query('to'));
   const types = enumList(c.req.query('type'), 'type', ENTRY_TYPES);
 
@@ -79,6 +80,14 @@ entries.get('/', async (c) => {
         ? entryList(q, viewer)
         : `e.visibility = 'public' AND e.status = 'published'`
   ];
+  // only what a map can place: its place, or one of the photos `photoIds` lists (entryCols) with a position the
+  // viewer is shown, coordinates or a place (lib/photos.ts geoFor)
+  if (located)
+    where.push(
+      `(e.poi_id IS NOT NULL OR EXISTS (SELECT 1 FROM entry_media lm JOIN photos lp ON lp.id = lm.photo_id
+        WHERE lm.entry_id = e.id AND ${photoById(q, viewer, 'lp', grant)} AND ${photoLocation(q, viewer, 'lp')}
+          AND ((lp.lat IS NOT NULL AND lp.lng IS NOT NULL) OR lp.poi_id IS NOT NULL)))`
+    );
   if (mine) where.push(`e.owner_id = ${q.p(viewer)}`);
   if (poiId) where.push(`e.poi_id = ${q.p(poiId)}`);
   if (ownerId) where.push(`e.owner_id = ${q.p(ownerId)}`);

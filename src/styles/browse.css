@@ -320,12 +320,13 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .plc-top { margin-top: -20px; }
   .pho-mat { padding: 12px; border-radius: var(--r-card); }
   .plc-map, .mpg-map { border-radius: var(--r-card); }
-  /* title and filter button on one row, the cities scrolling sideways below, the season and light chips folded:
+  /* title, layer switch and filter button on one row, the cities scrolling sideways below, the filter chips folded:
      the map takes the rest of the screen (136px: the rows above it and their gaps) */
   .mpg { gap: 12px; }
   .mpg-top { align-items: center; gap: 8px 12px; padding-top: 12px; }
   .mpg-title { display: contents; }
-  .mpg-h1 { order: 1; flex: 1 1 auto; }
+  .mpg-h1 { order: 1; }
+  .mpg-layers { order: 1; margin-right: auto; }
   .mpg-top > .bw-filter { order: 2; }
   .mpg-cities { order: 3; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) 0 calc(var(--gutter) - 10px); scrollbar-width: none; }
   .mpg-cities::-webkit-scrollbar { display: none; }

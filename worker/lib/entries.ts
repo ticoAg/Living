@@ -42,6 +42,8 @@ export interface EntryRow {
   poi_category: string | null;
   poi_city: string | null;
   poi_district: string | null;
+  poi_lat: number | null;
+  poi_lng: number | null;
   body?: string | null;
   revision?: number;
 }
@@ -58,6 +60,7 @@ export function entryCols(q: Sql, viewer: string | null, grant: string | null = 
   return `e.id, e.owner_id, u.handle AS owner_handle, e.type, e.title, substr(e.body, 1, ${ENTRY_EXCERPT_MAX + 1}) AS body_head,
     coalesce(length(e.body), 0) AS chars, e.occurred_at, e.visibility, e.status, e.created_at, e.updated_at,
     e.poi_id, epo.name AS poi_name, epo.category AS poi_category, epo.city AS poi_city, epo.district AS poi_district,
+    epo.lat AS poi_lat, epo.lng AS poi_lng,
     (SELECT group_concat(photo_id) FROM (SELECT em.photo_id FROM entry_media em JOIN photos p ON p.id = em.photo_id
        WHERE em.entry_id = e.id AND ${photoById(q, viewer, 'p', grant)} ORDER BY em.position)) AS photo_ids,
     (SELECT group_concat(et.tag_id) FROM entry_tags et WHERE et.entry_id = e.id) AS tag_ids,
@@ -84,9 +87,18 @@ export function toEntrySummary(r: EntryRow): EntrySummary {
     photoIds: ids(r.photo_ids),
     tagIds: ids(r.tag_ids),
     projectIds: ids(r.project_ids),
+    // the join finds the place, or nothing at all (its row is gone): then the entry has none
     poi:
-      r.poi_id && r.poi_name !== null
-        ? { id: r.poi_id, name: r.poi_name, category: r.poi_category ?? '', city: r.poi_city, district: r.poi_district }
+      r.poi_id && r.poi_name !== null && r.poi_lat !== null && r.poi_lng !== null
+        ? {
+            id: r.poi_id,
+            name: r.poi_name,
+            category: r.poi_category ?? '',
+            city: r.poi_city,
+            district: r.poi_district,
+            lat: r.poi_lat,
+            lng: r.poi_lng
+          }
         : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at

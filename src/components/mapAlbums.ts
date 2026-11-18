@@ -18,6 +18,8 @@ import { MUTED_OPACITY } from './mapPoints';
 type Lib = typeof import('maplibre-gl');
 
 export type AlbumSize = 'xl' | 'l' | 'm' | 's' | 'xs';
+/** what an album holds: its glyph, and the disc of an album with no photo to show */
+export type AlbumKind = 'photo' | 'entry';
 export type CoverPhoto = Pick<PhotoSummary, 'id' | 'variants' | 'thumbhash' | 'focus'>;
 
 export interface AlbumMark {
@@ -29,9 +31,11 @@ export interface AlbumMark {
   label: string;
   /** photos counted under the current filters */
   count: number;
-  /** all its photos: a caption is shown for two or more (or a name), a stack for two or more */
+  /** all it holds: a caption is shown for two or more (or a name), a stack for two or more */
   total: number;
-  /** the carousel, best first; at least one */
+  /** photos by default */
+  kind?: AlbumKind;
+  /** the carousel, best first; none for entries without photos, whose disc shows the glyph instead */
   covers: readonly CoverPhoto[];
   selected: boolean;
   muted: boolean;
@@ -148,8 +152,13 @@ function addBoundaries(map: MLMap): void {
   }
 }
 
-const ICON =
-  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="8.5" r="1.5"/></svg>';
+/** the glyph of each kind, as in components/icons.tsx: 'image' and 'note' */
+const GLYPH: Record<AlbumKind, string> = {
+  photo: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="8.5" r="1.5"/>',
+  entry: '<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/>'
+};
+const glyph = (kind: AlbumKind, size: number) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPH[kind]}</svg>`;
 
 interface Entry {
   key: string;
@@ -160,6 +169,10 @@ interface Entry {
   front: 0 | 1;
   dots: HTMLElement;
   tag: HTMLElement;
+  /** the kind's glyph in the caption, and on a disc without photos */
+  icon: HTMLElement;
+  bare: HTMLElement;
+  kind: AlbumKind | null;
   name: HTMLElement;
   n: HTMLElement;
   mark: AlbumMark;
@@ -193,7 +206,16 @@ export function createAlbumLayer(lib: Lib, map: MLMap, initial: AlbumSource): Al
 
   function show(e: Entry, i: number, instant = false) {
     const covers = e.mark.covers;
-    if (!covers.length) return;
+    if (!covers.length) {
+      // nothing to show: the disc keeps its glyph, and an image still on its way must not land
+      e.loading++;
+      for (const img of e.imgs) {
+        img.dataset.on = 'false';
+        img.removeAttribute('src');
+      }
+      e.disc.style.backgroundImage = '';
+      return;
+    }
     e.at = ((i % covers.length) + covers.length) % covers.length;
     const c = covers[e.at];
     const token = ++e.loading;
@@ -250,16 +272,20 @@ export function createAlbumLayer(lib: Lib, map: MLMap, initial: AlbumSource): Al
     dots.className = 'map-album-dots';
     dots.setAttribute('aria-hidden', 'true');
     disc.appendChild(dots);
+    const bare = document.createElement('span');
+    bare.className = 'map-album-glyph';
+    disc.appendChild(bare);
     el.appendChild(disc);
 
     const tag = document.createElement('span');
     tag.className = 'map-album-tag';
-    tag.insertAdjacentHTML('afterbegin', ICON);
+    const icon = document.createElement('span');
+    icon.className = 'map-album-icon';
     const name = document.createElement('span');
     name.className = 'map-album-name';
     const n = document.createElement('span');
     n.className = 'map-album-n';
-    tag.append(name, n);
+    tag.append(icon, name, n);
     el.appendChild(tag);
 
     const marker = new lib.Marker({ element: el, anchor: 'top', offset: [0, -DISC[m.size] / 2] }).setLngLat([m.lng, m.lat]).addTo(map);
@@ -272,6 +298,9 @@ export function createAlbumLayer(lib: Lib, map: MLMap, initial: AlbumSource): Al
       front: 0,
       dots,
       tag,
+      icon,
+      bare,
+      kind: null,
       name,
       n,
       mark: m,
@@ -341,6 +370,14 @@ export function createAlbumLayer(lib: Lib, map: MLMap, initial: AlbumSource): Al
       el.dataset.muted = String(m.muted);
       e.marker.setOpacity(m.muted ? MUTED_OPACITY : '1');
     }
+
+    const kind = m.kind ?? 'photo';
+    if (e.kind !== kind) {
+      e.kind = kind;
+      e.icon.innerHTML = glyph(kind, 12);
+      e.bare.innerHTML = glyph(kind, 22);
+    }
+    el.dataset.bare = String(!m.covers.length);
 
     const caption = !!m.label || m.total > 1;
     e.tag.hidden = !caption;

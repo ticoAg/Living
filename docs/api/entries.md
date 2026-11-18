@@ -25,6 +25,7 @@ sources:
 | `type=<类型>` | 这些类型的记录：`note`、`article`、`reading`、`practice`、`creation`、`trip`，几个用逗号隔开（`type=article,creation`）；空着等于不筛选 |
 | `from=YYYY-MM-DD` | 发生在这一天或以后的 |
 | `to=YYYY-MM-DD` | 发生在这一天或以前的，含这一天的所有时刻；只有日期的记录算在那一天 |
+| `located=1` | 地图能放上去的：有地点的，或者 `photoIds` 里有一张照片对请求者显示了位置（自己的坐标或地点，按 [位置精度](/api/conventions.md#位置精度对非所有者)，位置隐藏的不算）。`true` 也行，别的值等于不筛选。[地图的记录图层](/product/features/map.md#记录图层) 用它 |
 
 参数可以同时给出，结果取交集；项目里的记录都是项目作者的，见 [项目接口](/api/projects.md#记录与项目)。
 
@@ -32,7 +33,7 @@ sources:
 - `from`、`to` 不是真实存在的日期时返回 400「from 的格式应为 YYYY-MM-DD」（`to` 同理），`to` 早于 `from` 时返回 400「to 不能早于 from」。`type` 里有别的词（包括大小写不同、多余的逗号和空格）时返回 400「type 只能是 note / article / reading / practice / creation / trip，可以用逗号隔开几个」。
 - `excerpt` 是正文开头的 Markdown 原文，最多 300 个码点，能在换行处截断就在换行处截断；`hasMore` 表示正文还有后续。`chars` 是正文一共多少个码点（Markdown 原文，没有正文为 0），[文章](/product/features/showcase.md#文章) 列表用它显示字数。
 - `photoIds` 只含请求者能打开的照片，按记录里的顺序；`tagIds` 为直接标签；`projectIds` 只含请求者能在列表里看到的项目（本人：全部），按项目创建的先后。
-- `poi`：作者选的地点（`id`、`name`、`category`、`city`、`district`），没有为 null。能看到记录的人都能看到它的地点；地点落在作者的隐私区域里时，编辑器会提醒，不会自动隐藏。
+- `poi`：作者选的地点（`id`、`name`、`category`、`city`、`district`，和地图用的 `lat`、`lng`），没有为 null。能看到记录的人都能看到它的地点；地点落在作者的隐私区域里时，编辑器会提醒，不会自动隐藏。
 - 缓存同 [接口约定](/api/conventions.md#缓存)。
 
 # GET /api/entries/:id

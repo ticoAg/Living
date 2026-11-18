@@ -79,7 +79,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `shared/limits.ts` | 输入上限：照片、合集、合集条目、记录、标签、账号（含用户名格式 `HANDLE_RE`）、隐私区域、邀请码、地点搜索与地区名；地点编辑的 `POI_LIMITS` 留在 `shared/types.ts`，在这里再导出。Worker 的校验和表单的 `maxLength`、提示文案、发送前检查都引用它，不另写数字 |
 | `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()`；`/api/auth/*` 以外的 401 经 `onSessionLost` 通知会话层；`anonymous` 以访客身份请求（不带 Cookie、不读浏览器缓存） |
 | `src/lib/visitor.ts` | [访客视角](#访客视角)：`VisitorContext`、`withVisitor` / `withoutVisitor`（哪些页面保持访客视角）、`isVisitorSearch`、`keepVisitor`（自己改写地址的页面留住访客视角） |
-| `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`、`forget(path)`（删除后丢掉，不再显示也不重取）。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢。访客视角里用 `visitorKey(path)` 另存一份，任何改动都丢掉全部访客副本 |
+| `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`、`forget(path)`（删除后丢掉，不再显示也不重取）。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢。访客视角里用 `visitorKey(path)` 另存一份，任何改动都丢掉全部访客副本。`useApiEach(paths)` 一次读几个地址（一份分成几次请求的列表，如按 id 分批要的照片） |
 | `src/lib/chunks.ts` | 分块失效的识别与一次性整页重新加载，见 [分块失效与错误](#分块失效与错误) |
 | `src/lib/scroll.ts` | 按历史记录恢复滚动位置；页面经 `useScrollTop` 调用 |
 | `src/lib/usePaged.ts`、`shown.ts` | 长列表分段渲染：先渲染一页，接近底部时再接一页，数量记在 `history.state` |
@@ -88,7 +88,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/lib/tags.ts` | 标签树、子孙展开、按标签筛选、包含计数 |
 | `src/lib/format.ts` | 日期、时段、距今、距离、度分秒；浏览器本地的今天 `localDay()` 和此刻 `localDateTime()` |
 | `src/components/Img.tsx` | 响应式图片 + ThumbHash 占位 |
-| `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放；署名在地图加载后收成 ⓘ（地图页 `/map` 保持 MapLibre 默认） |
+| `src/components/MapView.tsx` | MapLibre 封装：点、图集（`albums` 属性，标记由 `mapAlbums.ts` 绘制；分级、合并与命名在 `src/browse/albums.ts`，照片和记录两个图层共用，见 [地图](/product/features/map.md)）、半径圈、朝向扇形、连线；`fitKey` 让视野只在它变化时重新缩放；署名在地图加载后收成 ⓘ（地图页 `/map` 保持 MapLibre 默认） |
 | `src/components/icons.tsx` | 地点类别符号 `CategoryIcon`、界面图标 `Icon` |
 | `src/components/PhotoPicker.tsx` | 从自己的照片里挑选（按日期范围、标签，可多选），合集编辑器和记录编辑器共用 |
 | `src/components/PickerDialog.tsx` | 挑选器的对话框：照片挑选器和合集编辑器的记录挑选器（`src/themes/EntryPicker.tsx`）共用，Esc 或点背景关闭 |

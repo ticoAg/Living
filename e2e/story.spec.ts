@@ -294,6 +294,37 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     clean('entry place');
   });
 
+  await test.step('the map from the entries: the afternoon at its place, its private photo asked for by id', async () => {
+    // one of the afternoon's photos leaves the public photo list; its author still sees it in her entry
+    const afternoon = photos.filter((p) => p.takenAt?.startsWith('2026-05-02'));
+    const own = afternoon[1];
+    await api.patch(`/api/photos/${own.id}`, { visibility: 'private' });
+    // a fresh page: the change went round it, so the lists it read before (the place page's) still hold the photo
+    await page.goto('/map');
+    const byId = page.waitForResponse((r) => {
+      const url = new URL(r.url());
+      return url.pathname === '/api/photos' && !!url.searchParams.get('ids')?.split(',').includes(own.id) && r.ok();
+    });
+    await page.getByRole('group', { name: '图层' }).getByRole('button', { name: '记录', exact: true }).click();
+    await expect(page).toHaveURL(/layer=entries/);
+    await byId;
+    const albums = page.locator('.map-album');
+    await expect(albums).toHaveCount(1);
+    await expect(albums).toHaveAttribute('aria-label', /，1 条$/);
+    // its carousel turns through both of its photos
+    await expect(albums.locator('.map-album-dots i')).toHaveCount(afternoon.length);
+    const panel = page.getByRole('complementary', { name: '图集' });
+    await panel.getByRole('button', { name: /断桥/ }).click();
+    await expect(page).toHaveURL(new RegExp(`poi=${poi.id}`));
+    const card = panel.locator('a.en-card');
+    await expect(card).toHaveCount(1);
+    await expect(card.locator('.en-card-thumb')).toHaveCount(afternoon.length);
+    await follow(card);
+    await expect(page).toHaveURL(new RegExp(`/e/${entryId}$`));
+    await api.patch(`/api/photos/${own.id}`, { visibility: 'public' });
+    clean('map entries');
+  });
+
   await test.step('projects: start one, keep each practice in it, mark a milestone', async () => {
     await follow(nav.getByRole('link', { name: '档案' }));
     await follow(page.getByRole('navigation', { name: '档案' }).getByRole('link', { name: '项目' }));

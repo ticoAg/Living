@@ -1,6 +1,7 @@
 # Directory Update Log
 
 ## 2026-11-18
+* **Creation**: 第三阶段：[地图的记录图层](/product/features/map.md#记录图层)。地图标题旁切换「照片 | 记录」（`?layer=entries`），公开且已完成的记录放在它的地点，没有地点时放在它第一张有位置的照片那里，和照片一样按省、市、区县、地点合成图集；没有照片的记录圆片上是记录图标；按类型筛选，侧栏列出记录卡片。[记录接口](/api/entries.md#get-apientries) 加上 `located=1`，摘要的 `poi` 带上 `lat`、`lng`；照片只算看的人能打开的，位置照旧按位置精度，见 [隐私](/product/features/privacy.md#记录)。[路线图](/product/roadmap.md)、[前端分区](/architecture/frontend.md) 随之更新。
 * **Update**: 登录限流偶尔漏记一次尝试：计数写进 KV 时用的是绝对过期时刻「现在 + 60 秒」，读写之间跨过一秒，KV 就按它自己的时钟拒绝这次写入。改用相对的 TTL，见 [KV](/data/kv.md)。
 * **Creation**: 第四阶段：[作品与文章](/product/features/showcase.md)。个人主页最先展示已完成的「创作」（作品：第一张照片排成格子，最新 8 件）和「文章」（标题、开头两行、日期和字数，最新 5 篇），之后才是合集、项目、其余的记录和照片；`/@handle/works`、`/@handle/articles` 列出全部，文章按年份分组。公开与否仍按每条记录的公开范围，作者看到的不公开的那些标着「仅链接可见」「仅自己可见」。不加表，见 [数据演进](/data/evolution.md#作品与文章)。
 * **Creation**: [访客视角](/product/features/showcase.md#访客视角)：作者在自己的主页、记录、合集和项目页上点「访客视角」（`?as=visitor`），页面不带登录信息重新读取，看到的就是没登录的人看到的；在里面点到访客也能打开的页面仍是访客视角，「退出」回到自己的视角。共享缓存为它另存一份，改动后不会显示旧的，见 [前端分区](/architecture/frontend.md#访客视角)。

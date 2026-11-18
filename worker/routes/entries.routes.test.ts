@@ -8,6 +8,7 @@ import {
   type EntryStatus,
   type EntrySummary,
   type PhotoDetail,
+  type PhotoSummary,
   type Poi,
   type ThemeDetail,
   type ThemeItem,
@@ -241,6 +242,91 @@ describe('type= on GET /api/entries', () => {
         message: 'type 只能是 note / article / reading / practice / creation / trip，可以用逗号隔开几个'
       });
     }
+  });
+});
+
+describe('located= on GET /api/entries (the map)', () => {
+  const titles = (es: EntrySummary[]) => es.map((e) => e.title);
+  beforeEach(async () => {
+    const lake = expectStatus(await alice.post('/api/pois', { name: '西湖', category: '湖', lat: 30.25, lng: 120.15 }), 201).poi as Poi;
+    const at = { lat: 30.26, lng: 120.16 };
+    const photo = async (meta: Json) => (await upload(alice, { visibility: 'public', geoPrivacy: 'exact', ...meta })).id;
+    const located = await photo(at);
+    const atPlace = await photo({ poiId: lake.id });
+    const unlisted = await photo({ ...at, visibility: 'unlisted' });
+    const own = await photo({ ...at, visibility: 'private' });
+    const nowhere = await photo({});
+    const geoHidden = await photo({ ...at, geoPrivacy: 'hidden' });
+    // a minute apart, the first the latest
+    const made: [Client, Json][] = [
+      [alice, { title: '有地点', visibility: 'public', poiId: lake.id }],
+      [alice, { title: '照片有坐标', visibility: 'public', media: [{ photoId: nowhere }, { photoId: located }] }],
+      [alice, { title: '照片在地点', visibility: 'public', media: [{ photoId: atPlace }] }],
+      [alice, { title: '照片不进列表', visibility: 'public', media: [{ photoId: unlisted }] }],
+      [alice, { title: '照片仅自己可见', visibility: 'public', media: [{ photoId: own }] }],
+      [alice, { title: '照片没有位置', visibility: 'public', media: [{ photoId: nowhere }] }],
+      [alice, { title: '照片的位置不公开', visibility: 'public', media: [{ photoId: geoHidden }] }],
+      [alice, { title: '都没有', visibility: 'public' }],
+      [alice, { title: '私密的有地点', poiId: lake.id }],
+      [alice, { title: '草稿有地点', visibility: 'public', status: 'draft', poiId: lake.id }],
+      [bob, { title: 'bob 有地点', visibility: 'public', poiId: lake.id }]
+    ];
+    for (const [i, [client, body]] of made.entries()) await create(client, { ...body, occurredAt: `2026-11-16T09:${String(59 - i)}:00` });
+  });
+
+  /** The entries a map can place from what the viewer is shown: by their place, else a photo's coordinates or place. */
+  const placeable = async (client: Client, es: EntrySummary[]): Promise<EntrySummary[]> => {
+    const ids = [...new Set(es.flatMap((e) => e.photoIds))];
+    const photos: PhotoSummary[] = ids.length ? expectStatus(await client.get(`/api/photos?ids=${ids.join(',')}`), 200).photos : [];
+    const at = new Set(photos.filter((p) => (p.lat !== null && p.lng !== null) || p.poiId).map((p) => p.id));
+    return es.filter((e) => e.poi || e.photoIds.some((id) => at.has(id)));
+  };
+
+  it('keeps the entries with a place, or with a photo shown with its position, out of each list', async () => {
+    // the unscoped list: everyone's finished public entries
+    expect(titles(await list(anon, 'located=1'))).toEqual(['有地点', '照片有坐标', '照片在地点', '照片不进列表', 'bob 有地点']);
+    // its author sees her own photos and where they are, so the entries holding them can be placed for her
+    expect(titles(await list(alice, 'located=1'))).toEqual([
+      '有地点',
+      '照片有坐标',
+      '照片在地点',
+      '照片不进列表',
+      '照片仅自己可见',
+      '照片的位置不公开',
+      'bob 有地点'
+    ]);
+    expect(titles(await list(alice, 'mine=1&located=1'))).toEqual([
+      '有地点',
+      '照片有坐标',
+      '照片在地点',
+      '照片不进列表',
+      '照片仅自己可见',
+      '照片的位置不公开',
+      '私密的有地点',
+      '草稿有地点'
+    ]);
+    expect(titles(await list(bob, 'owner=alice&located=1'))).toEqual(['有地点', '照片有坐标', '照片在地点', '照片不进列表']);
+  });
+
+  it('narrows to exactly what the viewer can place, and widens nothing', async () => {
+    for (const [client, query] of [
+      [anon, ''],
+      [alice, ''],
+      [alice, 'mine=1'],
+      [bob, 'owner=alice'],
+      [anon, 'owner=alice&type=note']
+    ] as const) {
+      const all = await list(client, query);
+      const kept = await list(client, query ? `${query}&located=1` : 'located=1');
+      expect(kept, query).toEqual(await placeable(client, all));
+      expect(kept.length, query).toBeLessThan(all.length);
+    }
+  });
+
+  it('takes 1 or true; anything else is no filter', async () => {
+    const all = await list(anon);
+    expect(await list(anon, 'located=true')).toEqual(await list(anon, 'located=1'));
+    for (const v of ['0', 'false', '', 'yes']) expect(await list(anon, `located=${v}`), v).toEqual(all);
   });
 });
 
@@ -510,23 +596,26 @@ describe('the place of an entry', () => {
     lake = await place(alice, { name: '西湖', category: '湖', lat: 30.25, district: '西湖区' });
     bridge = await place(alice, { name: '断桥', category: '桥', lat: 30.259 });
   });
-  /** What an entry carries of its place (docs/api/entries.md): these five fields and nothing more. */
-  const placed = (p: Poi) => ({ id: p.id, name: p.name, category: p.category, city: p.city, district: p.district });
+  /** What an entry carries of its place (docs/api/entries.md): what a card shows and where it is, and nothing more. */
+  const placed = (p: Poi) => ({ id: p.id, name: p.name, category: p.category, city: p.city, district: p.district, lat: p.lat, lng: p.lng });
   const ids = (items: { id: string }[]) => items.map((x) => x.id);
 
-  it('is null until its author picks a place, and then that place: its id, name, category, city and district', async () => {
+  it('is null until its author picks a place, and then that place: its id, name, category, city, district and position', async () => {
     expect((await create(alice, { body: 'x' })).poi).toBeNull();
     expect((await create(alice, { body: 'x', poiId: null })).poi).toBeNull();
     const e = await create(alice, { body: 'x', poiId: lake.id });
-    const expected = { id: lake.id, name: '西湖', category: '湖', city: '杭州市', district: '西湖区' };
+    const expected = { id: lake.id, name: '西湖', category: '湖', city: '杭州市', district: '西湖区', lat: 30.25, lng: 120.15 };
     expect(e.poi).toEqual(expected);
     expect(expectStatus(await alice.get<EntryDetail>(`/api/entries/${e.id}`), 200).poi).toEqual(expected);
+    expect((await list(alice, 'mine=1'))[0].poi).toEqual(expected);
     expect((await create(alice, { body: 'x', poiId: bridge.id })).poi).toEqual({
       id: bridge.id,
       name: '断桥',
       category: '桥',
       city: '杭州市',
-      district: null
+      district: null,
+      lat: 30.259,
+      lng: 120.15
     });
   });
 

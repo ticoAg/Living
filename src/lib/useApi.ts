@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { api } from './api';
 import { useVisitor } from './visitor';
 
@@ -159,6 +159,51 @@ export function useApi<T>(path: string | null): { data: T | undefined; error: un
     data: entry?.data as T | undefined,
     error: entry?.error,
     loading: !!key && !!entry?.promise && entry.data === undefined && !entry.error,
+    reload
+  };
+}
+
+/**
+ * `useApi` for several paths at once, such as one list asked for in parts: their answers in order, each undefined
+ * until it arrives; the first error; whether any is still loading; and a reload of them all.
+ */
+export function useApiEach<T>(paths: readonly string[]): {
+  data: readonly (T | undefined)[];
+  error: unknown;
+  loading: boolean;
+  reload: () => void;
+} {
+  const visitor = useVisitor();
+  const joined = paths.join('\n');
+  const keys = useMemo(() => (joined ? joined.split('\n') : []).map((p) => (visitor ? VISITOR + p : p)), [joined, visitor]);
+  const sub = useCallback(
+    (fn: () => void) => {
+      const offs = keys.map((k) => subscribe(k, fn));
+      return () => {
+        for (const off of offs) off();
+      };
+    },
+    [keys]
+  );
+  // the same array while every entry is the same, as useSyncExternalStore needs
+  const last = useRef<readonly (Entry | undefined)[]>([]);
+  const entries = useSyncExternalStore(sub, () => {
+    const now = keys.map((k) => cache.get(k));
+    const prev = last.current;
+    if (now.length !== prev.length || now.some((e, i) => e !== prev[i])) last.current = now;
+    return last.current;
+  });
+  useEffect(() => {
+    for (const k of keys) revalidate(k);
+  }, [keys]);
+  const reload = useCallback(() => {
+    for (const k of keys) invalidate(k);
+  }, [keys]);
+  const data = useMemo(() => entries.map((e) => e?.data as T | undefined), [entries]);
+  return {
+    data,
+    error: entries.find((e) => e?.error !== undefined)?.error,
+    loading: entries.some((e) => !!e?.promise && e.data === undefined && !e.error),
     reload
   };
 }
