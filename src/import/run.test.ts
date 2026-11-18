@@ -37,6 +37,8 @@ function server() {
     photos: new Map<string, string>(),
     existing: new Set<string>(),
     failed: new Map<string, string>(),
+    /** rows answered with another id than `resolve` gave them */
+    renamed: new Map<string, string>(),
     next: new Map<string, Queued[]>()
   };
   const target = (x: string) => ({ id: s.existing.has(x) ? x : hereId(x), exists: s.existing.has(x) });
@@ -72,7 +74,7 @@ function server() {
         const list = rows(path.slice('/api/import/'.length));
         const ok = list.filter((r) => !s.failed.has(r.id));
         return json({
-          ids: Object.fromEntries(ok.map((r) => [r.id, target(r.id).id])),
+          ids: Object.fromEntries(ok.map((r) => [r.id, s.renamed.get(r.id) ?? target(r.id).id])),
           created: ok.filter((r) => !s.existing.has(r.id)).length,
           existing: ok.filter((r) => s.existing.has(r.id)).length,
           failed: list.filter((r) => s.failed.has(r.id)).map((r) => ({ id: r.id, message: s.failed.get(r.id) }))
@@ -265,6 +267,13 @@ describe('planImport', () => {
     expect(plan.collections.get(TH)).toEqual({ id: hereId(TH), exists: false });
   });
 
+  it('tells the photos the export has no file for from those whose file was not picked', async () => {
+    server();
+    const plan = await planImport(exported(everything(), [PH.c, PH.d], notPicked), new AbortController().signal);
+    expect([plan.noFile, plan.notPicked]).toEqual([2, 1]);
+    expect(plan.upload.map((p) => p.id)).toEqual([PH.b, PH.a]);
+  });
+
   it('does not look for a large size standing in for an original by the original’s hash', async () => {
     const s = server();
     const data = exportData({ photos: [exportPhoto(PH.a, { sha256: sha(1) }), exportPhoto(PH.b, { sha256: sha(2) })] });
@@ -451,6 +460,15 @@ describe('runImport', () => {
     expect(outcome.existing).toMatchObject({ photos: 2, entries: 2, projects: 1, collections: 1 });
     const [entries] = bodies(s, '/api/import/entries');
     expect(entries.entries[0]).toMatchObject({ id: EN.one, media: [{ photoId: id('ph', 91) }, { photoId: PH_HERE }], projectIds: [PJ] });
+  });
+
+  it('takes the ids the Worker answers with, over those it said beforehand', async () => {
+    const s = server();
+    // the entry was brought meanwhile under another id
+    s.renamed.set(EN.one, id('en', 77));
+    await go(exported(everything(), [PH.d], notPicked));
+    const [collections] = bodies(s, '/api/import/collections');
+    expect(collections.collections[0]).toMatchObject({ items: [{ kind: 'photo' }, { kind: 'entry', entryId: id('en', 77) }] });
   });
 
   it('sends tags over several batches parents first, a child in a later batch with its parent’s id here', async () => {

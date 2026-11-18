@@ -170,7 +170,7 @@ async function toMake(
 
 imports.post('/resolve', async (c) => {
   const user = await requireUser(c);
-  const body = await readJson(c, 512 * 1024);
+  const body = await readJson(c, MAX_BYTES);
   const list = (key: string, re: RegExp): string[] => {
     const v = body[key];
     if (v === undefined || v === null) return [];
@@ -340,7 +340,8 @@ imports.post('/places', async (c) => {
     given.add(r.id);
     try {
       const p = parseNewPoi(r);
-      const radius = optNum(r.radius, '匹配半径', { min: 0, max: 1_000_000 }) ?? defaultRadius(p.category);
+      // however far out the export's radius is, the place comes with one in the range a place may have here
+      const radius = optNum(r.radius, '匹配半径') ?? defaultRadius(p.category);
       const aliases =
         r.own === true && Array.isArray(r.aliases)
           ? r.aliases

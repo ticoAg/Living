@@ -35,7 +35,7 @@ sources:
 | 403 | `forbidden` | 无权限、跨站写请求 |
 | 404 | `not_found` | 不存在或无权查看 |
 | 409 | `conflict` / `duplicate` | 重名、重复上传（附 `photoId`）、记录在别处改过（附当前 `revision`） |
-| 413 | `too_large` | 原图超过 50 MB |
+| 413 | `too_large` | 原图超过 50 MB；JSON 请求体超过接口的上限（按 UTF-8 的字节算，请求带不带 `Content-Length` 都一样） |
 | 429 | `rate_limited` | 登录尝试过多 |
 | 502 | `upstream_failed` | 高德 / OSM 不可用（地点匹配仍返回站内候选） |
 | 503 | `quota_exceeded` | 免费版 D1 当天能读写的行数用完了，协调世界时 0 点（北京时间 8 点）以后恢复，见 [费用](/architecture/cloudflare.md#费用) |
