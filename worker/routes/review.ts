@@ -1,5 +1,5 @@
 // Review (回顾): one's own archive by the calendar. The years that hold anything, and a year looked back on: its days,
-// how much was written, the entry types, places and tags most used, the projects worked on and the collections made,
+// how much was written, the entry types, places and tags most used, the projects worked on and the collections it is in,
 // the favourite photos. Only the signed-in owner's own entries (archived ones aside, as in the timeline) and photos,
 // whatever their visibility; nothing of anyone else's. Docs: /docs/api/review.md
 
@@ -124,13 +124,20 @@ review.get('/:year', async (c) => {
       ({ v, f, u }) => `SELECT ms.id, ms.project_id, ms.title, ms.date FROM milestones ms JOIN projects pj ON pj.id = ms.project_id
         WHERE pj.owner_id = ${v} AND ms.date >= ${f} AND ms.date < ${u} ORDER BY ms.date, ms.id`
     ),
+    // more favourites than shown: the first of each of REVIEW_FAVORITES equal runs in time order, so all the year shows
     st(
-      ({ P }) => `SELECT ${SUMMARY_COLS} FROM ${PHOTO_FROM} WHERE ${P} AND p.favorite = 1
-        ORDER BY p.taken_at, p.rowid LIMIT ${REVIEW_FAVORITES}`
+      ({ P }) => `WITH fav AS (
+          SELECT p.id, ROW_NUMBER() OVER (ORDER BY p.taken_at, p.rowid) - 1 AS i, COUNT(*) OVER () AS n
+          FROM photos p WHERE ${P} AND p.favorite = 1
+        )
+        SELECT ${SUMMARY_COLS} FROM ${PHOTO_FROM} JOIN fav ON fav.id = p.id
+        WHERE fav.i = 0 OR fav.i * ${REVIEW_FAVORITES} / fav.n > (fav.i - 1) * ${REVIEW_FAVORITES} / fav.n
+        ORDER BY fav.i`
     )
   ]);
 
-  // collections of the year: a dated one when its days meet the year, an undated one when it was made in it
+  // collections of the year: a dated one when its days meet the year (a single date is a single day), an undated one
+  // when it holds a photo, an entry or a day of the year, all by local dates like everything else here
   const tq = new Sql();
   const tv = tq.p(viewer);
   const tf = tq.p(from);
@@ -139,9 +146,17 @@ review.get('/:year', async (c) => {
     db,
     viewer,
     tq,
-    `th.owner_id = ${tv} AND CASE WHEN th.start_date IS NOT NULL
-       THEN th.start_date < ${tu} AND coalesce(th.end_date, th.start_date) >= ${tf}
-       ELSE th.created_at >= ${tf} AND th.created_at < ${tu} END`
+    `th.owner_id = ${tv} AND CASE WHEN coalesce(th.start_date, th.end_date) IS NOT NULL
+       THEN coalesce(th.start_date, th.end_date) < ${tu} AND coalesce(th.end_date, th.start_date) >= ${tf}
+       ELSE EXISTS (
+         SELECT 1 FROM theme_items ti
+           LEFT JOIN photos p ON p.id = ti.photo_id AND p.owner_id = ${tv}
+           LEFT JOIN entries e ON e.id = ti.entry_id AND e.owner_id = ${tv} AND ${KEPT}
+         WHERE ti.theme_id = th.id AND (
+           (p.taken_at >= ${tf} AND p.taken_at < ${tu})
+           OR (e.occurred_at >= ${tf} AND e.occurred_at < ${tu})
+           OR (ti.day >= ${tf} AND ti.day < ${tu}))
+       ) END`
   );
 
   const typeRows = types.results as { type: EntryType; count: number; chars: number | null }[];

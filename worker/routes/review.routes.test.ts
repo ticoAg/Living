@@ -223,8 +223,7 @@ describe('whose archive a review reads', () => {
     });
     await milestone(bob, p.id, '2026-06-01');
     await collection(bob, { visibility: 'public', startDate: '2026-05-01', coverPhotoId: shot.id }, [{ kind: 'photo', photoId: shot.id }]);
-    const undated = await collection(bob, { visibility: 'public' });
-    await run('UPDATE themes SET created_at = ?1 WHERE id = ?2', '2026-03-01T00:00:00Z', undated.id);
+    await collection(bob, { visibility: 'public' }, [{ kind: 'photo', photoId: shot.id }]);
 
     expect(await years(alice)).toEqual([]);
     expect(await review(alice, 2026)).toEqual(nothing(2026));
@@ -351,12 +350,14 @@ describe('what was written', () => {
     await entry(alice, '2026-06-01T09:00:00', { type: 'reading', title: 'Book', body: null });
     await entry(alice, '2026-07-01', { type: 'trip', body: null, media: [{ photoId: shot.id }] });
     await entry(alice, '2026-08-01', { status: 'draft', body: '# 标题\n\n正文' });
+    // NUL characters go when written, and what follows one still counts
+    await entry(alice, '2026-09-01', { title: 'a\u0000b', body: 'cd\u0000ef' });
     // none of these
     await entry(alice, '2026-08-02', { status: 'archived', title: '归档', body: '不算' });
     await entry(alice, '2025-12-31T23:59:59', { title: '去年', body: '写的' });
     await entry(bob, '2026-05-01', { title: '别人', body: '别人的字', visibility: 'public' });
 
-    expect((await review(alice, 2026)).chars).toBe(2 + 11 + 4 + 0 + 8);
+    expect((await review(alice, 2026)).chars).toBe(2 + 11 + 4 + 0 + 8 + 6);
     expect((await review(alice, 2025)).chars).toBe(4);
   });
 
@@ -637,61 +638,100 @@ describe('projects', () => {
 });
 
 describe('collections', () => {
-  it('are one’s own whose days meet the year, or undated ones made in it, as the collections list shows them', async () => {
-    const shot = await photo(alice, '2026-05-01T08:00:00');
+  it('are one’s own whose days meet the year, a single date being one day, as the collections list shows them', async () => {
+    const shot = await photo(alice, '2024-05-01T08:00:00');
     const e = await entry(alice, '2026-05-01', { media: [{ photoId: shot.id }] });
     const made: Record<string, string> = {};
-    const make = async (name: string, dates: Json, createdAt?: string, items: Json[] = []) => {
-      const t = await collection(alice, { title: name, ...dates }, items);
-      if (createdAt) await run('UPDATE themes SET created_at = ?1 WHERE id = ?2', createdAt, t.id);
-      made[name] = t.id;
+    const make = async (name: string, dates: Json, items: Json[] = []) => {
+      made[name] = (await collection(alice, { kind: 'trip', title: name, ...dates }, items)).id;
     };
     await make('跨年', { startDate: '2025-12-01', endDate: '2026-01-01' });
     await make('除夕', { startDate: '2026-12-31' });
+    await make('元旦', { endDate: '2026-01-01' });
     await make('去年', { startDate: '2025-06-01', endDate: '2025-12-31' });
+    await make('截至去年', { endDate: '2025-12-31' });
     await make('明年', { startDate: '2027-01-01', endDate: '2027-01-03' });
     await make('三年', { startDate: '2025-01-01', endDate: '2027-12-31' });
-    await make('一天', { kind: 'trip', startDate: '2026-05-01', coverPhotoId: shot.id }, undefined, [
+    // its dates place it, not what it holds
+    await make('一天', { startDate: '2024-05-01', coverPhotoId: shot.id }, [
       { kind: 'photo', photoId: shot.id },
-      { kind: 'entry', entryId: e.id }
+      { kind: 'entry', entryId: e.id },
+      { kind: 'day', day: '2026-05-01' }
     ]);
-    // dated before the year, though made in it
-    await make('从前', { startDate: '2024-05-01' }, '2026-05-01T00:00:00Z');
-    await make('年初', {}, '2026-01-01T00:00:00Z');
-    await make('年末', {}, '2026-12-31T23:59:59Z', [{ kind: 'text', text: '一段话' }]);
-    await make('年前', {}, '2025-12-31T23:59:59Z');
-    await make('年后', {}, '2027-01-01T00:00:00Z');
     // the latest changed first, as the collections list has them
-    const changed = ['年末', '去年', '跨年', '年后', '三年', '除夕', '从前', '一天', '年前', '明年', '年初'];
+    const changed = ['截至去年', '去年', '跨年', '元旦', '三年', '除夕', '一天', '明年'];
     for (const [i, name] of changed.entries()) {
       await run('UPDATE themes SET updated_at = ?1 WHERE id = ?2', `2026-11-${pad(20 - i)}T00:00:00Z`, made[name]);
     }
-    // bob's, public, dated in the year and made in it
-    await collection(bob, { visibility: 'public', startDate: '2026-05-01' });
-    await collection(bob, { visibility: 'public' });
+    // bob's, public, dated in the year
+    await collection(bob, { kind: 'trip', visibility: 'public', startDate: '2026-05-01' });
 
     const listed = expectStatus(await alice.get('/api/themes?mine=1'), 200).themes as ThemeSummary[];
     expect(listed.map((t) => t.title)).toEqual(changed);
     const inYear = async (year: number) => (await review(alice, year)).collections;
     const shown = (names: string[]) => listed.filter((t) => names.includes(t.title));
-    expect(await inYear(2026)).toEqual(shown(['跨年', '除夕', '三年', '一天', '年初', '年末']));
-    expect((await inYear(2026)).map((t) => t.title)).toEqual(['年末', '跨年', '三年', '除夕', '一天', '年初']);
-    expect(await inYear(2025)).toEqual(shown(['跨年', '去年', '三年', '年前']));
-    expect(await inYear(2027)).toEqual(shown(['明年', '三年', '年后']));
-    expect(await inYear(2024)).toEqual(shown(['从前']));
+    expect(await inYear(2026)).toEqual(shown(['跨年', '除夕', '元旦', '三年']));
+    expect((await inYear(2026)).map((t) => t.title)).toEqual(['跨年', '元旦', '三年', '除夕']);
+    expect(await inYear(2025)).toEqual(shown(['截至去年', '去年', '跨年', '三年']));
+    expect(await inYear(2027)).toEqual(shown(['明年', '三年']));
+    expect(await inYear(2024)).toEqual(shown(['一天']));
     expect(listed.find((t) => t.title === '一天')).toMatchObject({
       photoCount: 2,
       entryCount: 1,
       cover: expect.objectContaining({ id: shot.id })
     });
   });
+
+  it('are, when undated, those holding a photo, an entry or a day of the year, whenever they were made', async () => {
+    const at = {
+      lastNight: await photo(alice, '2026-12-31T23:59:59'),
+      lastYear: await photo(alice, '2025-12-31T23:59:59'),
+      undated: await photo(alice, null)
+    };
+    const newYear = await entry(alice, '2026-01-01');
+    const lastMinute = await entry(alice, '2026-12-31T23:59:00');
+    const nextYear = await entry(alice, '2027-01-01T00:00:00');
+    const archived = await entry(alice, '2026-06-01', { status: 'archived' });
+    const draft = await entry(alice, '2026-06-02', { status: 'draft' });
+    const made: Record<string, string> = {};
+    const make = async (name: string, items: Json[], createdAt = '2026-06-01T00:00:00Z') => {
+      const t = await collection(alice, { title: name }, items);
+      await run('UPDATE themes SET created_at = ?1 WHERE id = ?2', createdAt, t.id);
+      made[name] = t.id;
+    };
+    const photoItem = (p: PhotoDetail) => ({ kind: 'photo', photoId: p.id });
+    const entryItem = (x: EntryDetail) => ({ kind: 'entry', entryId: x.id });
+    await make('除夕的照片', [photoItem(at.lastNight)], '2027-02-01T00:00:00Z');
+    await make('元旦的记录', [entryItem(newYear)], '2025-02-01T00:00:00Z');
+    await make('除夕的记录', [entryItem(lastMinute)]);
+    await make('草稿', [entryItem(draft)]);
+    await make('一个日子', [
+      { kind: 'text', text: '一段话' },
+      { kind: 'day', day: '2026-07-01' }
+    ]);
+    await make('两头', [photoItem(at.lastYear), entryItem(nextYear)]);
+    // nothing of a year: an archived entry, a photo without a capture time, words, nothing at all
+    await make('归档', [entryItem(archived)]);
+    await make('没有时间', [photoItem(at.undated)]);
+    await make('只有文字', [{ kind: 'text', text: '一段话' }]);
+    await make('空的', []);
+    // bob's, public, holding his photo of the year
+    const bobs = await photo(bob, '2026-05-01T08:00:00', { visibility: 'public' });
+    await collection(bob, { visibility: 'public' }, [{ kind: 'photo', photoId: bobs.id }]);
+
+    const titles = async (year: number) => (await review(alice, year)).collections.map((t) => t.title).sort();
+    expect(await titles(2026)).toEqual(['一个日子', '元旦的记录', '草稿', '除夕的照片', '除夕的记录'].sort());
+    expect(await titles(2025)).toEqual(['两头']);
+    expect(await titles(2027)).toEqual(['两头']);
+    expect(await titles(2024)).toEqual([]);
+  });
 });
 
 describe('favourite photos', () => {
-  it('are one’s own favourites taken in the year, in the order they were taken, the first 24', async () => {
-    // 26 favourites taken in 2026: photo i on February i, and photo 0 at the same time as photo 1. They are uploaded out
+  it('are one’s own favourites taken in the year, all of them in the order they were taken while there are 24', async () => {
+    // 24 favourites taken in 2026: photo i on February i, and photo 0 at the same time as photo 1. They are uploaded out
     // of order, photo 0 before photo 1 although its id sorts after: taken at the same time, they keep their upload order.
-    const n = REVIEW_FAVORITES + 2;
+    const n = REVIEW_FAVORITES;
     const at = (i: number) => `2026-02-${pad(Math.max(i, 1))}T12:00:00`;
     const id = (i: number) => `ph_fav${pad(n - i)}`;
     const uploaded = Array.from({ length: n }, (_, k) => (k * 11) % n);
@@ -711,7 +751,7 @@ describe('favourite photos', () => {
     await addPhotos(bob, [{ id: 'ph_bobfav', at: '2026-01-01T00:00:00', favorite: true }]);
 
     const got = (await review(alice, 2026)).favorites;
-    expect(got.map((p) => p.id)).toEqual(Array.from({ length: REVIEW_FAVORITES }, (_, i) => id(i)));
+    expect(got.map((p) => p.id)).toEqual(Array.from({ length: n }, (_, i) => id(i)));
     const listed = await summaries(
       alice,
       got.map((p) => p.id)
@@ -721,6 +761,26 @@ describe('favourite photos', () => {
 
     expect((await review(alice, 2025)).favorites.map((p) => p.id)).toEqual(['ph_fav2025']);
     expect((await review(alice, 2027)).favorites.map((p) => p.id)).toEqual(['ph_fav2027']);
+  });
+
+  it('are, when there are more, the first of each of 24 equal runs in the order taken, so the whole year shows', async () => {
+    // 49 favourites a week apart, January 1 to December 3, uploaded out of order: runs of two or three, the last in November
+    const n = REVIEW_FAVORITES * 2 + 1;
+    const day = (i: number) => new Date(Date.UTC(2026, 0, 1 + i * 7)).toISOString().slice(0, 10);
+    const id = (i: number) => `ph_week${pad(i)}`;
+    const uploaded = Array.from({ length: n }, (_, k) => (k * 11) % n);
+    expect(new Set(uploaded).size).toBe(n);
+    await addPhotos(
+      alice,
+      uploaded.map((i) => ({ id: id(i), at: `${day(i)}T12:00:00`, favorite: true }))
+    );
+
+    const firsts = Array.from({ length: REVIEW_FAVORITES }, (_, k) => Math.ceil((k * n) / REVIEW_FAVORITES));
+    expect(firsts.slice(0, 4)).toEqual([0, 3, 5, 7]);
+    expect(firsts.at(-1)).toBe(47);
+    const got = (await review(alice, 2026)).favorites;
+    expect(got.map((p) => p.id)).toEqual(firsts.map(id));
+    expect(got.at(-1)?.takenAt?.slice(0, 7)).toBe('2026-11');
   });
 });
 

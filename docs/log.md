@@ -5,6 +5,7 @@
 * **Creation**: [回顾接口](/api/review.md)：`GET /api/review` 列出有内容的年份，`GET /api/review/:year` 在服务器上汇总一年，只算自己的、不算已归档的记录。[记录](/api/entries.md#get-apientries) 和 [照片](/api/photos.md#get-apiphotos) 列表加上 `from`、`to`，日历按月读取，不受 5000 条上限的影响。不加表和索引，见 [数据演进](/data/evolution.md#日历与回顾)。
 * **Update**: [项目](/product/features/projects.md#节奏) 页加上「节奏」：最长和现在连续几天、平均每周几天、最近六个月每天的小月历，超过六个月的项目再加每个月的记录数；只算已完成的记录。[路线图](/product/roadmap.md)、[档案](/product/features/archive.md)、[前端结构](/architecture/frontend.md) 随之更新。
 * **Update**: 修正两处：[今天](/product/features/today.md) 的「写长文」把文字交给编辑器后，随手记框里不再留着这段文字；[搜索](/product/features/search.md) 的 `/` 键在页眉出现搜索按钮时就能用，不再漏掉刚加载完时按下的那一次。
+* **Update**: 回顾接口的路由测试发现的几处：只有结束日期的合集按那一天算进回顾，不再按建立的时间；没有日期的合集改为看里面有没有这一年的照片、记录或日子，和别处一样按本地日期，不再按服务器时间的建立年份；收藏多于 24 张时在一年里均匀地挑，不再只有年初的；只有里程碑或合集的年份也列出它们。[合集](/api/themes.md#patch-apithemesid本人) 只改一端日期时和另一端一起检查，建立时从照片取来的日期也不会让开始晚于结束，否则这样的合集在哪一年的回顾里都没有。文字里的空字符在保存前去掉（[约定](/api/conventions.md#错误)）。
 
 ## 2026-11-17
 * **Creation**: 第四阶段：[搜索](/product/features/search.md)。`/search` 在自己的档案里找字，记录、照片、项目、合集、地点和标签分组列出，各带总数，片段里标出找到的字；页眉的放大镜或在任何页面按 `/` 打开。只搜自己的内容，包括草稿和仅自己可见的，见 [搜索接口](/api/search.md)。按字匹配（`LIKE`），不建 FTS5：D1 导出不支持虚拟表，理由见 [数据演进](/data/evolution.md#搜索)；迁移 `0009_search.sql` 加部分索引 `photos_owner_text`（[photos](/data/photos.md#索引)）。保留用户名加入 search。

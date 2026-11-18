@@ -39,12 +39,12 @@ tags: [api, themes, collections]
 `CreateThemeBody` → 201 `{ "theme": ThemeDetail }`，id `th_<ulid>`。
 
 - `photoIds` 必须都是自己的照片；按给定顺序写入条目。
-- `kind = trip` 且提供了 `photoIds`：按拍摄时间排序，并在每天第一张前插入 `day` 条目；`startDate`/`endDate` 未给时取照片日期范围。
+- `kind = trip` 且提供了 `photoIds`：按拍摄时间排序，并在每天第一张前插入 `day` 条目；`startDate`/`endDate` 没给的一端取照片日期范围的那一端；取来会让开始晚于结束时，那一端留空。
 - `visibility` 默认 `private`；创建即为 `public` 时写入 `published_at`。
 
 # PATCH /api/themes/:id（本人）
 
-`UpdateThemeBody` → `{ "theme": ThemeDetail }`。首次变为 `public` 时写入 `published_at`；更新 `updated_at`。
+`UpdateThemeBody` → `{ "theme": ThemeDetail }`。首次变为 `public` 时写入 `published_at`；更新 `updated_at`。只改开始或结束日期时，和保存着的另一端一起检查，开始晚于结束返回 400「开始日期不能晚于结束日期」。
 
 # PUT /api/themes/:id/items（本人）
 

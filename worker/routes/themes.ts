@@ -253,6 +253,11 @@ interface ThemeFields {
   photoIds?: string[];
 }
 
+/** A collection's days run forwards: it may not start after it ends. */
+function assertRange(start: string | null | undefined, end: string | null | undefined): void {
+  if (start && end && start > end) throw invalid('开始日期不能晚于结束日期');
+}
+
 function parseThemeFields(body: Body, create: boolean): ThemeFields {
   const f: ThemeFields = {};
   const kind = optEnum<ThemeKind>(body.kind, '合集类型', KINDS);
@@ -263,7 +268,7 @@ function parseThemeFields(body: Body, create: boolean): ThemeFields {
   if (has(body, 'intro')) f.intro = optText(body.intro, '导语', THEME_LIMITS.introMax);
   if (has(body, 'startDate')) f.startDate = optDate(body.startDate, '开始日期');
   if (has(body, 'endDate')) f.endDate = optDate(body.endDate, '结束日期');
-  if (f.startDate && f.endDate && f.startDate > f.endDate) throw invalid('开始日期不能晚于结束日期');
+  assertRange(f.startDate, f.endDate);
   const visibility = optEnum<Visibility>(body.visibility, '公开范围', VISIBILITIES);
   if (visibility) f.visibility = visibility;
   if (has(body, 'coverPhotoId')) {
@@ -373,8 +378,9 @@ themes.post('/', async (c) => {
   if (kind === 'trip' && photoIds.length) {
     const seeded = seedTrip(photoIds, info);
     items = seeded.items;
-    startDate = startDate ?? seeded.first;
-    endDate = endDate ?? seeded.last;
+    // an end not given takes the photos' own, unless that would put it before the start given; likewise the start
+    if (!startDate && !(endDate && seeded.first && seeded.first > endDate)) startDate = seeded.first;
+    if (!endDate && !(startDate && seeded.last && seeded.last < startDate)) endDate = seeded.last;
   } else {
     items = photoIds.map((photoId) => ({ kind: 'photo' as const, photoId }));
   }
@@ -411,10 +417,12 @@ interface OwnedTheme {
   owner_id: string;
   visibility: Visibility;
   published_at: string | null;
+  start_date: string | null;
+  end_date: string | null;
 }
 
 async function ownedTheme(c: Ctx, user: SessionUser, id: string): Promise<OwnedTheme> {
-  const row = await c.env.DB.prepare('SELECT id, owner_id, visibility, published_at FROM themes WHERE id = ?1')
+  const row = await c.env.DB.prepare('SELECT id, owner_id, visibility, published_at, start_date, end_date FROM themes WHERE id = ?1')
     .bind(id)
     .first<OwnedTheme>();
   if (!row) throw notFound('合集不存在');
@@ -430,6 +438,8 @@ themes.patch('/:id', async (c) => {
   const db = c.env.DB;
   const row = await ownedTheme(c, user, paramId(c));
   const f = parseThemeFields(await readJson(c), false);
+  // a date changed alone still has to fit the other one as stored
+  assertRange('startDate' in f ? f.startDate : row.start_date, 'endDate' in f ? f.endDate : row.end_date);
   if (f.coverPhotoId) await ownPhotos(db, user.id, [f.coverPhotoId]);
 
   const q = new Sql();

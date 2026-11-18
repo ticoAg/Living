@@ -40,6 +40,18 @@ describe('POST /api/themes', () => {
     expect(t).toMatchObject({ startDate: '2026-02-28', endDate: '2026-03-05' });
   });
 
+  it('takes a date not given from the photos, unless that would end the trip before it starts', async () => {
+    // the photos run from March 1 to March 4
+    const photoIds = photos.map((p) => p.id);
+    const trip = (dates: Json) => create(alice, { kind: 'trip', title: 't', photoIds, ...dates });
+    expect(await trip({ startDate: '2026-03-02' })).toMatchObject({ startDate: '2026-03-02', endDate: '2026-03-04' });
+    expect(await trip({ endDate: '2026-03-03' })).toMatchObject({ startDate: '2026-03-01', endDate: '2026-03-03' });
+    expect(await trip({ endDate: '2026-03-01' })).toMatchObject({ startDate: '2026-03-01', endDate: '2026-03-01' });
+    expect(await trip({ startDate: '2026-03-04' })).toMatchObject({ startDate: '2026-03-04', endDate: '2026-03-04' });
+    expect(await trip({ startDate: '2026-03-10' })).toMatchObject({ startDate: '2026-03-10', endDate: null });
+    expect(await trip({ endDate: '2026-02-20' })).toMatchObject({ startDate: null, endDate: '2026-02-20' });
+  });
+
   it('keeps the given order for a topic, with no day items', async () => {
     const t = await create(alice, { kind: 'topic', title: '桥', photoIds: [photos[4].id, photos[2].id, photos[0].id] });
     expect(shape(t)).toEqual(['photo:4', 'photo:2', 'photo:0']);
@@ -107,6 +119,23 @@ describe('PATCH /api/themes/:id', () => {
     expect(hidden.publishedAt).toBe(published.publishedAt);
     expect(again.publishedAt).toBe(published.publishedAt);
     expect(again.kind).toBe('topic');
+  });
+
+  it('checks a date changed alone against the other one as stored', async () => {
+    const t = await create(alice, { kind: 'trip', title: 't', startDate: '2026-03-01', endDate: '2026-03-04' });
+    const patch = async (body: Json) => expectStatus(await alice.patch(`/api/themes/${t.id}`, body), 200).theme as ThemeDetail;
+    for (const body of [{ endDate: '2026-02-28' }, { startDate: '2026-03-05' }, { startDate: '2026-03-05', endDate: '2026-03-04' }]) {
+      const res = await alice.patch(`/api/themes/${t.id}`, body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(res.body).toMatchObject({ error: 'invalid_input', message: '开始日期不能晚于结束日期' });
+    }
+    expect(expectStatus(await alice.get(`/api/themes/${t.id}`), 200)).toMatchObject({ startDate: '2026-03-01', endDate: '2026-03-04' });
+    // either end may meet the other, and one that goes holds the other back no longer, in the same request or after
+    expect(await patch({ startDate: '2026-03-04' })).toMatchObject({ startDate: '2026-03-04', endDate: '2026-03-04' });
+    expect(await patch({ startDate: '2026-03-10', endDate: null })).toMatchObject({ startDate: '2026-03-10', endDate: null });
+    expect(await patch({ startDate: '2026-04-01' })).toMatchObject({ startDate: '2026-04-01', endDate: null });
+    expect(await patch({ startDate: null, endDate: '2026-01-01' })).toMatchObject({ startDate: null, endDate: '2026-01-01' });
+    expect(await patch({ title: '改名' })).toMatchObject({ title: '改名', startDate: null, endDate: '2026-01-01' });
   });
 
   it('sets and clears the cover, which must be the owner’s photo', async () => {

@@ -22,7 +22,7 @@ import '../styles/review.css';
 import '../styles/themes.css';
 
 // /archive/:year — a year looked back on: how much it holds, its days month by month, the favourite photos, the
-// projects worked on and collections made, the places and tags most used, the kinds of entries. Only one's own, from
+// projects worked on and collections it is in, the places and tags most used, the kinds of entries. Only one's own, from
 // /api/review/:year. Docs: /docs/product/features/calendar.md
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -67,7 +67,9 @@ function Body({ year }: { year: number }) {
 
   const entries = review.days.reduce((n, d) => n + d.entries, 0);
   const photos = review.days.reduce((n, d) => n + d.photos, 0);
-  if (entries + photos === 0) {
+  // a year may hold only a milestone or a collection's days: those show without the counts and the days
+  const held = entries + photos > 0;
+  if (!held && review.projects.length === 0 && review.collections.length === 0) {
     return (
       <>
         <Years year={year} />
@@ -88,37 +90,41 @@ function Body({ year }: { year: number }) {
   return (
     <>
       <Years year={year} />
-      <dl className="rv-stats">
-        <Stat label="记录" n={fmtAmount(entries)} />
-        <Stat label="照片" n={fmtAmount(photos)} />
-        <Stat label="天" n={fmtAmount(review.days.length)} />
-        {run > 1 && <Stat label="最长连续" n={`${run} 天`} />}
-        {review.placeCount > 0 && <Stat label="地点" n={fmtAmount(review.placeCount)} />}
-        {review.chars > 0 && <Stat label="字" n={fmtAmount(review.chars)} />}
-      </dl>
+      {held && (
+        <>
+          <dl className="rv-stats">
+            <Stat label="记录" n={fmtAmount(entries)} />
+            <Stat label="照片" n={fmtAmount(photos)} />
+            <Stat label="天" n={fmtAmount(review.days.length)} />
+            {run > 1 && <Stat label="最长连续" n={`${run} 天`} />}
+            {review.placeCount > 0 && <Stat label="地点" n={fmtAmount(review.placeCount)} />}
+            {review.chars > 0 && <Stat label="字" n={fmtAmount(review.chars)} />}
+          </dl>
 
-      <section className="rv-sec" aria-labelledby="rv-days">
-        <h2 id="rv-days" className="en-h2">
-          每一天
-        </h2>
-        <div className="rv-months">
-          {MONTHS.map((m) => {
-            const ym = dayOf(year, m, 1).slice(0, 7);
-            return (
-              <HeatMonth
-                key={m}
-                year={year}
-                month={m}
-                counts={counts}
-                level={level}
-                today={today}
-                href={calendarHref(ym)}
-                dayHref={(d) => calendarHref(ym, d)}
-              />
-            );
-          })}
-        </div>
-      </section>
+          <section className="rv-sec" aria-labelledby="rv-days">
+            <h2 id="rv-days" className="en-h2">
+              每一天
+            </h2>
+            <div className="rv-months">
+              {MONTHS.map((m) => {
+                const ym = dayOf(year, m, 1).slice(0, 7);
+                return (
+                  <HeatMonth
+                    key={m}
+                    year={year}
+                    month={m}
+                    counts={counts}
+                    level={level}
+                    today={today}
+                    href={calendarHref(ym)}
+                    dayHref={(d) => calendarHref(ym, d)}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
 
       {review.favorites.length > 0 && (
         <section className="rv-sec" aria-labelledby="rv-fav">

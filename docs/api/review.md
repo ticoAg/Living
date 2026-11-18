@@ -1,7 +1,7 @@
 ---
 type: API
 title: 回顾接口
-description: 登录者自己的档案按日历汇总：有内容的年份，以及一年的每一天、类型和字数、用得最多的地点和标签、项目和合集、收藏的照片。
+description: 登录者自己的档案按日历汇总：有记录或照片的年份，以及一年的每一天、类型和字数、用得最多的地点和标签、项目和合集、收藏的照片。
 tags: [api, review, entries, photos]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/worker/routes/review.ts
@@ -19,7 +19,7 @@ sources:
 
 # `GET /api/review`
 
-有内容的年份，最近的在前，带各自的记录数和照片数（`ReviewYearsResponse`）：
+有记录或照片的年份，最近的在前，带各自的记录数和照片数（`ReviewYearsResponse`）。打开一年时年份写成四位，不足的前面补 0：`50` 年是 `/api/review/0050`。
 
 ```json
 { "years": [{ "year": 2026, "entries": 252, "photos": 3 }, { "year": 2025, "entries": 4, "photos": 120 }] }
@@ -57,9 +57,9 @@ sources:
 | `places` | 照片和记录的地点，按两者之和从多到少，同样多的按名称；最多 10 个（`REVIEW_TOP`）。`placeCount` 是这一年一共用到几个地点 |
 | `tags` | 照片和记录的直接标签，排法同地点，最多 10 个 |
 | `projects` | 自己的项目里这一年写过记录的，或有里程碑在这一年的：`entries`、`days` 只算这一年的记录，`milestones` 是这一年的里程碑（按日期）；记录多的在前，同样多的按名称 |
-| `collections` | 自己的合集，字段和 [合集列表](/api/themes.md) 相同：有日期的，日期和这一年有交集；没有日期的，在这一年建立 |
-| `favorites` | 这一年拍的收藏照片，字段和照片列表相同，按拍摄时间，最多 24 张（`REVIEW_FAVORITES`） |
+| `collections` | 自己的合集，字段和 [合集列表](/api/themes.md) 相同，最近改过的在前：有日期的，日期和这一年有交集，只有开始或结束日期的就是那一天；没有日期的，里面有这一年的照片、记录（不算已归档的）或日子（`day` 条目） |
+| `favorites` | 这一年拍的收藏照片，字段和照片列表相同，按拍摄时间，最多 24 张（`REVIEW_FAVORITES`）：更多时按拍摄时间均分成 24 段，每段取第一张，一年从头到尾都有 |
 
 # 读取的行数
 
-一年的汇总在一个 `db.batch` 里跑七条语句，再查一次合集。日期范围走 `entries_owner_occurred (owner_id, occurred_at)` 和 `photos_owner_taken (owner_id, taken_at)` 两个索引，只读这一年的行；项目按自己的项目逐个数这一年的记录。一年几千条记录、几万张照片时读几万行，D1 免费版每天 500 万行。年份列表读一遍自己全部的记录和照片。
+一年的汇总在一个 `db.batch` 里跑七条语句，再查一次合集。日期范围走 `entries_owner_occurred (owner_id, occurred_at)` 和 `photos_owner_taken (owner_id, taken_at)` 两个索引，只读这一年的行；项目按自己的项目逐个数这一年的记录，没有日期的合集逐个看里面的条目。一年几千条记录、几万张照片时读几万行，D1 免费版每天 500 万行。年份列表读一遍自己全部的记录和照片。

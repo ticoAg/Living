@@ -9,38 +9,41 @@ export const has = (o: Body, k: string): boolean => Object.prototype.hasOwnPrope
 /** Length in Unicode code points, so Chinese and emoji count as one. */
 export const cpLen = (s: string): number => [...s].length;
 
+/** Text without NUL characters: SQLite's string functions stop at one, so what follows would be lost to search and counts. */
+const noNul = (s: string): string => (s.includes('\u0000') ? s.replaceAll('\u0000', '') : s);
+
 export function isPlainObject(v: unknown): v is Body {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** Required string, trimmed, with a code-point length range. */
+/** Required string, trimmed and without NUL, with a code-point length range. */
 export function reqStr(o: Body, key: string, label: string, min: number, max: number): string {
   const v = o[key];
   if (typeof v !== 'string') throw invalid(`请填写${label}`);
-  const s = v.trim();
+  const s = noNul(v).trim();
   const n = cpLen(s);
   if (n < min || n > max) throw invalid(min <= 1 ? `${label}不能为空，且最多 ${max} 个字符` : `${label}需要 ${min} 到 ${max} 个字符`);
   return s;
 }
 
-/** Optional text: null/undefined/blank → null, otherwise trimmed and length-checked. */
+/** Optional text: null/undefined/blank → null, otherwise trimmed, without NUL and length-checked. */
 export function optText(v: unknown, label: string, max: number): string | null {
   if (v === null || v === undefined) return null;
   if (typeof v !== 'string') throw invalid(`${label}需要是文字`);
-  const s = v.trim();
+  const s = noNul(v).trim();
   if (s === '') return null;
   if (cpLen(s) > max) throw invalid(`${label}最多 ${max} 个字符`);
   return s;
 }
 
 /**
- * Optional Markdown, kept as written: blank lines before it and whitespace after it go, line ends become `\n`, and the
- * first line keeps its own indentation (a paragraph may open with full-width spaces). Blank → null.
+ * Optional Markdown, kept as written: blank lines before it, whitespace after it and NUL characters go, line ends become
+ * `\n`, and the first line keeps its own indentation (a paragraph may open with full-width spaces). Blank → null.
  */
 export function optMarkdown(v: unknown, label: string, max: number): string | null {
   if (v === null || v === undefined) return null;
   if (typeof v !== 'string') throw invalid(`${label}需要是文字`);
-  const s = v
+  const s = noNul(v)
     .replace(/\r\n?/g, '\n')
     .replace(/^(?:[ \t　]*\n)+/, '')
     .replace(/\s+$/, '');

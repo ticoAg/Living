@@ -944,7 +944,7 @@ export const REVIEW_TOP = 10;
 /** How many favourite photos a review shows. */
 export const REVIEW_FAVORITES = 24;
 
-/** `GET /api/review`: the years that hold anything, latest first. */
+/** `GET /api/review`: the years that hold an entry or a photo, latest first. */
 export interface ReviewYearsResponse {
   years: { year: number; entries: number; photos: number }[];
 }
@@ -1000,9 +1000,9 @@ export interface YearReview {
   tags: ReviewTag[];
   /** most entries first */
   projects: ReviewProject[];
-  /** collections dated in the year, or made in it when undated; latest first */
+  /** collections whose days meet the year, or undated ones holding something of it; the latest changed first */
   collections: ThemeSummary[];
-  /** favourite photos taken in the year, in time order, at most REVIEW_FAVORITES */
+  /** favourite photos taken in the year, in time order: REVIEW_FAVORITES spread over the year when there are more */
   favorites: PhotoSummary[];
 }
 
