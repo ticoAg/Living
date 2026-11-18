@@ -38,6 +38,7 @@ sources:
 | 413 | `too_large` | 原图超过 50 MB |
 | 429 | `rate_limited` | 登录尝试过多 |
 | 502 | `upstream_failed` | 高德 / OSM 不可用（地点匹配仍返回站内候选） |
+| 503 | `quota_exceeded` | 免费版 D1 当天能读写的行数用完了，协调世界时 0 点（北京时间 8 点）以后恢复，见 [费用](/architecture/cloudflare.md#费用) |
 
 `message` 用中文，直接说明原因和解决办法。
 

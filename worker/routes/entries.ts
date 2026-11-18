@@ -11,8 +11,18 @@ import {
   type Visibility
 } from '../../shared/types';
 import type { AppEnv } from '../env';
-import { assertOwnPhotos, ENTRY_FROM, entryCols, loadEntryDetail, toEntrySummary, type EntryRow } from '../lib/entries';
-import { assertNotEmpty, parseEntryFields, type MediaField } from '../lib/entryInput';
+import {
+  assertOwnPhotos,
+  ENTRY_FROM,
+  entryCols,
+  loadEntryDetail,
+  toEntrySummary,
+  writeMedia,
+  writeProjects,
+  writeTags,
+  type EntryRow
+} from '../lib/entries';
+import { assertNotEmpty, parseEntryFields } from '../lib/entryInput';
 import { conflict, forbidden, invalid, listCache, notFound, paramId, readJson, unauthenticated, type Ctx } from '../lib/http';
 import { newId } from '../lib/ids';
 import { requireUser, viewerId } from '../lib/session';
@@ -119,51 +129,9 @@ entries.get('/:id', async (c) => {
 
 // ---- writing ------------------------------------------------------------------------------------------------------
 
-/** The entry's photos as one statement, positions in array order from 0; with `replace`, the old ones go first. */
-function writeMedia(db: D1Database, entryId: string, media: MediaField[], replace = false): D1PreparedStatement[] {
-  const out = replace ? [prep(db, 'DELETE FROM entry_media WHERE entry_id = ?1', entryId)] : [];
-  if (media.length) {
-    out.push(
-      prep(
-        db,
-        `INSERT INTO entry_media (entry_id, photo_id, position, caption)
-         SELECT ?1, json_extract(value, '$.photoId'), key, json_extract(value, '$.caption') FROM json_each(?2)`,
-        entryId,
-        JSON.stringify(media)
-      )
-    );
-  }
-  return out;
-}
-
-function writeProjects(db: D1Database, entryId: string, projectIds: string[], replace = false): D1PreparedStatement[] {
-  const out = replace ? [prep(db, 'DELETE FROM entry_projects WHERE entry_id = ?1', entryId)] : [];
-  if (projectIds.length) {
-    out.push(
-      prep(
-        db,
-        'INSERT OR IGNORE INTO entry_projects (entry_id, project_id) SELECT ?1, value FROM json_each(?2)',
-        entryId,
-        JSON.stringify(projectIds)
-      )
-    );
-  }
-  return out;
-}
-
 /** Any existing place will do, as for a photo (400 otherwise). */
 async function assertPlace(db: D1Database, poiId: string): Promise<void> {
   if (!(await db.prepare('SELECT 1 AS ok FROM pois WHERE id = ?1').bind(poiId).first())) throw invalid('所选地点不存在');
-}
-
-function writeTags(db: D1Database, entryId: string, tagIds: string[], replace = false): D1PreparedStatement[] {
-  const out = replace ? [prep(db, 'DELETE FROM entry_tags WHERE entry_id = ?1', entryId)] : [];
-  if (tagIds.length) {
-    out.push(
-      prep(db, 'INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) SELECT ?1, value FROM json_each(?2)', entryId, JSON.stringify(tagIds))
-    );
-  }
-  return out;
 }
 
 entries.post('/', async (c) => {

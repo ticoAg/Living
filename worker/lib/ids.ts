@@ -58,6 +58,30 @@ export const newId = {
   share: () => `sl_${ulid()}`
 };
 
+/**
+ * The id an import gives an item of an export (docs/api/import.md#id): the prefix and 26 Crockford characters of the
+ * SHA-256 of the account and the item's id in the export. The same each time, so a second import of the same export
+ * finds what the first one made; and only that account's imports arrive at it, so nobody can take an id that another
+ * account's import, or anyone's earlier item, has.
+ */
+export async function importedId(prefix: string, ownerId: string, sourceId: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`living-import\n${ownerId}\n${sourceId}`)));
+  let acc = 0;
+  let bits = 0;
+  let out = '';
+  for (const b of digest) {
+    acc = (acc << 8) | b;
+    bits += 8;
+    while (bits >= 5 && out.length < 26) {
+      out += CROCKFORD[(acc >> (bits - 5)) & 31];
+      bits -= 5;
+    }
+    acc &= (1 << bits) - 1;
+    if (out.length === 26) break;
+  }
+  return `${prefix}_${out}`;
+}
+
 /** 10 characters from the unambiguous alphabet (no 0 O 1 I L), rejection-sampled for uniformity. */
 const INVITE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 export function inviteCode(): string {

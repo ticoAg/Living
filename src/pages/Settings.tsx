@@ -5,6 +5,7 @@ import { useSession } from '../lib/session';
 import { PageHead } from '../studio/ui';
 import AdminSection from '../studio/settings/AdminSection';
 import ExportSection from '../studio/settings/ExportSection';
+import ImportSection from '../studio/settings/ImportSection';
 import PasswordSection from '../studio/settings/PasswordSection';
 import PhotoDefaultsSection from '../studio/settings/PhotoDefaultsSection';
 import ProfileSection from '../studio/settings/ProfileSection';
@@ -56,6 +57,7 @@ export default function Settings() {
         <a href="#privacy">隐私区域</a>
         <a href="#shares">分享链接</a>
         <a href="#export">导出</a>
+        <a href="#import">导入</a>
         {staff && <a href="#admin">站点管理</a>}
       </nav>
 
@@ -66,6 +68,7 @@ export default function Settings() {
         <ZonesSection />
         <SharesSection />
         <ExportSection user={user} />
+        <ImportSection />
         {staff && <AdminSection user={user} />}
         <div className="se-out">
           <button

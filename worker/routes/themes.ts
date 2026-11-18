@@ -1,24 +1,20 @@
 import { Hono } from 'hono';
-import { THEME_ITEM_LIMITS, THEME_LIMITS } from '../../shared/limits';
 import type { Poi, ThemeDetail, ThemeEntry, ThemeItem, ThemeItemKind, ThemeKind, ThemeSummary, Visibility } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { forbidden, invalid, listCache, notFound, paramId, readJson, unauthenticated, type Ctx } from '../lib/http';
 import { ENTRY_FROM, entryCols, toEntrySummary, type EntryRow } from '../lib/entries';
 import { newId } from '../lib/ids';
-import { VISIBILITIES } from '../lib/photoInput';
 import { summariesByIds } from '../lib/photos';
 import { poiCols, toPoi, type PoiRow } from '../lib/poi';
 import { requireUser, viewerId } from '../lib/session';
+import { assertRange, insertItems, parseItems, parseThemeFields, type NewItem } from '../lib/themeInput';
 import { grantFor, sharedCache } from '../lib/shares';
 import { nowIso, prep, prepQ, Sql } from '../lib/sql';
-import { has, isDate, isPlainObject, optDate, optEnum, optText, reqStr, strArray, type Body } from '../lib/validate';
 import { entryById, photoById, photoLocation, themeList } from '../lib/visibility';
 import type { SessionUser } from '../../shared/types';
 
 export const themes = new Hono<AppEnv>({ strict: false });
 
-const KINDS = ['trip', 'topic'] as const;
-const MAX_ITEMS = THEME_LIMITS.itemCount;
 const LIST_LIMIT = 500;
 
 interface ThemeRow {
@@ -241,47 +237,6 @@ themes.get('/:id', async (c) => {
 
 // ---- writing ----------------------------------------------------------------------------------------------------
 
-interface ThemeFields {
-  kind?: ThemeKind;
-  title?: string;
-  subtitle?: string | null;
-  intro?: string | null;
-  startDate?: string | null;
-  endDate?: string | null;
-  visibility?: Visibility;
-  coverPhotoId?: string | null;
-  photoIds?: string[];
-}
-
-/** A collection's days run forwards: it may not start after it ends. */
-function assertRange(start: string | null | undefined, end: string | null | undefined): void {
-  if (start && end && start > end) throw invalid('开始日期不能晚于结束日期');
-}
-
-function parseThemeFields(body: Body, create: boolean): ThemeFields {
-  const f: ThemeFields = {};
-  const kind = optEnum<ThemeKind>(body.kind, '合集类型', KINDS);
-  if (create && !kind) throw invalid('请选择合集类型：trip（旅程）或 topic（专题）');
-  if (kind) f.kind = kind;
-  if (create || has(body, 'title')) f.title = reqStr(body, 'title', '标题', 1, THEME_LIMITS.titleMax);
-  if (has(body, 'subtitle')) f.subtitle = optText(body.subtitle, '副标题', THEME_LIMITS.subtitleMax);
-  if (has(body, 'intro')) f.intro = optText(body.intro, '导语', THEME_LIMITS.introMax);
-  if (has(body, 'startDate')) f.startDate = optDate(body.startDate, '开始日期');
-  if (has(body, 'endDate')) f.endDate = optDate(body.endDate, '结束日期');
-  assertRange(f.startDate, f.endDate);
-  const visibility = optEnum<Visibility>(body.visibility, '公开范围', VISIBILITIES);
-  if (visibility) f.visibility = visibility;
-  if (has(body, 'coverPhotoId')) {
-    if (body.coverPhotoId !== null && typeof body.coverPhotoId !== 'string') throw invalid('封面需要是照片 id 或 null');
-    f.coverPhotoId = body.coverPhotoId as string | null;
-  }
-  if (create && has(body, 'photoIds')) {
-    if (!Array.isArray(body.photoIds)) throw invalid('photoIds 需要是数组');
-    f.photoIds = strArray(body.photoIds, '照片', MAX_ITEMS);
-  }
-  return f;
-}
-
 interface PhotoInfo {
   id: string;
   taken_at: string | null;
@@ -308,36 +263,6 @@ async function ownPhotos(db: D1Database, ownerId: string, ids: string[]): Promis
   for (const r of res.results) out.set(r.id, r);
   if (out.size !== new Set(ids).size) throw invalid('照片必须是你自己的照片');
   return out;
-}
-
-interface NewItem {
-  kind: ThemeItemKind;
-  photoId?: string | null;
-  entryId?: string | null;
-  text?: string | null;
-  day?: string | null;
-}
-
-/** One statement inserting all items; positions follow array order from 0. */
-function insertItems(db: D1Database, themeId: string, items: NewItem[]): D1PreparedStatement {
-  const rows = items.map((it, i) => ({
-    id: newId.item(),
-    pos: i,
-    kind: it.kind,
-    photoId: it.photoId ?? null,
-    entryId: it.entryId ?? null,
-    text: it.text ?? null,
-    day: it.day ?? null
-  }));
-  return prep(
-    db,
-    `INSERT INTO theme_items (id, theme_id, position, kind, photo_id, entry_id, text, day)
-     SELECT json_extract(value, '$.id'), ?1, json_extract(value, '$.pos'), json_extract(value, '$.kind'),
-            json_extract(value, '$.photoId'), json_extract(value, '$.entryId'), json_extract(value, '$.text'), json_extract(value, '$.day')
-     FROM json_each(?2)`,
-    themeId,
-    JSON.stringify(rows)
-  );
 }
 
 /** Trip seeding: photos by capture time, with a `day` item before the first photo of each date. Undated photos go last. */
@@ -468,34 +393,7 @@ themes.put('/:id/items', async (c) => {
   const db = c.env.DB;
   const row = await ownedTheme(c, user, paramId(c));
   const body = await readJson(c, 1024 * 1024);
-  if (!Array.isArray(body.items)) throw invalid('items 需要是数组');
-  if (body.items.length > MAX_ITEMS) throw invalid(`一个合集最多 ${MAX_ITEMS} 个条目`);
-
-  const items: NewItem[] = [];
-  const photoIds: string[] = [];
-  const entryIds: string[] = [];
-  body.items.forEach((raw: unknown, i: number) => {
-    const at = `第 ${i + 1} 个条目`;
-    if (!isPlainObject(raw)) throw invalid(`${at}格式不对`);
-    if (raw.kind === 'photo') {
-      if (typeof raw.photoId !== 'string' || !raw.photoId) throw invalid(`${at}缺少 photoId`);
-      photoIds.push(raw.photoId);
-      items.push({ kind: 'photo', photoId: raw.photoId, text: optText(raw.text, `${at}的说明`, THEME_ITEM_LIMITS.captionMax) });
-    } else if (raw.kind === 'text') {
-      const text = optText(raw.text, `${at}的文字`, THEME_ITEM_LIMITS.textMax);
-      if (!text) throw invalid(`${at}的文字不能为空`);
-      items.push({ kind: 'text', text });
-    } else if (raw.kind === 'day') {
-      if (typeof raw.day !== 'string' || !isDate(raw.day)) throw invalid(`${at}的日期格式应为 YYYY-MM-DD`);
-      items.push({ kind: 'day', day: raw.day, text: optText(raw.text, `${at}的说明`, THEME_ITEM_LIMITS.captionMax) });
-    } else if (raw.kind === 'entry') {
-      if (typeof raw.entryId !== 'string' || !raw.entryId) throw invalid(`${at}缺少 entryId`);
-      entryIds.push(raw.entryId);
-      items.push({ kind: 'entry', entryId: raw.entryId, text: optText(raw.text, `${at}的说明`, THEME_ITEM_LIMITS.captionMax) });
-    } else {
-      throw invalid(`${at}的类型需要是 photo、text、day 或 entry`);
-    }
-  });
+  const { items, photoIds, entryIds } = parseItems(body.items);
   // photos and entries must belong to the theme's owner
   await ownPhotos(db, row.owner_id, photoIds);
   await assertOwnEntries(db, row.owner_id, entryIds);

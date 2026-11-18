@@ -942,6 +942,79 @@ export interface ExportShareLink {
   expiresAt: string | null;
 }
 
+// ---- import (docs/api/import.md) -------------------------------------------------------------------------------------
+// An export brought into the signed-in account, a batch at a time. Rows come as living.json has them, except that what
+// they point to (photos, tags, projects, places, entries) is already this site's id; what is here already stays as it is.
+
+/** Where an item of an export is, or is to be, in this account. */
+export interface ImportTarget {
+  id: string;
+  /** here already: the export's own item (an export of this account), or the one an earlier import made */
+  exists: boolean;
+}
+
+/** `POST /api/import/resolve`: photos by the SHA-256 of their file, the rest by their id in the export. */
+export interface ImportResolveBody {
+  photos?: string[];
+  entries?: string[];
+  projects?: string[];
+  collections?: string[];
+}
+
+export interface ImportResolveResponse {
+  /** this account's photo with those bytes, by SHA-256; a hash left out has none */
+  photos: Record<string, string>;
+  entries: Record<string, ImportTarget>;
+  projects: Record<string, ImportTarget>;
+  collections: Record<string, ImportTarget>;
+}
+
+/** `POST /api/import/tags` and `/places`: each one's id in the export → its id here. */
+export interface ImportIdsResponse {
+  ids: Record<string, string>;
+  created: number;
+}
+
+/** `POST /api/import/zones`. */
+export interface ImportZonesResponse {
+  created: number;
+  /** the same zone (name, centre and radius) was here already */
+  existing: number;
+  /** left out: the account had as many zones as it may have */
+  full: number;
+}
+
+export type ImportMilestone = Pick<ExportMilestone, 'title' | 'body' | 'date' | 'createdAt' | 'updatedAt'>;
+
+/** A project of an export, with its milestones. */
+export interface ImportProject extends ExportProject {
+  milestones: ImportMilestone[];
+}
+
+/** An entry of an export; `media`, `tagIds`, `projectIds` and `poiId` are ids here. */
+export interface ImportEntry extends Omit<ExportEntry, 'revision'> {
+  media: { photoId: string; caption: string | null }[];
+  tagIds: string[];
+  projectIds: string[];
+}
+
+export type ImportCollectionItem = Pick<ExportThemeItem, 'kind' | 'photoId' | 'entryId' | 'text' | 'day'>;
+
+/** A collection of an export, its items in order; `coverPhotoId` and the items' photos and entries are ids here. */
+export interface ImportCollection extends ExportTheme {
+  items: ImportCollectionItem[];
+}
+
+/** `POST /api/import/projects`, `/entries` and `/collections`. */
+export interface ImportRowsResponse {
+  /** each one's id in the export → its id here, for every row that is here now */
+  ids: Record<string, string>;
+  created: number;
+  existing: number;
+  /** rows left out, with why */
+  failed: { id: string; message: string }[];
+}
+
 // ---- review (回顾) ---------------------------------------------------------------------------------------------
 // One's own archive by the calendar: the days that hold something, and a year looked back on. Only the signed-in
 // owner's entries (archived ones aside) and photos. Docs: /docs/api/review.md

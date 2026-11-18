@@ -6,16 +6,13 @@ import { conflict, forbidden, invalid, listCache, notFound, paramId, readJson } 
 import { newId } from '../lib/ids';
 import { isStaff, requireUser, viewerId } from '../lib/session';
 import { nowIso, prep, prepQ, Sql } from '../lib/sql';
-import { tagCount, tagEntryCount, toTag, type TagRow } from '../lib/tags';
+import { tagCount, tagEntryCount, tagNameKey as nameKey, toTag, type TagRow } from '../lib/tags';
 import { has, optColor, optNum, reqStr } from '../lib/validate';
 import { entryList, photoList } from '../lib/visibility';
 
 export const tags = new Hono<AppEnv>({ strict: false });
 
 const TAG_COLS = 'id, name, parent_id, owner_id, color, sort';
-
-/** Case/width-insensitive form for sibling-name comparison. */
-const nameKey = (s: string) => s.normalize('NFKC').toLowerCase();
 
 tags.get('/', async (c) => {
   const viewer = await viewerId(c);

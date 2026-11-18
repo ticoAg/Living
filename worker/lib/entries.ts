@@ -12,9 +12,10 @@ import {
   type EntryType,
   type Visibility
 } from '../../shared/types';
+import type { MediaField } from './entryInput';
 import { invalid } from './http';
 import { summariesByIds } from './photos';
-import { prepQ, Sql } from './sql';
+import { prep, prepQ, Sql } from './sql';
 import { entryById, photoById, projectList, themeList } from './visibility';
 
 export interface EntryRow {
@@ -168,4 +169,48 @@ export async function assertOwnPhotos(db: D1Database, ownerId: string, photoIds:
     .bind(ownerId, JSON.stringify(photoIds))
     .first<{ n: number }>();
   if ((row?.n ?? 0) !== new Set(photoIds).size) throw invalid('只能添加你自己的照片');
+}
+
+// ---- writing ------------------------------------------------------------------------------------------------------
+
+/** The entry's photos as one statement, positions in array order from 0; with `replace`, the old ones go first. */
+export function writeMedia(db: D1Database, entryId: string, media: MediaField[], replace = false): D1PreparedStatement[] {
+  const out = replace ? [prep(db, 'DELETE FROM entry_media WHERE entry_id = ?1', entryId)] : [];
+  if (media.length) {
+    out.push(
+      prep(
+        db,
+        `INSERT INTO entry_media (entry_id, photo_id, position, caption)
+         SELECT ?1, json_extract(value, '$.photoId'), key, json_extract(value, '$.caption') FROM json_each(?2)`,
+        entryId,
+        JSON.stringify(media)
+      )
+    );
+  }
+  return out;
+}
+
+export function writeProjects(db: D1Database, entryId: string, projectIds: string[], replace = false): D1PreparedStatement[] {
+  const out = replace ? [prep(db, 'DELETE FROM entry_projects WHERE entry_id = ?1', entryId)] : [];
+  if (projectIds.length) {
+    out.push(
+      prep(
+        db,
+        'INSERT OR IGNORE INTO entry_projects (entry_id, project_id) SELECT ?1, value FROM json_each(?2)',
+        entryId,
+        JSON.stringify(projectIds)
+      )
+    );
+  }
+  return out;
+}
+
+export function writeTags(db: D1Database, entryId: string, tagIds: string[], replace = false): D1PreparedStatement[] {
+  const out = replace ? [prep(db, 'DELETE FROM entry_tags WHERE entry_id = ?1', entryId)] : [];
+  if (tagIds.length) {
+    out.push(
+      prep(db, 'INSERT OR IGNORE INTO entry_tags (entry_id, tag_id) SELECT ?1, value FROM json_each(?2)', entryId, JSON.stringify(tagIds))
+    );
+  }
+  return out;
 }

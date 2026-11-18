@@ -51,7 +51,7 @@ living-ada/
 
 - 只有本人能导出自己的档案，导出的文件含有原图的 EXIF 和全部位置，请像对待相册备份一样保管。
 - 档案存放在站长的 Cloudflare 账号里（D1 存记录和元数据，R2 存照片），这是托管存储，不等于存在自己的电脑上。定期导出，手里才有一份完全由自己保管的副本。
-- 还不能把导出的文件导回 Living。整站的备份与恢复由站长按 [备份与恢复](/runbooks/backup.md) 做。
+- 导出可以 [导入](/product/features/import.md) 回 Living：换站点、找回删掉的内容都用它。整站的备份与恢复由站长按 [备份与恢复](/runbooks/backup.md) 做。
 
 # 额度
 
@@ -59,5 +59,5 @@ living-ada/
 
 # 相关
 
-- [隐私](/product/features/privacy.md#搜索与导出)、[账号](/product/features/accounts.md)
+- [导入](/product/features/import.md)、[隐私](/product/features/privacy.md#搜索与导出)、[账号](/product/features/accounts.md)
 - 接口 [导出接口](/api/export.md)，站长的 [备份与恢复](/runbooks/backup.md)

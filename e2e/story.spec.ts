@@ -3,8 +3,8 @@
 // checks the page's key elements and that nothing reached the console as an error. The session it ends with is saved
 // for regressions.spec.ts.
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OWNER, OWNER_STATE } from './env.ts';
 import { apiOf, cutOff, expect, follow, rendered, test, watch } from './support.ts';
@@ -527,14 +527,23 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     clean('search');
   });
 
+  let exported = '';
   await test.step('export: a zip with the Markdown, living.json and the originals as uploaded', async () => {
+    // a link from one entry to another, for the import to follow
+    const { entries } = await api.get<{ entries: { id: string; excerpt: string | null }[] }>('/api/entries?mine=1');
+    const note = entries.find((e) => e.excerpt?.startsWith('湖边的风很大'));
+    await api.patch(`/api/entries/${entryId}`, {
+      body: `# 午后\n\n断桥残雪，其实是断桥残阳。\n\n- [x] 看荷花\n- [ ] 坐船\n\n那天的[风](/e/${note?.id})。`
+    });
     await page.goto('/settings#export');
     const section = page.getByRole('region', { name: '导出' });
     await expect(section).toContainText('4 条记录 · 3 张照片 · 1 个项目 · 1 个合集');
     const [download] = await Promise.all([page.waitForEvent('download'), section.getByRole('button', { name: '下载 zip' }).click()]);
     await expect(section.getByRole('status')).toContainText('导出完成');
     expect(download.suggestedFilename()).toMatch(new RegExp(`^living-${OWNER.handle}-\\d{4}-\\d{2}-\\d{2}\\.zip$`));
-    const files = zipFiles(readFileSync(await download.path()));
+    exported = test.info().outputPath('export.zip');
+    await download.saveAs(exported);
+    const files = zipFiles(readFileSync(exported));
     const root = `living-${OWNER.handle}/`;
     const names = [...files.keys()];
     expect(names.every((n) => n.startsWith(root))).toBe(true);
@@ -590,6 +599,78 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     await section.getByRole('button', { name: '导出到文件夹' }).click();
     await expect(section.getByRole('status')).toContainText('3 张照片上次已经导出，这次没有再下载。');
     clean('export to a folder');
+  });
+
+  await test.step('import: the zip into another account brings it all, kept private; the folder a second time brings nothing more', async () => {
+    const { invite } = await api.post<{ invite: { code: string } }>('/api/admin/invites', { role: 'member', note: '导入' });
+    const context = await browser.newContext({ storageState: undefined });
+    await cutOff(context);
+    const other = await context.newPage();
+    const otherErrors = watch(other);
+    await other.goto('/register');
+    await other.locator('#au-invite').fill(invite.code);
+    await other.locator('#au-handle').fill('mori');
+    await other.locator('#au-name').fill('森');
+    await other.locator('#au-password').fill('smoke-test-pass-2');
+    await other.locator('form button[type=submit]').click();
+    await expect(other).toHaveURL(/\/today$/);
+
+    await other.goto('/settings#import');
+    const section = other.getByRole('region', { name: '导入' });
+    await section.locator('input[accept*=".zip"]').setInputFiles(exported);
+    await expect(section).toContainText('4 条记录 · 3 张照片 · 1 个项目 · 1 个合集');
+    await expect(section).not.toContainText('已经在这里');
+    // the story's public photos stay the owner's alone in the gallery (regressions.spec.ts counts them)
+    await section.getByRole('switch', { name: '全部设为私密' }).check();
+    await section.getByRole('button', { name: '开始导入' }).click();
+    await expect(section.getByRole('status')).toContainText('导入完成', { timeout: 60_000 });
+    await expect(section).toContainText('新加了 3 张照片、4 条记录、1 个项目、1 个合集');
+
+    // the photos as they were, now the new account's
+    const mine = apiOf(other.request);
+    const { photos: got } = await mine.get<{ photos: (ApiPhoto & { visibility: string })[] }>('/api/photos?mine=1');
+    const by = (list: ApiPhoto[]) =>
+      list
+        .map(({ lat, lng, heading, takenAt }) => ({ lat, lng, heading, takenAt }))
+        .sort((a, b) => String(a.takenAt).localeCompare(String(b.takenAt)));
+    expect(by(got)).toEqual(by(photos));
+    expect(got.some((p) => photos.some((q) => q.id === p.id))).toBe(false);
+    expect(got.map((p) => p.visibility)).toEqual(['private', 'private', 'private']);
+    // the entries with their photos, and the link between them follows them here
+    const { entries } = await mine.get<{ entries: { id: string; title: string | null; excerpt: string | null; visibility: string }[] }>(
+      '/api/entries?mine=1'
+    );
+    expect(entries).toHaveLength(4);
+    const afternoon = entries.find((e) => e.title === '西湖边的一个下午');
+    const note = entries.find((e) => e.excerpt?.startsWith('湖边的风很大'));
+    expect(afternoon?.id).not.toBe(entryId);
+    expect(entries.map((e) => e.visibility)).toEqual(['private', 'private', 'private', 'private']);
+    const entry = await mine.get<{ body: string; media: { photoId: string }[] }>(`/api/entries/${afternoon?.id}`);
+    expect(entry.body).toContain(`[风](/e/${note?.id})`);
+    expect(entry.media.map((m) => got.some((p) => p.id === m.photoId))).toEqual([true, true]);
+    await other.goto(`/e/${afternoon?.id}`);
+    await expect(other.getByRole('heading', { level: 1, name: '西湖边的一个下午' })).toBeVisible();
+    await expect(other.locator('.er-figure')).toHaveCount(2);
+    await follow(other.getByRole('link', { name: '风', exact: true }));
+    await expect(other).toHaveURL(new RegExp(`/e/${note?.id}$`));
+
+    // the same export once more, as a folder: all of it is here already
+    const dir = test.info().outputPath('unzipped');
+    for (const [name, bytes] of zipFiles(readFileSync(exported))) {
+      mkdirSync(dirname(join(dir, name)), { recursive: true });
+      writeFileSync(join(dir, name), bytes);
+    }
+    await other.goto('/settings#import');
+    await section.locator('input[type=file]:not([accept])').setInputFiles(join(dir, `living-${OWNER.handle}`));
+    await expect(section).toContainText('其中 3 张照片、4 条记录、1 个项目、1 个合集已经在这里，会跳过。');
+    await section.getByRole('button', { name: '开始导入' }).click();
+    await expect(section.getByRole('status')).toContainText('导入完成', { timeout: 60_000 });
+    await expect(section).toContainText('没有新加任何内容。');
+    expect((await mine.get<{ entries: unknown[] }>('/api/entries?mine=1')).entries).toHaveLength(4);
+    expect((await mine.get<{ photos: unknown[] }>('/api/photos?mine=1')).photos).toHaveLength(3);
+    expect(otherErrors.take(), 'console errors of the importer').toEqual([]);
+    await context.close();
+    clean('import');
   });
 
   await test.step('works and articles: first on the profile, each on a page of its own, then the profile as a visitor sees it', async () => {

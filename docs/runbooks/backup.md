@@ -116,5 +116,4 @@ D1 和 R2 恢复到不同时间时：
 
 # 还不能做的
 
-- 把个人的导出导回 Living：导入要处理 id 冲突、别的账号的地点和标签、重复的照片，以后单独设计，见 [数据演进](/data/evolution.md#导出与备份)。
-- 只恢复一个人的数据：D1 的导出和 Time Travel 都是整个库。要找回某个人误删的一条记录，可以把备份导入一个单独的本地库（`npx wrangler d1 execute living --local --persist-to=/tmp/living-restore --file=…`），查出那几行，再用 `--remote --command` 写回去。
+- 只恢复一个人的数据：D1 的导出和 Time Travel 都是整个库。本人有自己的导出时，[导入](/product/features/import.md) 它就能找回删掉的记录、照片、项目和合集（换了新地址）。没有导出时，要找回某个人误删的一条记录，可以把备份导入一个单独的本地库（`npx wrangler d1 execute living --local --persist-to=/tmp/living-restore --file=…`），查出那几行，再用 `--remote --command` 写回去。

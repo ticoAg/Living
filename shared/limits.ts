@@ -111,6 +111,18 @@ export const PRIVACY_ZONE_LIMITS = {
   count: 50
 } as const;
 
+/** Rows in one request to `/api/import/*`; the browser also keeps each request's JSON to about 1 MB. */
+export const IMPORT_LIMITS = {
+  /** ids (for photos, SHA-256) of each kind in one `resolve` */
+  resolve: 1000,
+  tags: 2000,
+  places: 500,
+  zones: 10,
+  projects: 50,
+  entries: 100,
+  collections: 20
+} as const;
+
 /** `POST /api/admin/invites`. */
 export const INVITE_LIMITS = {
   noteMax: 200,

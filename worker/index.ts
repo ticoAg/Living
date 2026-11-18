@@ -13,6 +13,7 @@ import { admin } from './routes/admin';
 import { auth } from './routes/auth';
 import { entries } from './routes/entries';
 import { exporter } from './routes/export';
+import { imports } from './routes/import';
 import { me } from './routes/me';
 import { media } from './routes/media';
 import { photos } from './routes/photos';
@@ -90,6 +91,7 @@ app.route('/api/privacy-zones', privacyZones);
 app.route('/api/shares', shares);
 app.route('/api/search', search);
 app.route('/api/export', exporter);
+app.route('/api/import', imports);
 app.route('/api/review', review);
 app.route('/api/admin', admin);
 app.route('/media', media);
@@ -108,6 +110,16 @@ app.notFound((c) => {
   // Anything else belongs to the SPA (normally served before the Worker runs).
   return c.env.ASSETS.fetch(c.req.raw);
 });
+
+/**
+ * On the Workers Free plan, D1 refuses every query for the rest of the UTC day once the account has read or written its
+ * daily rows (docs/architecture/cloudflare.md#费用). Said as such, so that a long job (an import) can stop and say when
+ * to go on, instead of retrying a server error.
+ */
+const D1_QUOTA = /exceeded D1's free tier daily row (?:read|write) limit/i;
+const D1_QUOTA_MESSAGE = '今天的数据库额度已经用完，要到协调世界时 0 点（北京时间 8 点）以后才能继续';
+const isD1Quota = (err: unknown): boolean =>
+  err instanceof Error && (D1_QUOTA.test(err.message) || (err.cause instanceof Error && D1_QUOTA.test(err.cause.message)));
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {
@@ -130,6 +142,10 @@ app.onError((err, c) => {
                 ? 'too_large'
                 : 'invalid_input';
     return c.json({ error, message: err.message || '请求有误' }, status, { 'Cache-Control': 'no-store' });
+  }
+  if (isD1Quota(err)) {
+    console.error('d1 daily limit', c.req.method, new URL(c.req.url).pathname);
+    return c.json({ error: 'quota_exceeded', message: D1_QUOTA_MESSAGE }, 503, { 'Cache-Control': 'no-store' });
   }
   console.error('unhandled error', c.req.method, new URL(c.req.url).pathname, err instanceof Error ? (err.stack ?? err.message) : err);
   return c.json({ error: 'internal', message: '服务器出错了，请稍后再试' }, 500, { 'Cache-Control': 'no-store' });

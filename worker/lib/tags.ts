@@ -17,6 +17,9 @@ export function toTag(r: TagRow, count = r.count ?? 0, entryCount = r.entry_coun
   return { id: r.id, name: r.name, parentId: r.parent_id, ownerId: r.owner_id, color: r.color, sort: r.sort, count, entryCount };
 }
 
+/** Case/width-insensitive form for sibling-name comparison: siblings may not share one. */
+export const tagNameKey = (s: string): string => s.normalize('NFKC').toLowerCase();
+
 /** Subset of `ids` that exist and are usable by the user: system presets or the user's own tags. */
 export async function usableTagIds(db: D1Database, userId: string, ids: string[]): Promise<string[]> {
   if (!ids.length) return [];

@@ -127,4 +127,4 @@ sources:
 - **导出**（[导出接口](/api/export.md)）：不加表。Worker 按页读出登录者自己的行，浏览器拼成 Markdown、living.json 和原文件。导出的格式有版本号（`living-export` 第 1 版），字段改动时升版本，旧版本的字段说明留在文档里。
 - **备份**：站长用 `wrangler d1 export` 导出整个 D1，用 rclone 复制 R2 的桶；恢复先导入新库、核对后再换上，见 [备份与恢复](/runbooks/backup.md)。
 - Cloudflare 托管的存储不等于本地自托管：数据在站长的 Cloudflare 账号里，个人的导出和站长的备份才是在自己手里的副本，产品说明（[愿景](/product/vision.md)、[导出](/product/features/export.md#隐私)）里写明了。
-- 还不能把导出导回 Living：导入要处理 id 冲突、别的账号的地点和标签、重复的照片（`photos_owner_sha`），以后单独设计。
+- **导入**（[导入接口](/api/import.md)）：不加表，也不加列。认出「以前导入过」靠 id 本身：新的记录、项目、合集和自建地点的 id 是账号 id 和导出里的 id 的 SHA-256（`importedId`，[worker/lib/ids.ts](https://github.com/ticoAg/Living/blob/main/worker/lib/ids.ts)），同一个账号再导入得到同一个 id，别的账号和普通的新建到不了它。照片照旧按 `photos_owner_sha` 认重复，标签按上级标签下的名字，地图服务的地点按 `source`、`source_id`。导出的格式升版本时，导入要能读旧版本。
