@@ -78,8 +78,29 @@ describe('hit', () => {
     const { kv, puts } = fakeKv();
     await hit(kv, 'long', 5, 900);
     await hit(kv, 'short', 5, 10);
-    expect(puts[0].options).toEqual({ expiration: nowSec() + 900 });
-    expect(puts[1].options).toEqual({ expiration: nowSec() + 60 });
+    advance(300);
+    await hit(kv, 'long', 5, 900);
+    expect(puts.map((p) => p.options)).toEqual([{ expirationTtl: 900 }, { expirationTtl: 60 }, { expirationTtl: 600 }]);
+  });
+
+  it('keeps counting when the store’s clock has moved on a second by the time the count is written', async () => {
+    // the store's rule on expiries, against its own clock; the read takes long enough to cross into the next second
+    const { kv: inner } = fakeKv();
+    const kv = {
+      get: async (key: string, type: 'json') => {
+        const value = await inner.get(key, type);
+        advance(1);
+        return value;
+      },
+      put: async (key: string, value: string, options: KVNamespacePutOptions = {}) => {
+        const ahead = options.expiration !== undefined ? options.expiration - nowSec() : options.expirationTtl;
+        if (ahead !== undefined && ahead < 60) throw new Error('Expiration times must be at least 60 seconds in the future.');
+        await inner.put(key, value, options);
+      }
+    } as unknown as KVNamespace;
+    const results = [];
+    for (let i = 0; i < 3; i++) results.push((await hit(kv, 'login', 2, 60)).ok);
+    expect(results).toEqual([true, true, false]);
   });
 
   it('starts over when the stored value is damaged', async () => {
