@@ -1273,6 +1273,78 @@ describe('POST /api/import/places', () => {
     expect(await importPlaces(carol, rows)).toEqual({ ids: res.ids, created: 0 });
   });
 
+  it('takes the place another import made meanwhile, and does not count it as made', async () => {
+    // two imports at once: after this one looked the place up and before it wrote, the other made the same place
+    const real = platform.env;
+    const theirs = 'poi_01HZZZZZZZZZZZZZZZZZZZZZZZ';
+    let writing = false;
+    let raced = false;
+    const DB = new Proxy(real.DB, {
+      get(db, key) {
+        if (key === 'prepare')
+          return (sql: string) => {
+            if (sql.trimStart().startsWith('INSERT OR IGNORE INTO pois')) writing = true;
+            return db.prepare(sql);
+          };
+        if (key === 'batch')
+          return async (statements: D1PreparedStatement[]) => {
+            if (writing && !raced) {
+              raced = true;
+              await db
+                .prepare(
+                  `INSERT INTO pois (id, name, category, lat, lng, source, source_id) VALUES (?1, '雷峰塔', '塔', 30.2311, 120.1489, 'osm', 'way/2')`
+                )
+                .bind(theirs)
+                .run();
+            }
+            return db.batch(statements);
+          };
+        const value: unknown = Reflect.get(db, key);
+        return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(db) : value;
+      }
+    });
+    platform.env = { ...real, DB };
+    let res: ImportIdsResponse;
+    try {
+      res = await importPlaces(bob, [
+        placeRow('poi_pagoda', {
+          name: '雷峰塔',
+          category: '塔',
+          lat: 30.2311,
+          lng: 120.1489,
+          source: 'osm',
+          sourceId: 'way/2',
+          own: false
+        }),
+        placeRow('poi_temple', {
+          name: '灵隐寺',
+          category: '寺',
+          lat: 30.2408,
+          lng: 120.1012,
+          source: 'amap',
+          sourceId: 'B023B0',
+          own: false
+        }),
+        placeRow('poi_bench', { name: '湖边的长椅', category: '景', lat: 30.25, lng: 120.15, source: 'custom', sourceId: null, own: true })
+      ]);
+    } finally {
+      platform.env = real;
+    }
+    expect(raced).toBe(true);
+    expect(res.ids.poi_pagoda).toBe(theirs);
+    expect(res.ids.poi_bench).toBe(await importedId('poi_', bob, 'poi_bench'));
+    expect(res.created).toBe(2);
+    const pois = await platform.env.DB.prepare('SELECT id, source_id FROM pois ORDER BY source_id').all<{
+      id: string;
+      source_id: string | null;
+    }>();
+    expect(pois.results).toEqual([
+      { id: res.ids.poi_bench, source_id: null },
+      { id: res.ids.poi_temple, source_id: 'B023B0' },
+      { id: theirs, source_id: 'way/2' }
+    ]);
+  });
+
   it('makes a place of no map service at the id the import gives, and finds it there the next time', async () => {
     const carol = await newUser(platform, 'carol');
     const row = placeRow('poi_gate', { name: '小区门口', category: '街区', source: 'custom', sourceId: null, own: true });
