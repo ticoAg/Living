@@ -595,27 +595,34 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     // the other entries keep their own section
     await expect(page.getByRole('region', { name: '记录' })).not.toContainText('晨雾');
     await page.goto(`/@${OWNER.handle}/articles`);
-    await expect(page.getByRole('heading', { level: 1, name: /^文章/ })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: '文章', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: '2026' })).toBeVisible();
     await expect(page.locator('a.sc-article')).toHaveCount(2);
     await follow(page.getByRole('link', { name: OWNER.name, exact: true }));
     await expect(page).toHaveURL(new RegExp(`/@${OWNER.handle}$`));
     clean('works and articles');
 
-    await follow(page.getByRole('link', { name: '访客视角' }));
+    await follow(page.getByRole('link', { name: '访客视角', exact: true }));
     await expect(page).toHaveURL(new RegExp(`/@${OWNER.handle}\\?as=visitor$`));
     await expect(page.getByRole('status').filter({ hasText: '访客看到的样子' })).toBeVisible();
     await expect(articles.getByRole('link')).toHaveCount(1);
     await expect(articles.getByRole('link')).toHaveAccessibleName('画了一年水彩之后，2026.05.05，10 字');
-    await expect(page.getByRole('link', { name: '访客视角' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: '访客视角', exact: true })).toHaveCount(0);
     // the header still shows who is signed in
     await expect(nav.getByRole('link', { name: '今天' })).toBeVisible();
+    // Living plays what a visitor may see: the view stays, its bar out of the way
+    await follow(page.getByRole('link', { name: /^Living，/ }));
+    await expect(page).toHaveURL(/\/living\?.*as=visitor/);
+    await expect(page.getByLabel('Living 全屏轮播')).toBeVisible();
+    await expect(page.locator('.vv-bar')).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(new RegExp(`/@${OWNER.handle}\\?as=visitor$`));
     // links inside the view keep it
     await follow(works.getByRole('link', { name: /^晨雾/ }));
     await expect(page).toHaveURL(new RegExp(`/e/${work.id}\\?as=visitor$`));
     await expect(page.getByRole('heading', { level: 1, name: '晨雾' })).toBeVisible();
     await expect(page.getByRole('link', { name: '编辑' })).toHaveCount(0);
-    await follow(page.getByRole('link', { name: '退出', exact: true }));
+    await follow(page.getByRole('link', { name: '退出访客视角' }));
     await expect(page).toHaveURL(new RegExp(`/e/${work.id}$`));
     await expect(page.getByRole('link', { name: '编辑' })).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: '访客看到的样子' })).toHaveCount(0);

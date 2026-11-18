@@ -11,7 +11,9 @@ import { useVisitor } from './visitor';
 // A failed request is kept until the next mount (or `reload`) asks again.
 //
 // Inside the visitor view (lib/visitor.ts) each path is cached under its visitor key and asked for without cookies.
-// Invalidating, forgetting or replacing a path drops its visitor copy too, so the view never shows what was changed.
+// Any change the author makes (anything invalidated, forgotten or replaced) drops every visitor copy: what a visitor
+// sees depends on more than the paths the author's own pages refresh (a photo made public changes the entries it is
+// in, though the author's copy of them stays the same), so the view never shows what was there before a change.
 
 export const STALE_MS = 5 * 60_000;
 
@@ -74,27 +76,30 @@ export function peek(path: string): Readonly<Entry> | undefined {
  */
 const DERIVED: readonly { path: string; from: readonly string[] }[] = [
   // the year in review counts one's entries, photos, projects, collections, places and tags
-  { path: '/api/review', from: ['/api/entries', '/api/photos', '/api/projects', '/api/themes', '/api/pois', '/api/tags'] }
+  { path: '/api/review', from: ['/api/entries', '/api/photos', '/api/projects', '/api/themes', '/api/pois', '/api/tags'] },
+  // a profile counts the person's photos, collections, entries and projects
+  { path: '/api/users/', from: ['/api/entries', '/api/photos', '/api/projects', '/api/themes'] }
 ];
 
 export function invalidate(prefix: string) {
+  const under = [prefix, VISITOR];
   for (const d of DERIVED) {
-    if (d.from.some((f) => prefix.startsWith(f))) drop(d.path);
+    if (d.from.some((f) => prefix.startsWith(f))) under.push(d.path);
   }
-  drop(prefix);
+  drop(under);
 }
 
-function drop(prefix: string) {
+/** Drop every path under one of `prefixes`: a mounted one is refetched (once), the rest go. */
+function drop(prefixes: readonly string[]) {
   for (const key of Array.from(cache.keys())) {
-    if (key.startsWith(prefix) || key.startsWith(VISITOR + prefix)) {
-      if (listeners.get(key)?.size) {
-        // keep showing the previous data while the refetch runs
-        const prev = cache.get(key);
-        cache.set(key, prev && 'data' in prev ? { data: prev.data, at: prev.at } : {});
-        void load(key);
-      } else {
-        cache.delete(key);
-      }
+    if (!prefixes.some((p) => key.startsWith(p))) continue;
+    if (listeners.get(key)?.size) {
+      // keep showing the previous data while the refetch runs
+      const prev = cache.get(key);
+      cache.set(key, prev && 'data' in prev ? { data: prev.data, at: prev.at } : {});
+      void load(key);
+    } else {
+      cache.delete(key);
     }
   }
 }
@@ -107,15 +112,14 @@ export function prefetch(path: string) {
 /** Drop a cached path, read or not: what it held is gone (a deleted entry), and nothing should show it again. */
 export function forget(path: string) {
   cache.delete(path);
-  cache.delete(VISITOR + path);
+  drop([VISITOR]);
 }
 
 /** Seed or replace a cached value without a request (e.g. after a mutation returns the new object). */
 export function setCached<T>(path: string, data: T) {
   cache.set(path, { data, at: Date.now() });
   notify(path);
-  // what a visitor sees of it may have changed too
-  drop(VISITOR + path);
+  drop([VISITOR]);
 }
 
 /** Back on a tab after a while: refresh what the mounted components show, if it has gone stale. */

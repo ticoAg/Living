@@ -184,10 +184,10 @@ function Reader({ theme, isOwner }: { theme: ThemeDetail; isOwner: boolean }) {
   const scrollToItem = useCallback((itemId: string | undefined) => {
     const el = itemId ? document.getElementById(`item-${itemId}`) : null;
     if (!el) return;
-    // leave room for the sticky site header, whatever height it has at this width
-    const header = document.querySelector('.site-header')?.getBoundingClientRect().height ?? 0;
+    // leave room for the sticky site header, and the visitor view's bar under it, whatever height they have here
+    const top = Math.max(0, ...['.site-header', '.vv-bar'].map((s) => document.querySelector(s)?.getBoundingClientRect().bottom ?? 0));
     const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - header - 16, behavior: calm ? 'auto' : 'smooth' });
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - top - 16, behavior: calm ? 'auto' : 'smooth' });
     el.focus({ preventScroll: true });
   }, []);
 

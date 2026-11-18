@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
-import { enc } from '../browse/api';
 import { useDocTitle, useScrollTop } from '../browse/hooks';
 import { EmptyState, LoadError, Loading } from '../browse/ui';
 import { useEntryList } from '../entries/api';
-import { shelve, WORK_STEP, WORK_TYPE } from '../showcase/showcase';
+import { shelfPath, shelve, WORK_STEP, WORK_TYPE } from '../showcase/showcase';
 import ShowcaseHead from '../showcase/ShowcaseHead';
 import { usePerson } from '../showcase/usePerson';
 import WorkGrid from '../showcase/WorkGrid';
@@ -14,7 +13,7 @@ import '../styles/showcase.css';
 /** /@handle/works — every work of a person the viewer may see, latest first. */
 export default function Works() {
   const { handle, profile, error, reload, own } = usePerson();
-  const list = useEntryList(profile ? `/api/entries?owner=${enc(profile.handle)}&type=${WORK_TYPE}` : null);
+  const list = useEntryList(profile ? shelfPath(profile.handle, WORK_TYPE) : null);
   const works = useMemo(() => (list.entries ? shelve(list.entries).works : undefined), [list.entries]);
   const [limit, setLimit] = useState(WORK_STEP);
 

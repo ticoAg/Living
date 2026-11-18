@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { entry } from '../test-utils';
-import { byYear, coverIds, fmtLength, shelve } from './showcase';
+import { byYear, coverIds, fmtLength, profileShelves, shelfPath, shelve } from './showcase';
 
 describe('shelve', () => {
   it('puts finished creations with the works and finished articles with the articles, the rest after, in list order', () => {
@@ -33,6 +33,40 @@ describe('shelve', () => {
   it('keeps an entry whatever its visibility: the list already holds only what the viewer may see', () => {
     const list = [entry('a', { type: 'article', visibility: 'private' }), entry('b', { type: 'article', visibility: 'unlisted' })];
     expect(shelve(list).articles).toEqual(list);
+  });
+});
+
+describe('profileShelves', () => {
+  const list = [entry('w1', { type: 'creation' }), entry('a1', { type: 'article' }), entry('n1', { type: 'note' })];
+
+  it('splits the list as shelve does while there are no lists by type', () => {
+    expect(profileShelves(list)).toEqual(shelve(list));
+    expect(profileShelves(list, { works: undefined, articles: undefined })).toEqual(shelve(list));
+  });
+
+  it('takes the works and the articles from their own lists once they are here, finished ones only, the rest from the list', () => {
+    const works = [
+      entry('w0', { type: 'creation' }),
+      entry('w1', { type: 'creation' }),
+      entry('wd', { type: 'creation', status: 'draft' })
+    ];
+    const s = profileShelves(list, { works });
+    expect(s.works.map((e) => e.id)).toEqual(['w0', 'w1']);
+    expect(s.articles.map((e) => e.id)).toEqual(['a1']);
+    expect(s.rest.map((e) => e.id)).toEqual(['n1']);
+    const articles = [entry('a0', { type: 'article' }), entry('a1', { type: 'article' })];
+    const t = profileShelves(list, { articles });
+    expect(t.works.map((e) => e.id)).toEqual(['w1']);
+    expect(t.articles.map((e) => e.id)).toEqual(['a0', 'a1']);
+    // an empty list by type is an answer too: none
+    expect(profileShelves(list, { works: [], articles: [] })).toEqual({ works: [], articles: [], rest: shelve(list).rest });
+  });
+});
+
+describe('shelfPath', () => {
+  it('asks for one type of one person, the handle escaped', () => {
+    expect(shelfPath('linzhi', 'creation')).toBe('/api/entries?owner=linzhi&type=creation');
+    expect(shelfPath('a b', 'article')).toBe('/api/entries?owner=a%20b&type=article');
   });
 });
 

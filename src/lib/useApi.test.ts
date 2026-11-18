@@ -129,10 +129,14 @@ describe('invalidate', () => {
     await settle();
     invalidate('/api/users/');
     expect(peek('/api/review/2026')).toBeDefined();
+    prefetch('/api/users/ada');
+    await settle();
     invalidate('/api/entries?');
     expect(peek('/api/entries?mine=1')).toBeUndefined();
     expect(peek('/api/review')).toBeUndefined();
     expect(peek('/api/review/2026')).toBeUndefined();
+    // a profile counts them too
+    expect(peek('/api/users/ada')).toBeUndefined();
     prefetch('/api/review/2026');
     await settle();
     invalidate('/api/photos/');
@@ -152,33 +156,43 @@ describe('the visitor view', () => {
     expect(peek(visitorKey('/api/users/ada'))?.data).toEqual({ as: 'visitor' });
   });
 
-  it('drops the visitor copies of what is invalidated, forgotten or replaced, and nothing else', async () => {
+  it('drops every visitor copy on any change: what a visitor sees hangs on more than the paths changed', async () => {
     const { prefetch, invalidate, forget, setCached, peek, visitorKey: v } = await fresh();
     api.mockResolvedValue({});
-    const paths = ['/api/entries?owner=ada', '/api/entries/en_1', '/api/entries/en_2', '/api/themes/th_1', '/api/review'];
-    for (const p of paths) {
-      prefetch(p);
-      prefetch(v(p));
-    }
-    await settle();
-    invalidate('/api/entries?');
-    expect(peek(v('/api/entries?owner=ada'))).toBeUndefined();
-    expect(peek(v('/api/review'))).toBeUndefined(); // counted from entries
-    expect(peek(v('/api/entries/en_1'))).toBeDefined();
+    const paths = ['/api/entries?owner=ada', '/api/entries/en_1', '/api/themes/th_1', '/api/users/ada', '/api/tags?owner=ada'];
+    const fill = async () => {
+      for (const p of paths) {
+        prefetch(p);
+        prefetch(v(p));
+      }
+      await settle();
+    };
+    await fill();
+    // a photo made public: the author's entries stay as they were, a visitor's do not
+    invalidate('/api/photos');
+    for (const p of paths) expect(peek(v(p)), p).toBeUndefined();
+    expect(peek('/api/entries/en_1')).toBeDefined();
+    expect(peek('/api/tags?owner=ada')).toBeDefined();
+    await fill();
     forget('/api/entries/en_1');
     expect(peek('/api/entries/en_1')).toBeUndefined();
-    expect(peek(v('/api/entries/en_1'))).toBeUndefined();
-    expect(peek(v('/api/entries/en_2'))).toBeDefined();
+    for (const p of paths) expect(peek(v(p)), p).toBeUndefined();
+    expect(peek('/api/themes/th_1')).toBeDefined();
+    await fill();
     setCached('/api/themes/th_1', { theme: 1 });
     expect(peek('/api/themes/th_1')?.data).toEqual({ theme: 1 });
-    expect(peek(v('/api/themes/th_1'))).toBeUndefined();
-    expect(peek(v('/api/entries/en_2'))).toBeDefined();
+    for (const p of paths) expect(peek(v(p)), p).toBeUndefined();
+    expect(peek('/api/entries/en_1')).toBeDefined();
     // a session change drops everything, the visitor's copies included
+    await fill();
     invalidate('/api');
-    for (const p of paths) expect(peek(v(p))).toBeUndefined();
+    for (const p of paths) {
+      expect(peek(p)).toBeUndefined();
+      expect(peek(v(p))).toBeUndefined();
+    }
   });
 
-  it('invalidating a visitor key drops only visitor copies', async () => {
+  it("invalidating a visitor key (a retry in the view) drops the visitor copies and none of the author's", async () => {
     const { prefetch, invalidate, peek, visitorKey: v } = await fresh();
     api.mockResolvedValue({});
     prefetch('/api/entries/en_1');

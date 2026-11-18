@@ -16,7 +16,7 @@ import { useProjectList } from '../projects/api';
 import ProjectCard from '../projects/ProjectCard';
 import { byStatusAndTouch } from '../projects/stages';
 import ArticleRow from '../showcase/ArticleRow';
-import { PROFILE_ARTICLES, PROFILE_WORKS, shelve } from '../showcase/showcase';
+import { ARTICLE_TYPE, PROFILE_ARTICLES, PROFILE_WORKS, profileShelves, shelfPath, WORK_TYPE } from '../showcase/showcase';
 import WorkGrid from '../showcase/WorkGrid';
 import '../styles/browse.css';
 import '../styles/entries.css';
@@ -154,8 +154,11 @@ export default function Profile() {
   const canonical = profile?.handle ?? null;
   const themes = useApi<{ themes: ThemeSummary[] }>(canonical ? `/api/themes?owner=${enc(canonical)}` : null);
   const { photos } = usePhotoList(canonical ? `owner=${enc(canonical)}` : null);
-  const { entries } = useEntryList(canonical ? `/api/entries?owner=${enc(canonical)}` : null);
-  const shelves = useMemo(() => shelve(entries ?? []), [entries]);
+  const { entries, truncated } = useEntryList(canonical ? `/api/entries?owner=${enc(canonical)}` : null);
+  // past the cap of that list the works and articles come from their own lists (showcase/showcase.ts)
+  const works = useEntryList(canonical && truncated ? shelfPath(canonical, WORK_TYPE) : null).entries;
+  const articles = useEntryList(canonical && truncated ? shelfPath(canonical, ARTICLE_TYPE) : null).entries;
+  const shelves = useMemo(() => profileShelves(entries ?? [], { works, articles }), [entries, works, articles]);
   const { user: me } = useSession();
   const own = !!me && !!canonical && me.handle.toLowerCase() === canonical.toLowerCase();
 

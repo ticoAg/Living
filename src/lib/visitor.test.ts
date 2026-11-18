@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { isVisitorSearch, withoutVisitor, withVisitor } from './visitor';
+import { isVisitorSearch, keepVisitor, withoutVisitor, withVisitor } from './visitor';
 
 describe('withVisitor', () => {
   it('keeps the visitor view on the pages a visitor can open, with their query and fragment', () => {
@@ -16,6 +16,7 @@ describe('withVisitor', () => {
     expect(withVisitor('/map')).toBe('/map?as=visitor');
     expect(withVisitor('/index')).toBe('/index?as=visitor');
     expect(withVisitor('/themes')).toBe('/themes?as=visitor');
+    expect(withVisitor('/living?src=theme&theme=th_1')).toBe('/living?src=theme&theme=th_1&as=visitor');
     expect(withVisitor('/e/en_1?as=visitor')).toBe('/e/en_1?as=visitor');
   });
 
@@ -35,7 +36,7 @@ describe('withVisitor', () => {
       '/settings',
       '/login',
       '/upload',
-      '/living',
+      '/living/x',
       '/s/abc',
       '/@linzhi/photos',
       '/api/photos',
@@ -67,5 +68,14 @@ describe('isVisitorSearch', () => {
     expect(isVisitorSearch('')).toBe(false);
     expect(isVisitorSearch('as=owner')).toBe(false);
     expect(isVisitorSearch('as=Visitor')).toBe(false);
+  });
+});
+
+describe('keepVisitor', () => {
+  it('adds the visitor view to a query a page writes for itself, only when the page is in it', () => {
+    expect(keepVisitor('src=all&every=10', '?src=all&as=visitor')).toBe('src=all&every=10&as=visitor');
+    expect(keepVisitor('', 'as=visitor')).toBe('as=visitor');
+    expect(keepVisitor('src=all&every=10', '?src=all')).toBe('src=all&every=10');
+    expect(keepVisitor('', '')).toBe('');
   });
 });

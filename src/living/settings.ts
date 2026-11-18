@@ -8,6 +8,8 @@
 //            Link parameters win; anything the link leaves out falls back to the last settings
 //            used on this device (localStorage), then to the defaults below.
 
+import { keepVisitor } from '../lib/visitor';
+
 export const SRCS = ['all', 'tags', 'place', 'city', 'theme', 'today'] as const;
 export const MATCHES = ['any', 'all'] as const;
 export const ORDERS = ['shuffle', 'time'] as const;
@@ -214,10 +216,14 @@ export function buildQuery(source: Source, s: Settings): string {
   return q.join('&');
 }
 
-/** Keep the address bar equal to the current configuration without adding history entries. */
+/**
+ * Keep the address bar equal to the current configuration without adding history entries. Inside the visitor view the
+ * address keeps saying so: without it the app would leave the view, and start the slideshow again.
+ */
 export function replaceUrl(query: string): void {
+  const q = keepVisitor(query, window.location.search);
   try {
-    window.history.replaceState(window.history.state, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${q ? `?${q}` : ''}${window.location.hash}`);
   } catch {
     /* sandboxed frame */
   }

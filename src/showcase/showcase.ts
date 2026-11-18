@@ -33,6 +33,26 @@ export function shelve(entries: readonly EntrySummary[]): Shelves {
   return out;
 }
 
+/** A person's works or articles alone, as their pages ask for them (src/routes.ts prefetches the same). */
+export const shelfPath = (handle: string, type: EntryType): string => `/api/entries?owner=${encodeURIComponent(handle)}&type=${type}`;
+
+/**
+ * A profile's shelves, from the person's list of entries. That list holds the newest entries only, up to its cap; past
+ * it the works and articles may be more than it holds, so the profile asks for them by type too, as their pages do,
+ * and once those lists are here they take the place of what the first one had.
+ */
+export function profileShelves(
+  entries: readonly EntrySummary[],
+  typed: { works?: readonly EntrySummary[]; articles?: readonly EntrySummary[] } = {}
+): Shelves {
+  const s = shelve(entries);
+  return {
+    works: typed.works ? shelve(typed.works).works : s.works,
+    articles: typed.articles ? shelve(typed.articles).articles : s.articles,
+    rest: s.rest
+  };
+}
+
 /** Entries of one year after another, in list order (latest first): the years of an article list. */
 export function byYear<T extends Pick<EntrySummary, 'occurredAt'>>(entries: readonly T[]): { year: string; entries: T[] }[] {
   const out: { year: string; entries: T[] }[] = [];

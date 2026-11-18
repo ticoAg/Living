@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
-import { enc } from '../browse/api';
 import { useDocTitle, useScrollTop } from '../browse/hooks';
 import { EmptyState, LoadError, Loading } from '../browse/ui';
 import { useEntryList } from '../entries/api';
 import ArticleRow from '../showcase/ArticleRow';
-import { ARTICLE_TYPE, byYear, shelve } from '../showcase/showcase';
+import { ARTICLE_TYPE, byYear, shelfPath, shelve } from '../showcase/showcase';
 import ShowcaseHead from '../showcase/ShowcaseHead';
 import { usePerson } from '../showcase/usePerson';
 import '../styles/browse.css';
@@ -17,7 +16,7 @@ const ARTICLE_STEP = 100;
 /** /@handle/articles — every article of a person the viewer may see, latest first, a year at a time. */
 export default function Articles() {
   const { handle, profile, error, reload, own } = usePerson();
-  const list = useEntryList(profile ? `/api/entries?owner=${enc(profile.handle)}&type=${ARTICLE_TYPE}` : null);
+  const list = useEntryList(profile ? shelfPath(profile.handle, ARTICLE_TYPE) : null);
   const articles = useMemo(() => (list.entries ? shelve(list.entries).articles : undefined), [list.entries]);
   const [limit, setLimit] = useState(ARTICLE_STEP);
   const years = useMemo(() => byYear((articles ?? []).slice(0, limit)), [articles, limit]);

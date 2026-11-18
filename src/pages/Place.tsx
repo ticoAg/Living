@@ -22,6 +22,7 @@ import EntryCard from '../entries/EntryCard';
 import { fmtDistance } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { useVisitor } from '../lib/visitor';
 import '../styles/browse.css';
 import '../styles/entries.css';
 
@@ -63,9 +64,13 @@ export default function Place() {
   const seasonHas = useMemo(() => new Set(rows.filter((r) => !part || r.part === part).map((r) => r.season)), [rows, part]);
   const showOwner = useMemo(() => new Set(rows.map((r) => r.p.ownerHandle)).size > 1, [rows]);
 
+  const visitor = useVisitor();
   useEffect(() => {
-    setBrowseList(visible.map((r) => r.p.id));
-  }, [visible]);
+    setBrowseList(
+      visible.map((r) => r.p.id),
+      visitor
+    );
+  }, [visible, visitor]);
 
   const visibleIds = useMemo(() => new Set(visible.map((r) => r.p.id)), [visible]);
   const photoById = useMemo(() => new Map((photos ?? []).map((p) => [p.id, p])), [photos]);

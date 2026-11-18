@@ -8,10 +8,11 @@ export default function ShowcaseHead({ profile, title, count }: { profile: UserP
       <Link href={`/@${profile.handle}`} className="sc-who">
         {profile.displayName}
       </Link>
-      <h1 className="display display-m">
-        {title}
+      {/* the count beside the heading, not in it: the page's name is the title alone */}
+      <div className="sc-title">
+        <h1 className="display display-m">{title}</h1>
         {count !== undefined && count > 0 && <span className="sc-count">{count}</span>}
-      </h1>
+      </div>
     </header>
   );
 }

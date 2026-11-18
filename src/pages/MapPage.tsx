@@ -35,6 +35,7 @@ import { CategoryIcon, Icon } from '../components/icons';
 import type { AlbumMark, AlbumSize, AlbumSource, MapTarget } from '../components/mapAlbums';
 import { fmtCount } from '../components/mapAlbums';
 import { fmtDay } from '../lib/format';
+import { useVisitor } from '../lib/visitor';
 import '../styles/browse.css';
 
 const PANEL_LIMIT = 24;
@@ -244,9 +245,10 @@ export default function MapPage() {
         : [],
     [selected, matching]
   );
+  const visitor = useVisitor();
   useEffect(() => {
-    setBrowseList(selected ? panelPhotos.map((p) => p.id) : null);
-  }, [selected, panelPhotos]);
+    setBrowseList(selected ? panelPhotos.map((p) => p.id) : null, visitor);
+  }, [selected, panelPhotos, visitor]);
 
   const cities = useMemo(() => {
     const n = new Map<string, number>();

@@ -4,6 +4,7 @@ import type { PhotoSummary } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { useSession } from '../lib/session';
 import { buildTagTree, filterByTags, inclusiveCounts } from '../lib/tags';
+import { useVisitor } from '../lib/visitor';
 import { enc, usePhotoList, usePoiList, useTagTree } from './api';
 import { setBrowseList } from './context';
 import GalleryTile, { galleryTileSize } from './GalleryTile';
@@ -50,9 +51,13 @@ export default function Gallery({ owner }: { owner?: string }) {
   const listed = useDeferredValue(shown);
 
   // the photo page steps through the whole filtered list, not just the tiles rendered so far
+  const visitor = useVisitor();
   useEffect(() => {
-    setBrowseList(shown.map((p) => p.id));
-  }, [shown]);
+    setBrowseList(
+      shown.map((p) => p.id),
+      visitor
+    );
+  }, [shown, visitor]);
 
   const poiOf = useCallback((p: PhotoSummary) => (p.poiId ? poiById.get(p.poiId) : undefined), [poiById]);
   const tileSize = useCallback((p: PhotoSummary) => galleryTileSize(p, poiOf(p)), [poiOf]);

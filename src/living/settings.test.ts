@@ -6,6 +6,7 @@ import {
   defaultOrder,
   readInitial,
   readStored,
+  replaceUrl,
   sourceFromQuery,
   writeStored,
   type Settings,
@@ -347,5 +348,23 @@ describe('buildQuery', () => {
       const s = { ...DEFAULT_SETTINGS };
       expect(readInitial(`?${buildQuery(all, s)}`).settings).toEqual(s);
     });
+  });
+});
+
+describe('replaceUrl', () => {
+  /** A window at `/living` + `search`, recording what the address is replaced with. */
+  function at(search: string) {
+    const replaceState = vi.fn();
+    vi.stubGlobal('window', { location: { pathname: '/living', search, hash: '' }, history: { state: null, replaceState } });
+    return replaceState;
+  }
+
+  it('writes the configuration over the address, and keeps the visitor view in it', () => {
+    const plain = at('?src=all');
+    replaceUrl('src=all&every=10');
+    expect(plain).toHaveBeenCalledWith(null, '', '/living?src=all&every=10');
+    const visitor = at('?src=all&as=visitor');
+    replaceUrl('src=all&every=10');
+    expect(visitor).toHaveBeenCalledWith(null, '', '/living?src=all&every=10&as=visitor');
   });
 });

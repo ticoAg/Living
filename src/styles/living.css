@@ -4,6 +4,8 @@
 html.lv-active,
 html.lv-active body { background: var(--night); }
 html.lv-active body { overflow: hidden; overscroll-behavior: none; }
+/* the slideshow covers the page; in the visitor view (components/VisitorView.tsx) it leaves its bar out too */
+html.lv-active .vv-bar { display: none; }
 
 .lv {
   --lv-gutter: clamp(20px, 3.2vw, 48px);

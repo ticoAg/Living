@@ -15,7 +15,7 @@ export default function VisitorView({ children }: { children: ReactNode }) {
       <div className="vv-bar" role="status">
         <span>访客看到的样子</span>
         {/* outside the router below, so this link leaves the view */}
-        <Link href={withoutVisitor(`${path}?${search}`)} className="vv-exit">
+        <Link href={withoutVisitor(`${path}?${search}`)} className="vv-exit" aria-label="退出访客视角">
           退出
         </Link>
       </div>

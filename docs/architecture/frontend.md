@@ -56,15 +56,17 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 - 其他渲染错误显示「出错了」和「刷新」按钮。
 - `React.lazy` 一旦失败会一直抛同一个错误，所以恢复靠整页跳转，不在页面内重试；预取失败不会让 `lazy` 失败，渲染时会重新请求。
 
-分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品、节奏和列表顺序在 `src/projects/stages.ts`；日历的周、每天的格子、颜色深浅、连续天数和按月计数在 `src/review/calendar.ts`，小月历和按月的柱子是 `src/review/HeatMonth.tsx`、`MonthBars.tsx`，日期的加减在 `shared/days.ts`（Worker 也用它划定日期范围）；分享链接的请求、地址和有效期文字在 `src/shares/api.ts`，记录、合集、项目页上的「分享」对话框是 `src/shares/ShareButton.tsx`，设置里的列表复用同一个 `ShareItem.tsx`；[作品与文章](/product/features/showcase.md) 的分组、按年份分段、字数和封面照片在 `src/showcase/showcase.ts`，作品的格子和按批请求封面在 `WorkTile.tsx`、`WorkGrid.tsx`，文章的一行在 `ArticleRow.tsx`，个人主页也用它们。
+分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品、节奏和列表顺序在 `src/projects/stages.ts`；日历的周、每天的格子、颜色深浅、连续天数和按月计数在 `src/review/calendar.ts`，小月历和按月的柱子是 `src/review/HeatMonth.tsx`、`MonthBars.tsx`，日期的加减在 `shared/days.ts`（Worker 也用它划定日期范围）；分享链接的请求、地址和有效期文字在 `src/shares/api.ts`，记录、合集、项目页上的「分享」对话框是 `src/shares/ShareButton.tsx`，设置里的列表复用同一个 `ShareItem.tsx`；[作品与文章](/product/features/showcase.md) 的分组、按年份分段、字数、封面照片和按类型读取的地址在 `src/showcase/showcase.ts`，作品的格子和按批请求封面在 `WorkTile.tsx`、`WorkGrid.tsx`，文章的一行在 `ArticleRow.tsx`，个人主页也用它们。
 
 ## 访客视角
 
 地址带 `?as=visitor` 时，`src/App.tsx` 把路由包进 `src/components/VisitorView.tsx`，页眉留在外面：
 
-- `VisitorContext`（`src/lib/visitor.ts`）为真，`useApi(path)` 改用缓存键 `visitor:` + path，请求不带 Cookie、不读浏览器缓存（`api()` 的 `anonymous`）。同一个地址自己读和访客读分开缓存；失效、`forget`、`setCached` 一个地址时，它的访客副本一并丢掉，改完再看访客视角不会是旧的。访客请求的 401 不当作会话过期。
+- `VisitorContext`（`src/lib/visitor.ts`）为真，`useApi(path)` 改用缓存键 `visitor:` + path，请求不带 Cookie、不读浏览器缓存（`api()` 的 `anonymous`）。同一个地址自己读和访客读分开缓存；任何失效、`forget`、`setCached` 都丢掉全部访客副本：访客看到什么不只取决于作者那边会刷新的地址（一张照片改为公开，包含它的记录在访客眼里变了，作者的那份却没变），改完再看访客视角不会是旧的。访客请求的 401 不当作会话过期。
 - `AsVisitor`（`src/lib/session.tsx`）让里面的页面看到「没有登录」：`own`、编辑、分享这些都按访客算。
-- 里面的 wouter `Router` 用 `hrefs` 和 `aroundNav` 给访客也能打开的页面（`withVisitor`）的链接和跳转加上 `?as=visitor`，去别的页面就离开访客视角；横栏的「退出」在这个 `Router` 外面，去掉参数回到自己的视角。悬停预取（`src/routes.ts`）对带 `?as=visitor` 的链接也按访客的缓存键预取。
+- 里面的 wouter `Router` 用 `hrefs` 和 `aroundNav` 给访客也能打开的页面（`withVisitor`）的链接和跳转加上 `?as=visitor`，去别的页面就离开访客视角；横栏的「退出」在这个 `Router` 外面，去掉参数回到自己的视角。悬停预取（`src/routes.ts`）对带 `?as=visitor` 的链接也按访客的缓存键预取。自己改写地址的页面用 `keepVisitor` 留住参数（Living 的 `replaceUrl`），否则 `App` 离开访客视角，页面重新挂载。
+- 照片页的上一张、下一张用列表页记下的顺序（`src/browse/context.ts`），记下时注明视角，只在同一视角里用，访客视角里不会翻到自己才看得到的照片。
+- `--vv-h` 是横栏的高度：`:root:has(.vv-bar)` 把它设为 `scroll-padding-top`，锚点和滚动定位让开横栏；铺满一屏的地图页减去它；合集阅读页的 `scrollToItem` 量页眉和横栏的底边。Living 全屏播放，横栏不显示。
 
 # 共享模块（改动需要协调）
 
@@ -76,8 +78,8 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `shared/projects.ts` | 项目类型与状态的名字、从项目新写的记录的类型（`entryTypeFor`）、两个本地日期之间的天数 |
 | `shared/limits.ts` | 输入上限：照片、合集、合集条目、记录、标签、账号（含用户名格式 `HANDLE_RE`）、隐私区域、邀请码、地点搜索与地区名；地点编辑的 `POI_LIMITS` 留在 `shared/types.ts`，在这里再导出。Worker 的校验和表单的 `maxLength`、提示文案、发送前检查都引用它，不另写数字 |
 | `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()`；`/api/auth/*` 以外的 401 经 `onSessionLost` 通知会话层；`anonymous` 以访客身份请求（不带 Cookie、不读浏览器缓存） |
-| `src/lib/visitor.ts` | [访客视角](#访客视角)：`VisitorContext`、`withVisitor` / `withoutVisitor`（哪些页面保持访客视角）、`isVisitorSearch` |
-| `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`、`forget(path)`（删除后丢掉，不再显示也不重取）。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢。访客视角里用 `visitorKey(path)` 另存一份 |
+| `src/lib/visitor.ts` | [访客视角](#访客视角)：`VisitorContext`、`withVisitor` / `withoutVisitor`（哪些页面保持访客视角）、`isVisitorSearch`、`keepVisitor`（自己改写地址的页面留住访客视角） |
+| `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`、`forget(path)`（删除后丢掉，不再显示也不重取）。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢。访客视角里用 `visitorKey(path)` 另存一份，任何改动都丢掉全部访客副本 |
 | `src/lib/chunks.ts` | 分块失效的识别与一次性整页重新加载，见 [分块失效与错误](#分块失效与错误) |
 | `src/lib/scroll.ts` | 按历史记录恢复滚动位置；页面经 `useScrollTop` 调用 |
 | `src/lib/usePaged.ts`、`shown.ts` | 长列表分段渲染：先渲染一页，接近底部时再接一页，数量记在 `history.state` |

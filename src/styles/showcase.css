@@ -47,7 +47,8 @@
 .sc-page { display: flex; flex-direction: column; }
 .sc-page-text { max-width: 880px; }
 .sc-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 30px 0 26px; }
-.sc-head h1 { margin: 0; display: flex; align-items: baseline; gap: 14px; }
+.sc-title { display: flex; align-items: baseline; gap: 14px; }
+.sc-head h1 { margin: 0; }
 .sc-who { display: inline-flex; align-items: center; min-height: 44px; margin: 0 -10px; padding: 0 10px; color: var(--ink-2); font-size: 14px; }
 .sc-who:hover { color: var(--ink); }
 .sc-count { font: 400 18px var(--latin); font-variant-numeric: lining-nums tabular-nums; color: var(--ink-3); }

@@ -14,10 +14,14 @@ export const useVisitor = () => useContext(VisitorContext);
 
 /** Pages a visitor can open. A link to one keeps the visitor view; any other link leaves it. */
 const VISITOR_PAGES =
-  /^\/(?:|(?:@|%40)[^/]+(?:\/works|\/articles)?\/?|e\/[^/]+|t\/[^/]+|projects\/(?!new$)[^/]+|p\/[^/]+|place\/[^/]+|map|index|themes)$/i;
+  /^\/(?:|(?:@|%40)[^/]+(?:\/works|\/articles)?\/?|e\/[^/]+|t\/[^/]+|projects\/(?!new$)[^/]+|p\/[^/]+|place\/[^/]+|map|index|themes|living)$/i;
 
 /** A query string (with or without its "?") that opens the visitor view. */
 export const isVisitorSearch = (search: string): boolean => new URLSearchParams(search).get(PARAM) === VALUE;
+
+/** `query` (without its "?") for a page that rewrites its own address: still in the visitor view if `search` is. */
+export const keepVisitor = (query: string, search: string): string =>
+  isVisitorSearch(search) ? `${query ? `${query}&` : ''}${PARAM}=${VALUE}` : query;
 
 function parse(href: string): URL | null {
   try {
