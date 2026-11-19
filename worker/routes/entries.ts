@@ -11,6 +11,7 @@ import {
   type Visibility
 } from '../../shared/types';
 import type { AppEnv } from '../env';
+import { assertUsableAttachments, deleteAttachmentFiles, FILE_COLS, writeAttachments, type AttachmentFiles } from '../lib/attachments';
 import {
   assertOwnPhotos,
   ENTRY_FROM,
@@ -139,11 +140,19 @@ entries.post('/', async (c) => {
   const db = c.env.DB;
   const f = parseEntryFields(await readJson(c, MAX_BODY_BYTES), true);
   const media = f.media ?? [];
-  assertNotEmpty(f.title, f.body, media.length);
+  const attached = f.attachments ?? [];
+  assertNotEmpty(f.title, f.body, media.length + attached.length);
   await assertOwnPhotos(
     db,
     user.id,
     media.map((m) => m.photoId)
+  );
+  // uploaded beforehand (POST /api/attachments), and in no entry yet
+  await assertUsableAttachments(
+    db,
+    user.id,
+    null,
+    attached.map((a) => a.attachmentId)
   );
   // like a photo's: presets and the author's own tags; others are dropped
   const tagIds = f.tagIds ? await usableTagIds(db, user.id, f.tagIds) : [];
@@ -170,6 +179,7 @@ entries.post('/', async (c) => {
       updated_at: now
     }),
     ...writeMedia(db, id, media),
+    ...writeAttachments(db, id, attached, now),
     ...writeTags(db, id, tagIds),
     ...writeProjects(db, id, projectIds)
   ]);
@@ -208,16 +218,23 @@ entries.patch('/:id', async (c) => {
   if (f.revision !== undefined && f.revision !== row.revision) {
     throw conflict('这条记录在别的窗口或设备上改过了，先载入最新的内容', { revision: row.revision });
   }
-  const mediaCount =
-    f.media?.length ??
-    (await db.prepare('SELECT COUNT(*) AS n FROM entry_media WHERE entry_id = ?1').bind(row.id).first<{ n: number }>())?.n ??
-    0;
-  assertNotEmpty('title' in f ? f.title : row.title, 'body' in f ? f.body : row.body, mediaCount);
+  const count = async (table: string) =>
+    (await db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE entry_id = ?1`).bind(row.id).first<{ n: number }>())?.n ?? 0;
+  const held = (f.media?.length ?? (await count('entry_media'))) + (f.attachments?.length ?? (await count('attachments')));
+  assertNotEmpty('title' in f ? f.title : row.title, 'body' in f ? f.body : row.body, held);
   if (f.media) {
     await assertOwnPhotos(
       db,
       user.id,
       f.media.map((m) => m.photoId)
+    );
+  }
+  if (f.attachments) {
+    await assertUsableAttachments(
+      db,
+      user.id,
+      row.id,
+      f.attachments.map((a) => a.attachmentId)
     );
   }
   const tagIds = f.tagIds ? await usableTagIds(db, user.id, f.tagIds) : undefined;
@@ -236,11 +253,14 @@ entries.patch('/:id', async (c) => {
   if ('poiId' in f) set('poi_id', f.poiId ?? null);
 
   const statements: D1PreparedStatement[] = [];
-  if (sets.length || f.media || tagIds || projectIds) {
-    set('updated_at', nowIso());
+  const now = nowIso();
+  if (sets.length || f.media || f.attachments || tagIds || projectIds) {
+    set('updated_at', now);
     statements.push(prepQ(db, `UPDATE entries SET ${sets.join(', ')}, revision = revision + 1 WHERE id = ${q.p(row.id)}`, q));
   }
   if (f.media) statements.push(...writeMedia(db, row.id, f.media, true));
+  // the ones it no longer lists come loose, to be deleted a week later (lib/attachments.ts)
+  if (f.attachments) statements.push(...writeAttachments(db, row.id, f.attachments, now, true));
   if (tagIds) statements.push(...writeTags(db, row.id, tagIds, true));
   if (projectIds) statements.push(...writeProjects(db, row.id, projectIds, true));
   if (statements.length) await db.batch(statements);
@@ -252,14 +272,18 @@ entries.delete('/:id', async (c) => {
   const db = c.env.DB;
   const row = await ownedEntry(c, user, paramId(c));
   // the photos stay: an entry only points at them; the themes holding it lose that item and count as changed
-  await db.batch([
+  const statements = [
     prep(db, 'UPDATE themes SET updated_at = ?1 WHERE id IN (SELECT theme_id FROM theme_items WHERE entry_id = ?2)', nowIso(), row.id),
     prep(db, 'DELETE FROM theme_items WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_media WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_tags WHERE entry_id = ?1', row.id),
     prep(db, 'DELETE FROM entry_projects WHERE entry_id = ?1', row.id),
-    prep(db, 'DELETE FROM share_links WHERE entry_id = ?1', row.id),
-    prep(db, 'DELETE FROM entries WHERE id = ?1', row.id)
-  ]);
+    prep(db, 'DELETE FROM share_links WHERE entry_id = ?1', row.id)
+  ];
+  // its attachments go with it, rows first: once gone, nothing reaches their files
+  const attachments = statements.push(prep(db, `DELETE FROM attachments WHERE entry_id = ?1 RETURNING ${FILE_COLS}`, row.id)) - 1;
+  statements.push(prep(db, 'DELETE FROM entries WHERE id = ?1', row.id));
+  const results = await db.batch<AttachmentFiles>(statements);
+  await deleteAttachmentFiles(c.env.MEDIA, results[attachments].results);
   return c.json({ ok: true });
 });

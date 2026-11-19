@@ -2,6 +2,7 @@
 // Docs: /docs/api/entries.md
 
 import { ENTRY_LIMITS, PROJECT_LIMITS } from '../../shared/limits';
+import { parseEntryAttachments, type AttachmentField } from './attachments';
 import { ENTRY_STATUSES, ENTRY_TYPES, VISIBILITIES, type EntryStatus, type EntryType, type Visibility } from '../../shared/types';
 import { ID_RE, invalid } from './http';
 import { has, isPlainObject, optEnum, optMarkdown, optNum, optOccurredAt, optText, strArray, type Body } from './validate';
@@ -20,6 +21,8 @@ export interface EntryFields {
   visibility?: Visibility;
   status?: EntryStatus;
   media?: MediaField[];
+  /** the route checks that they are the author's, uploaded, and loose or the entry's own */
+  attachments?: AttachmentField[];
   tagIds?: string[];
   projectIds?: string[];
   /** an existing place, or null for none; the route checks that it exists */
@@ -63,6 +66,7 @@ export function parseEntryFields(body: Body, create: boolean): EntryFields {
   const status = optEnum<EntryStatus>(body.status, '状态', ENTRY_STATUSES);
   if (status) f.status = status;
   if (has(body, 'media')) f.media = parseMedia(body.media);
+  if (has(body, 'attachments')) f.attachments = parseEntryAttachments(body.attachments);
   if (has(body, 'tagIds')) {
     if (!Array.isArray(body.tagIds)) throw invalid('标签需要是数组');
     f.tagIds = strArray(body.tagIds, '标签', ENTRY_LIMITS.tagCount);
@@ -82,7 +86,7 @@ export function parseEntryFields(body: Body, create: boolean): EntryFields {
   return f;
 }
 
-/** An entry says something: a title, some text, or a photo. */
-export function assertNotEmpty(title: string | null | undefined, body: string | null | undefined, mediaCount: number): void {
-  if (!title && !body && mediaCount === 0) throw invalid('记录不能是空的：写点文字，或者加一张照片');
+/** An entry says something: a title, some text, a photo or an attachment (`held`: photos and attachments). */
+export function assertNotEmpty(title: string | null | undefined, body: string | null | undefined, held: number): void {
+  if (!title && !body && held === 0) throw invalid('记录不能是空的：写点文字，或者加一张照片、一个附件');
 }

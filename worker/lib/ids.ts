@@ -55,7 +55,8 @@ export const newId = {
   milestone: () => `ms_${ulid()}`,
   tag: () => `t_${ulid()}`,
   zone: () => `pz_${ulid()}`,
-  share: () => `sl_${ulid()}`
+  share: () => `sl_${ulid()}`,
+  attachment: () => `at_${ulid()}`
 };
 
 /**

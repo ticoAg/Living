@@ -1,15 +1,17 @@
 // Living — one Worker: JSON API (/api), media from R2 (/media), and the SPA via static assets; plus the hourly job
-// (provinces, place cache cleanup).
+// (provinces, place cache cleanup, loose attachments).
 // Contract: /docs/api/
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AppEnv, Env } from './env';
+import { purgeLooseAttachments } from './lib/attachments';
 import { forbidden, HttpError, REFERRER_POLICY } from './lib/http';
 import { fillRegions } from './lib/regions';
 import { purgePlaceCache } from './providers/cache';
 import { admin } from './routes/admin';
+import { attachments } from './routes/attachments';
 import { auth } from './routes/auth';
 import { entries } from './routes/entries';
 import { exporter } from './routes/export';
@@ -86,6 +88,7 @@ app.route('/api/tags', tags);
 app.route('/api/pois', pois);
 app.route('/api/themes', themes);
 app.route('/api/entries', entries);
+app.route('/api/attachments', attachments);
 app.route('/api/projects', projects);
 app.route('/api/privacy-zones', privacyZones);
 app.route('/api/shares', shares);
@@ -152,13 +155,17 @@ app.onError((err, c) => {
 });
 
 /**
- * The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts), and expired rows of the
- * place cache (providers/cache.ts). The two are independent: one failing does not stop the other.
+ * The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts), expired rows of the
+ * place cache (providers/cache.ts), and attachments in no entry past their time (lib/attachments.ts). The jobs are
+ * independent: one failing does not stop the others.
  */
 async function scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
   const failed = (job: string) => (e: unknown) => console.error(`${job}: run failed`, e instanceof Error ? (e.stack ?? e.message) : e);
   ctx.waitUntil(fillRegions(env).then((run) => console.log('regions', JSON.stringify(run)), failed('regions')));
   ctx.waitUntil(purgePlaceCache(env.DB).then((purged) => console.log('place cache', JSON.stringify({ purged })), failed('place cache')));
+  ctx.waitUntil(
+    purgeLooseAttachments(env.DB, env.MEDIA).then((run) => console.log('attachments', JSON.stringify(run)), failed('attachments'))
+  );
 }
 
 export default { fetch: app.fetch, scheduled } satisfies ExportedHandler<Env>;

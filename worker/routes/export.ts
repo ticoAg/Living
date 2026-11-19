@@ -8,6 +8,7 @@
 import { Hono } from 'hono';
 import {
   EXPORT_PARTS,
+  type ExportAttachment,
   type ExportEntry,
   type ExportEntryMedia,
   type ExportEntryProject,
@@ -171,6 +172,29 @@ const PARTS: { [P in ExportPart]: PartSpec<unknown> } = {
     cols: 'ep.entry_id, ep.project_id',
     size: '80',
     map: (r): ExportEntryProject => ({ entryId: str(r.entry_id), projectId: str(r.project_id) })
+  },
+  // the ones in entries: a loose one is an upload not kept, or one taken out of its entry
+  attachments: {
+    from: 'attachments a',
+    where: 'a.owner_id = ?owner AND a.entry_id IS NOT NULL AND a.uploaded_at IS NOT NULL',
+    key: ['a.id'],
+    cols: 'a.id, a.entry_id, a.position, a.caption, a.kind, a.name, a.mime, a.size, a.duration, a.width, a.height, a.poster_key, a.created_at',
+    size: `${bytes('a.caption')} + ${bytes('a.name')} + 300`,
+    map: (r): ExportAttachment => ({
+      id: str(r.id),
+      entryId: str(r.entry_id),
+      position: r.position as number,
+      caption: opt(r.caption),
+      kind: r.kind as ExportAttachment['kind'],
+      name: str(r.name),
+      mime: str(r.mime),
+      size: r.size as number,
+      duration: num(r.duration),
+      width: num(r.width),
+      height: num(r.height),
+      poster: r.poster_key !== null,
+      createdAt: str(r.created_at)
+    })
   },
   projects: {
     from: 'projects pj',
@@ -388,7 +412,9 @@ exporter.get('/', async (c) => {
   const row = await prepQ(
     db,
     `SELECT u.id, u.handle, u.display_name, u.bio, u.avatar_photo_id, u.role, u.photo_visibility, u.created_at,
-       (SELECT coalesce(SUM(file_size), 0) FROM photos WHERE owner_id = ${v}) AS original_bytes, ${counts.join(', ')}
+       (SELECT coalesce(SUM(file_size), 0) FROM photos WHERE owner_id = ${v}) AS original_bytes,
+       (SELECT coalesce(SUM(a.size), 0) FROM ${PARTS.attachments.from} WHERE ${PARTS.attachments.where.replaceAll('?owner', v)}) AS attachment_bytes,
+       ${counts.join(', ')}
      FROM users u WHERE u.id = ${v}`,
     q
   ).first<Row>();
@@ -406,7 +432,8 @@ exporter.get('/', async (c) => {
   const body: ExportSummary = {
     profile,
     counts: Object.fromEntries(EXPORT_PARTS.map((p) => [p, row[p] as number])) as ExportSummary['counts'],
-    originalBytes: row.original_bytes as number
+    originalBytes: row.original_bytes as number,
+    attachmentBytes: row.attachment_bytes as number
   };
   return c.json(body);
 });

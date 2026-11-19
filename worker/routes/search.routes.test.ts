@@ -20,7 +20,7 @@ import {
   type ThemeDetail,
   type Visibility
 } from '../../shared/types';
-import { Client, expectStatus, newUser, upload, usePlatform, type Json } from '../test-platform';
+import { bytesOf, Client, expectStatus, newUser, upload, uploadAttachment, usePlatform, type Json } from '../test-platform';
 
 const platform = usePlatform();
 
@@ -161,11 +161,13 @@ describe('whose archive a search reads', () => {
     const own = await tag(bob, '西湖');
     const lake = await place(bob, '西湖', ['西湖']);
     const shot = await upload(bob, { title: '西湖', note: '西湖', visibility: 'public', tagIds: ['lake', own], poiId: lake });
+    const sound = await uploadAttachment(bob, bytesOf(10), { name: '西湖.m4a' });
     await entry(bob, {
       title: '西湖',
       body: '西湖',
       visibility: 'public',
       media: [{ photoId: shot.id, caption: '西湖' }],
+      attachments: [{ attachmentId: sound.id, caption: '西湖' }],
       tagIds: [own],
       poiId: lake
     });
@@ -239,6 +241,23 @@ describe('how words match', () => {
       expect(sorted(await found(alice, q, 'entries')), q).toEqual(sorted([both.id, bodyAndCaption.id, titleAndCaption.id, twoCaptions.id]));
       expect(await found(alice, q, 'photos'), q).toEqual([titled.id]);
     }
+  });
+
+  it('finds an entry by its attachments too: their captions and their files’ names, while it holds them', async () => {
+    const recording = (name: string) => uploadAttachment(alice, bytesOf(10), { name });
+    const [named, captioned, both] = [await recording('西湖夜游.m4a'), await recording('a.m4a'), await recording('断桥.m4a')];
+    const byName = await entry(alice, { body: '雪', attachments: [{ attachmentId: named.id }] });
+    const byCaption = await entry(alice, { body: '雨', attachments: [{ attachmentId: captioned.id, caption: '西湖的雨声' }] });
+    const across = await entry(alice, { title: '游记', attachments: [{ attachmentId: both.id, caption: '西湖' }] });
+    // in no entry, it is found nowhere
+    await recording('西湖.m4a');
+    const snippets = Object.fromEntries((await hits(alice, '西湖', 'entries')).map((h) => [h.id, h.snippet]));
+    expect(snippets).toEqual({ [byName.id]: '西湖夜游.m4a', [byCaption.id]: '西湖的雨声', [across.id]: '西湖' });
+    expect(await found(alice, '西湖 断桥', 'entries')).toEqual([across.id]);
+    expect(await found(alice, '游记 断桥', 'entries')).toEqual([across.id]);
+    // taken out of its entry, it no longer finds it
+    expectStatus(await alice.patch(`/api/entries/${byName.id}`, { attachments: [] }), 200);
+    expect(sorted(await found(alice, '西湖', 'entries'))).toEqual(sorted([byCaption.id, across.id]));
   });
 
   it('needs every word in a project, a collection, a place or a tag, each anywhere in it', async () => {

@@ -67,6 +67,28 @@ export const ENTRY_LIMITS = {
   tagCount: 200
 } as const;
 
+/** `POST /api/attachments` and an entry's `attachments`. */
+export const ATTACHMENT_LIMITS = {
+  /** one file, in bytes (2 GiB) */
+  maxBytes: 2 * 1024 ** 3,
+  /** attachments one entry holds */
+  perEntry: 20,
+  /** the file's name */
+  nameMax: 200,
+  /** under one attachment of an entry */
+  captionMax: 2000,
+  /** uploads one person has begun and not completed */
+  uploadingMax: 10,
+  /** a video's frame, in bytes */
+  posterMaxBytes: 2 * 1024 * 1024
+} as const;
+
+/**
+ * An attachment goes up in parts of this many bytes, the last one shorter: an R2 multipart upload takes parts of at
+ * least 5 MiB, all but the last of one size, and the Workers plans take request bodies of up to 100 MB.
+ */
+export const ATTACHMENT_PART_BYTES = 16 * 1024 * 1024;
+
 /** `POST /api/projects`, `PATCH /api/projects/:id`. */
 export const PROJECT_LIMITS = {
   titleMax: 100,

@@ -4,7 +4,7 @@
 
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, beforeEach, expect } from 'vite-plus/test';
-import type { PhotoDetail, Role, SessionUser, Visibility } from '../shared/types';
+import type { AttachmentUpload, OwnAttachment, PhotoDetail, Role, SessionUser, Visibility } from '../shared/types';
 import type { Env } from './env';
 import { app } from './index';
 import { hashPassword, randomToken } from './lib/crypto';
@@ -374,6 +374,36 @@ export class Client {
   }
 }
 
+/**
+ * A browser that also keeps the share links it opened: the `living_shares` cookie the Worker sets goes back with every
+ * request, as a real browser sends it (it is HttpOnly, so no page script ever sees it). `Client` carries the session only.
+ */
+export class Browser extends Client {
+  shares: string | null = null;
+
+  /** A browser with `client`'s session, or a visitor's. */
+  static of(platform: Platform, client?: Client): Browser {
+    const b = new Browser(platform);
+    b.cookie = client?.cookie ?? null;
+    b.user = client?.user ?? null;
+    return b;
+  }
+
+  override async fetch(path: string, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers);
+    if (this.shares && !headers.has('cookie')) {
+      const session = this.cookie ? `living_session=${this.cookie}; ` : '';
+      headers.set('cookie', `${session}living_shares=${this.shares}`);
+    }
+    const res = await super.fetch(path, { ...init, headers });
+    for (const line of res.headers.getSetCookie()) {
+      const m = /^living_shares=([^;]*)/.exec(line);
+      if (m) this.shares = m[1] && !/max-age=0\b/i.test(line) ? m[1] : null;
+    }
+    return res;
+  }
+}
+
 /** Returns the body of a response that must have `status`, with the error body in the failure message. */
 export function expectStatus<T>(res: ApiResponse<T>, status: number): T {
   expect(res.status, JSON.stringify(res.body)).toBe(status);
@@ -470,4 +500,47 @@ export async function uploadRaw(client: Client, form: FormData): Promise<ApiResp
 /** Uploads a photo that must succeed and returns it. */
 export async function upload(client: Client, meta: Json = {}): Promise<PhotoDetail> {
   return expectStatus(await uploadRaw(client, uploadForm(meta)), 201).photo as PhotoDetail;
+}
+
+// ---- attachments --------------------------------------------------------------------------------------------------
+
+/** A file of `size` bytes that says where each of its bytes is: byte i is i mod 251. */
+export function bytesOf(size: number): Uint8Array {
+  const out = new Uint8Array(size);
+  for (let i = 0; i < size; i++) out[i] = i % 251;
+  return out;
+}
+
+/** An attachment begun, a recording's meta unless `meta` says otherwise; it must succeed. */
+export async function beginAttachment(client: Client, meta: Json = {}): Promise<AttachmentUpload> {
+  const body = { kind: 'audio', name: '录音.m4a', mime: 'audio/mp4', size: 1000, duration: 3.5, ...meta };
+  return expectStatus(await client.post<AttachmentUpload>('/api/attachments', body), 201);
+}
+
+/** `bytes` sent as part `n` of attachment `id`. */
+export async function putPart(client: Client, id: string, n: number, bytes: Uint8Array, headers: Record<string, string> = {}) {
+  const res = await client.fetch(`/api/attachments/${id}/parts/${n}`, {
+    method: 'PUT',
+    body: bytes,
+    headers: { 'content-type': 'application/octet-stream', ...headers }
+  });
+  const text = await res.text();
+  return { status: res.status, body: (text ? JSON.parse(text) : null) as Json, headers: res.headers } satisfies ApiResponse<Json>;
+}
+
+/** Every part of an upload sent, in order: what `complete` takes. */
+export async function putParts(client: Client, begun: AttachmentUpload, bytes: Uint8Array): Promise<Json[]> {
+  const parts: Json[] = [];
+  for (let n = 1; n <= begun.parts; n++) {
+    const from = (n - 1) * begun.partBytes;
+    parts.push(expectStatus(await putPart(client, begun.attachment.id, n, bytes.subarray(from, from + begun.partBytes)), 200));
+  }
+  return parts;
+}
+
+/** An attachment of `bytes` uploaded in full and in no entry, a recording unless `meta` says otherwise. */
+export async function uploadAttachment(client: Client, bytes: Uint8Array = bytesOf(1000), meta: Json = {}): Promise<OwnAttachment> {
+  const begun = await beginAttachment(client, { ...meta, size: bytes.byteLength });
+  const parts = await putParts(client, begun, bytes);
+  return expectStatus(await client.post(`/api/attachments/${begun.attachment.id}/complete`, { parts }), 200).attachment as OwnAttachment;
 }

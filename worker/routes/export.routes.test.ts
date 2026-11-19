@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it } from 'vite-plus/test';
 import {
   EXPORT_PARTS,
+  type EntryAttachment,
   type EntryDetail,
   type ExportPage,
   type ExportPart,
@@ -16,7 +17,7 @@ import {
   type ShareLink,
   type ThemeDetail
 } from '../../shared/types';
-import { Client, expectStatus, JPEG, newSha, newUser, upload, usePlatform, type Json } from '../test-platform';
+import { bytesOf, Client, expectStatus, JPEG, newSha, newUser, upload, uploadAttachment, usePlatform, type Json } from '../test-platform';
 
 const platform = usePlatform();
 
@@ -128,6 +129,9 @@ interface Archive {
   photos: [PhotoDetail, PhotoDetail];
   sha: string;
   entry: EntryDetail;
+  /** the entry's one attachment; another of the person's, in no entry, is no part of an export */
+  attachment: EntryAttachment;
+  loose: string;
   project: ProjectDetail;
   milestone: Milestone;
   theme: ThemeDetail;
@@ -185,6 +189,15 @@ async function archive(client: Client, name: string): Promise<Archive> {
     await client.post(`/api/projects/${pid}/milestones`, { title: '第一步', date: '2026-04-01', body: '小结' }),
     201
   ).milestone as Milestone;
+  const clip = await uploadAttachment(client, bytesOf(1234), {
+    kind: 'video',
+    name: `${name}的视频.mp4`,
+    mime: 'video/mp4',
+    duration: 4.25,
+    width: 640,
+    height: 360
+  });
+  const loose = (await uploadAttachment(client)).id;
   const e = expectStatus(
     await client.post('/api/entries', {
       occurredAt: AT,
@@ -194,6 +207,7 @@ async function archive(client: Client, name: string): Promise<Archive> {
       status: 'archived',
       visibility: 'unlisted',
       media: [{ photoId: first.id, caption: '说明' }, { photoId: second.id }],
+      attachments: [{ attachmentId: clip.id, caption: '湖边' }],
       tagIds: [tag, 'lake'],
       projectIds: [pid],
       poiId: place
@@ -220,6 +234,7 @@ async function archive(client: Client, name: string): Promise<Archive> {
   expectStatus(await client.put(`/api/themes/${tid}/items`, { items }), 200);
   const zone = expectStatus(await client.post('/api/privacy-zones', { name: '家', lat: 31, lng: 121, radius: 300 }), 201).zone.id as string;
   const link = await share(client, 'entry', e.id, { expiresInDays: 7 });
+  const entry = expectStatus(await client.get<EntryDetail>(`/api/entries/${e.id}`), 200);
   return {
     tag,
     place,
@@ -228,7 +243,9 @@ async function archive(client: Client, name: string): Promise<Archive> {
       expectStatus(await client.get<PhotoDetail>(`/api/photos/${second.id}`), 200)
     ],
     sha,
-    entry: expectStatus(await client.get<EntryDetail>(`/api/entries/${e.id}`), 200),
+    entry,
+    attachment: entry.attachments[0],
+    loose,
     project: expectStatus(await client.get<ProjectDetail>(`/api/projects/${pid}`), 200),
     milestone,
     theme: expectStatus(await client.get<ThemeDetail>(`/api/themes/${tid}`), 200),
@@ -248,6 +265,7 @@ function keysOf(a: Archive, presetIds: string[]): Record<ExportPart, string[]> {
     entryMedia: [`${e},${p1.id}`, `${e},${p2.id}`],
     entryTags: [`${e},${a.tag}`, `${e},lake`],
     entryProjects: [`${e},${a.project.id}`],
+    attachments: [a.attachment.id],
     projects: [a.project.id],
     milestones: [a.milestone.id],
     themes: [a.theme.id],
@@ -295,7 +313,8 @@ describe('GET /api/export and /api/export/:part', () => {
       ['photoTags', ',lake'],
       ['entryMedia', 'en_a'],
       ['entryTags', 'en_a,t a'],
-      ['entryProjects', 'en_a']
+      ['entryProjects', 'en_a'],
+      ['attachments', 'at_a,x']
     ];
     for (const [part, after] of bad) {
       const res = await alice.get(`/api/export/${part}?after=${encodeURIComponent(after)}`);
@@ -364,6 +383,7 @@ describe('what an export holds', () => {
       entryMedia: 2,
       entryTags: 2,
       entryProjects: 1,
+      attachments: 1,
       projects: 1,
       milestones: 1,
       themes: 1,
@@ -373,8 +393,15 @@ describe('what an export holds', () => {
       privacyZones: 1,
       shareLinks: 1
     });
+    // the attachments' files, those in entries alone
+    expect(summary.attachmentBytes).toBe(1234);
     // bob's sum: his originals as uploaded
     expect(expectStatus(await bob.get<ExportSummary>('/api/export'), 200).originalBytes).toBe(2 * JPEG.length);
+    expect(expectStatus(await bob.get<ExportSummary>('/api/export'), 200).attachmentBytes).toBe(1234);
+    // nothing kept, nothing to sum
+    const carol = await newUser(platform, 'carol');
+    await uploadAttachment(carol);
+    expect(expectStatus(await carol.get<ExportSummary>('/api/export'), 200)).toMatchObject({ originalBytes: 0, attachmentBytes: 0 });
   });
 
   it('holds one’s own rows in every part, the presets among the tags, and nothing of anyone else’s', async () => {
@@ -398,6 +425,8 @@ describe('what an export holds', () => {
       theirs.place,
       ...theirs.photos.map((p) => p.id),
       theirs.entry.id,
+      theirs.attachment.id,
+      theirs.loose,
       theirs.project.id,
       theirs.milestone.id,
       theirs.theme.id,
@@ -407,6 +436,8 @@ describe('what an export holds', () => {
       theirs.share.token
     ];
     for (const id of his) expect(text).not.toContain(id);
+    // nor one's own attachment that no entry holds
+    expect(text).not.toContain(mine.loose);
   });
 
   it('gives each part’s rows in their documented fields', async () => {
@@ -581,6 +612,23 @@ describe('what an export holds', () => {
     ]);
     expect(await rowsOf(alice, 'shareLinks')).toEqual([
       { id: a.share.id, kind: 'entry', itemId: a.entry.id, createdAt: a.share.createdAt, expiresAt: a.share.expiresAt }
+    ]);
+    expect(await rowsOf(alice, 'attachments')).toEqual([
+      {
+        id: a.attachment.id,
+        entryId: a.entry.id,
+        position: 0,
+        caption: '湖边',
+        kind: 'video',
+        name: '我的视频.mp4',
+        mime: 'video/mp4',
+        size: 1234,
+        duration: 4.25,
+        width: 640,
+        height: 360,
+        poster: false,
+        createdAt: a.attachment.createdAt
+      }
     ]);
   });
 

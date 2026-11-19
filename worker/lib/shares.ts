@@ -82,31 +82,34 @@ export async function holdShare(c: Ctx, token: string): Promise<void> {
 export type Reachable = ShareKind | 'photo';
 
 /**
- * SQL that is true when a link to `grantKind` `t` reaches `kind` `x` (both bound on the caller's Sql), or null when
- * that kind of link never reaches that kind of thing. What a link reaches is what its item shows:
+ * SQL that is true when a link to a `grantKind` reaches `kind` `x` (bound on the caller's Sql; `item()` binds the link's
+ * own item there), or null when that kind of link never reaches that kind of thing, its item then left unbound: a
+ * parameter bound and not used fails the statement. What a link reaches is what its item shows:
  *  - an entry: its photos, while it is finished;
  *  - a collection: its photo items, its cover, and its finished entries with their photos;
  *  - a project: its finished entries with their photos.
  * Entries must be finished either way; the loaders check that again through `entryById`.
  */
-function reachSql(grantKind: ShareKind, kind: Reachable, t: string, x: string): string | null {
+function reachSql(grantKind: ShareKind, kind: Reachable, item: () => string, x: string): string | null {
   const done = `e.status = 'published'`;
   if (grantKind === 'entry') {
     if (kind !== 'photo') return null;
+    const t = item();
     return `EXISTS (SELECT 1 FROM entry_media em JOIN entries e ON e.id = em.entry_id WHERE em.entry_id = ${t} AND em.photo_id = ${x} AND ${done})`;
   }
   if (grantKind === 'theme') {
-    if (kind === 'entry') return `EXISTS (SELECT 1 FROM theme_items ti WHERE ti.theme_id = ${t} AND ti.entry_id = ${x})`;
+    if (kind === 'entry') return `EXISTS (SELECT 1 FROM theme_items ti WHERE ti.theme_id = ${item()} AND ti.entry_id = ${x})`;
     if (kind !== 'photo') return null;
+    const t = item();
     return `(EXISTS (SELECT 1 FROM theme_items ti WHERE ti.theme_id = ${t} AND ti.photo_id = ${x})
       OR EXISTS (SELECT 1 FROM themes th WHERE th.id = ${t} AND th.cover_photo_id = ${x})
       OR EXISTS (SELECT 1 FROM theme_items ti JOIN entries e ON e.id = ti.entry_id JOIN entry_media em ON em.entry_id = e.id
                  WHERE ti.theme_id = ${t} AND em.photo_id = ${x} AND ${done}))`;
   }
-  if (kind === 'entry') return `EXISTS (SELECT 1 FROM entry_projects ep WHERE ep.project_id = ${t} AND ep.entry_id = ${x})`;
+  if (kind === 'entry') return `EXISTS (SELECT 1 FROM entry_projects ep WHERE ep.project_id = ${item()} AND ep.entry_id = ${x})`;
   if (kind !== 'photo') return null;
   return `EXISTS (SELECT 1 FROM entry_projects ep JOIN entries e ON e.id = ep.entry_id JOIN entry_media em ON em.entry_id = e.id
-                  WHERE ep.project_id = ${t} AND em.photo_id = ${x} AND ${done})`;
+                  WHERE ep.project_id = ${item()} AND em.photo_id = ${x} AND ${done})`;
 }
 
 /**
@@ -122,7 +125,7 @@ export async function grantFor(c: Ctx, kind: Reachable, id: string): Promise<str
   const x = q.p(id);
   const tests: string[] = [];
   for (const g of grants) {
-    const reach = reachSql(g.kind, kind, q.p(g.target), x);
+    const reach = reachSql(g.kind, kind, () => q.p(g.target), x);
     if (reach) tests.push(`SELECT ${q.p(g.owner)} AS owner WHERE ${reach}`);
   }
   if (!tests.length) return null;

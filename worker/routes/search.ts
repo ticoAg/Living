@@ -111,16 +111,23 @@ interface EntryHitRow {
   total: number;
 }
 
+/** An entry's attachments, as its pages show them. */
+const ITS_ATTACHMENTS = 'FROM attachments ea WHERE ea.entry_id = e.id AND ea.uploaded_at IS NOT NULL';
+
 function entriesSql(w: Words, v: string, limit: number): string {
   const caption = (l: string) => `EXISTS (SELECT 1 FROM entry_media em WHERE em.entry_id = e.id AND ${like('em.caption', l)})`;
+  // an attachment's caption, or its file's name
+  const attached = (l: string) => `EXISTS (SELECT 1 ${ITS_ATTACHMENTS} AND (${like('ea.caption', l)} OR ${like('ea.name', l)}))`;
+  const first = (expr: string) => `(SELECT ${around(w, expr)} ${ITS_ATTACHMENTS} AND ${anyWord(w, expr)} ORDER BY ea.position LIMIT 1)`;
   return `SELECT e.id, e.type, e.title, substr(e.body, 1, 400) AS body_head, e.occurred_at, e.status, e.visibility,
       (SELECT em.photo_id FROM entry_media em WHERE em.entry_id = e.id ORDER BY em.position LIMIT 1) AS photo_id,
       coalesce(${around(w, 'e.body')},
         (SELECT ${around(w, 'em.caption')} FROM entry_media em WHERE em.entry_id = e.id AND ${anyWord(w, 'em.caption')} ORDER BY em.position LIMIT 1),
+        ${first('ea.caption')}, ${first('ea.name')},
         ${head('e.body')}) AS snip,
       COUNT(*) OVER () AS total
     FROM entries e
-    WHERE e.owner_id = ${v} AND ${allWords(w, (l) => [like('e.title', l), like('e.body', l), caption(l)])}
+    WHERE e.owner_id = ${v} AND ${allWords(w, (l) => [like('e.title', l), like('e.body', l), caption(l), attached(l)])}
     ORDER BY ${wordFirst(w, 'e.title')}, e.occurred_at DESC, e.rowid DESC LIMIT ${limit}`;
 }
 

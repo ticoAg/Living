@@ -5,6 +5,7 @@
 import { entryLabel, entryTypeLabel, ENTRY_STATUS_LABELS } from '../../shared/entries';
 import { PROJECT_STATUS_LABELS, projectTypeLabel } from '../../shared/projects';
 import type {
+  ExportAttachment,
   ExportEntry,
   ExportEntryMedia,
   ExportEntryProject,
@@ -36,6 +37,7 @@ export interface ExportData {
   entryMedia: ExportEntryMedia[];
   entryTags: ExportEntryTag[];
   entryProjects: ExportEntryProject[];
+  attachments: ExportAttachment[];
   projects: ExportProject[];
   milestones: ExportMilestone[];
   themes: ExportTheme[];

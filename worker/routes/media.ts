@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
 import type { Variants, Visibility } from '../../shared/types';
 import type { AppEnv } from '../env';
+import { attachmentCols, contentDisposition, parseRange, servedAs, type AttachmentRow } from '../lib/attachments';
 import { etagMatches, notFound, ID_RE, REFERRER_POLICY, type Ctx } from '../lib/http';
 import { mediaCacheKey } from '../lib/mediaCache';
 import { viewerId } from '../lib/session';
 import { grantFor } from '../lib/shares';
-import { parseJson } from '../lib/sql';
+import { parseJson, prepQ, Sql } from '../lib/sql';
+import { entryById } from '../lib/visibility';
 
 export const media = new Hono<AppEnv>({ strict: false });
 
@@ -84,5 +86,91 @@ media.get('/o/:ownerId/:file', async (c) => {
   // Originals (with their EXIF) are for the owner only.
   if ((await viewerId(c)) !== ownerId) throw notFound('文件不存在');
   const { res } = await serve(c, `o/${ownerId}/${file}`, PRIVATE_CACHE, { 'Content-Disposition': 'inline' });
+  return res;
+});
+
+// ---- attachments (docs/api/attachments.md#文件) ---------------------------------------------------------------------
+
+interface Opened {
+  row: AttachmentRow;
+  /** in a finished public entry: anyone may see it */
+  everyone: boolean;
+  /** opened through a share link this browser holds */
+  shared: boolean;
+}
+
+/**
+ * An attachment as the request may open it: its author's, or in an entry the requester may open by id, by its
+ * visibility or a share link reaching it (lib/shares.ts). Loose ones and unfinished uploads are their author's alone.
+ */
+async function openAttachment(c: Ctx, id: string): Promise<Opened> {
+  if (!ID_RE.test(id)) throw notFound('文件不存在');
+  const viewer = await viewerId(c);
+  const q = new Sql();
+  const row = await prepQ(
+    c.env.DB,
+    `SELECT ${attachmentCols('a')}, ${viewer ? `a.owner_id = ${q.p(viewer)}` : '0'} AS own,
+       e.id IS NOT NULL AND ${entryById(q, viewer, 'e')} AS open,
+       e.id IS NOT NULL AND e.visibility = 'public' AND e.status = 'published' AS everyone
+     FROM attachments a LEFT JOIN entries e ON e.id = a.entry_id
+     WHERE a.id = ${q.p(id)} AND a.uploaded_at IS NOT NULL`,
+    q
+  ).first<AttachmentRow & { own: number; open: number; everyone: number }>();
+  if (!row) throw notFound('文件不存在');
+  if (row.own || row.open) return { row, everyone: row.everyone === 1, shared: false };
+  if (row.entry_id) {
+    const grant = await grantFor(c, 'entry', row.entry_id);
+    if (grant) {
+      const qg = new Sql();
+      const ok = await prepQ(
+        c.env.DB,
+        `SELECT 1 AS ok FROM entries e WHERE e.id = ${qg.p(row.entry_id)} AND ${entryById(qg, viewer, 'e', grant)}`,
+        qg
+      ).first();
+      if (ok) return { row, everyone: false, shared: true };
+    }
+  }
+  throw notFound('文件不存在');
+}
+
+/** Only this site may embed them; what is not a PDF opens, if at all, with nothing allowed to run. */
+const ATTACHMENT_HEADERS = { 'Cross-Origin-Resource-Policy': 'same-origin', ...SECURITY };
+
+media.get('/a/:id', async (c) => {
+  const { row, shared } = await openAttachment(c, c.req.param('id'));
+  const { type, inline } = servedAs(row.kind, row.mime);
+  const headers = new Headers({
+    'Content-Type': type,
+    'Content-Disposition': contentDisposition(row.name, inline && c.req.query('download') === undefined),
+    'Accept-Ranges': 'bytes',
+    // the file follows its entry's visibility, which may change: kept nowhere but where it is played
+    'Cache-Control': PRIVATE_CACHE,
+    ...ATTACHMENT_HEADERS
+  });
+  if (type !== 'application/pdf') headers.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  if (shared) headers.set('Vary', 'Cookie');
+  const range = parseRange(c.req.header('range'), row.size);
+  if (range === 'unsatisfiable') {
+    headers.set('Content-Range', `bytes */${row.size}`);
+    return new Response(null, { status: 416, headers });
+  }
+  const obj = await c.env.MEDIA.get(row.file_key, range ? { range } : {});
+  if (!obj || !('body' in obj) || !obj.body) throw notFound('文件不存在');
+  headers.set('ETag', obj.httpEtag);
+  if (!range) {
+    headers.set('Content-Length', String(row.size));
+    return new Response(obj.body, { status: 200, headers });
+  }
+  headers.set('Content-Range', `bytes ${range.offset}-${range.offset + range.length - 1}/${row.size}`);
+  headers.set('Content-Length', String(range.length));
+  return new Response(obj.body, { status: 206, headers });
+});
+
+media.get('/a/:id/poster', async (c) => {
+  const { row, everyone, shared } = await openAttachment(c, c.req.param('id'));
+  if (!row.poster_key) throw notFound('文件不存在');
+  // a frame in a public entry may stay in the browser for an hour; anything else is not kept
+  const { res } = await serve(c, row.poster_key, everyone ? 'private, max-age=3600' : PRIVATE_CACHE, ATTACHMENT_HEADERS);
+  if (shared) res.headers.set('Vary', 'Cookie');
   return res;
 });

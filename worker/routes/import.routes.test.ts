@@ -7,8 +7,17 @@
 
 import { beforeEach, describe, expect, it } from 'vite-plus/test';
 import { destination } from '../../shared/geo';
-import { IMPORT_LIMITS, MILESTONE_LIMITS, PRIVACY_ZONE_LIMITS, TAG_LIMITS, THEME_LIMITS } from '../../shared/limits';
+import {
+  ATTACHMENT_LIMITS,
+  ATTACHMENT_PART_BYTES,
+  IMPORT_LIMITS,
+  MILESTONE_LIMITS,
+  PRIVACY_ZONE_LIMITS,
+  TAG_LIMITS,
+  THEME_LIMITS
+} from '../../shared/limits';
 import type {
+  AttachmentUpload,
   EntryDetail,
   ImportIdsResponse,
   ImportResolveBody,
@@ -22,7 +31,22 @@ import type {
   Tag,
   ThemeDetail
 } from '../../shared/types';
-import { Client, expectStatus, newSha, newUser, upload, usePlatform, type ApiResponse, type Json } from '../test-platform';
+import {
+  beginAttachment,
+  bytesOf,
+  Client,
+  expectStatus,
+  newSha,
+  newUser,
+  putPart,
+  putParts,
+  upload,
+  uploadAttachment,
+  usePlatform,
+  WEBP,
+  type ApiResponse,
+  type Json
+} from '../test-platform';
 
 const platform = usePlatform();
 
@@ -68,7 +92,7 @@ const byId = <T extends { id: string }>(list: T[]) => [...list].sort((a, b) => a
 /** A `failed` row's message: some reason, in words. */
 const REASON = expect.stringMatching(/\S/);
 /** The entries API's message for an entry with nothing in it, as the docs' example of `failed` has it. */
-const EMPTY = '记录不能是空的：写点文字，或者加一张照片';
+const EMPTY = '记录不能是空的：写点文字，或者加一张照片、一个附件';
 
 // ---- rows as living.json has them (docs/api/export.md#livingjson), pointing to ids here ------------------------------
 // `over` replaces fields; a field set to `undefined` is left out of the JSON.
@@ -159,6 +183,23 @@ const placeRow = (id: string, over: Json = {}): Json => ({
   ...over
 });
 const zone = (name: string, lat: number, lng: number, radius = 300): Json => ({ name, lat, lng, radius });
+/** An attachment as the export's `attachments` part has it: a recording of 1000 bytes in an entry. */
+const attachmentRow = (id: string, over: Json = {}): Json => ({
+  id,
+  entryId: 'en_source',
+  position: 0,
+  caption: null,
+  kind: 'audio',
+  name: '录音.m4a',
+  mime: 'audio/mp4',
+  size: 1000,
+  duration: 3.5,
+  width: null,
+  height: null,
+  poster: false,
+  createdAt: CREATED,
+  ...over
+});
 
 // ---- the three kinds of rows ----------------------------------------------------------------------------------------
 
@@ -177,6 +218,17 @@ const importRows = (client: Client, part: RowsPart, rows: Json[]) =>
 const importTags = (client: Client, tags: Json[]) => ok(client.post<ImportIdsResponse>('/api/import/tags', { tags }));
 const importPlaces = (client: Client, places: Json[]) => ok(client.post<ImportIdsResponse>('/api/import/places', { places }));
 const importZones = (client: Client, zones: Json[]) => ok(client.post<ImportZonesResponse>('/api/import/zones', { zones }));
+/** The answer of POST /api/import/attachments: `ImportAttachmentResponse`, or an error. */
+const importAttachment = (client: Client, row: Json) => client.post<Json>('/api/import/attachments', row);
+/** An attachment of an export brought over, its file uploaded in full: its id here. */
+async function bring(client: Client, row: Json, bytes = bytesOf(row.size as number)): Promise<string> {
+  const begun = expectStatus(await importAttachment(client, row), 201) as AttachmentUpload;
+  const parts = await putParts(client, begun, bytes);
+  expectStatus(await client.post(`/api/attachments/${begun.attachment.id}/complete`, { parts }), 200);
+  return begun.attachment.id;
+}
+const bytesAt = async (res: Response) => new Uint8Array(await res.arrayBuffer());
+const attachmentRowOf = (id: string) => platform.env.DB.prepare('SELECT * FROM attachments WHERE id = ?1').bind(id).first<Json>();
 /** A request whose answer may not be JSON (a body over the size limit). */
 const postRaw = (client: Client, path: string, body: unknown) =>
   client.fetch(path, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } });
@@ -235,6 +287,20 @@ describe('a round trip', () => {
         201
       )
     ).project;
+    const clip = await uploadAttachment(alice, bytesOf(3000), {
+      kind: 'video',
+      name: '湖边.mp4',
+      mime: 'video/mp4',
+      duration: 4.5,
+      width: 640,
+      height: 360
+    });
+    const putPoster = async (client: Client, id: string, bytes: Uint8Array) =>
+      expect(
+        (await client.fetch(`/api/attachments/${id}/poster`, { method: 'PUT', body: bytes, headers: { 'content-type': 'image/webp' } }))
+          .status
+      ).toBe(200);
+    await putPoster(alice, clip.id, WEBP);
     const entry = (
       await ok(
         alice.post<{ entry: EntryDetail }>('/api/entries', {
@@ -243,6 +309,7 @@ describe('a round trip', () => {
           occurredAt: '2026-11-16T09:00:00',
           visibility: 'public',
           media: [{ photoId: photo.id, caption: '桥' }],
+          attachments: [{ attachmentId: clip.id, caption: '湖边' }],
           projectIds: [project.id]
         }),
         201
@@ -252,10 +319,25 @@ describe('a round trip', () => {
     // bob's import: the photo first, as an upload, then the rows pointing to it by its id here
     const bobPhoto = await upload(bob, { sha256: sha, title: '断桥', takenAt: '2026-11-16T08:30:00', visibility: 'public' });
     const where = await ok(
-      bob.post<ImportResolveResponse>('/api/import/resolve', { photos: [sha], entries: [entry.id], projects: [project.id] })
+      bob.post<ImportResolveResponse>('/api/import/resolve', {
+        photos: [sha],
+        entries: [entry.id],
+        attachments: [clip.id],
+        projects: [project.id]
+      })
     );
     expect(where.photos).toEqual({ [sha]: bobPhoto.id });
     expect(where.entries[entry.id].exists).toBe(false);
+    expect(where.attachments).toEqual({ [clip.id]: { id: await importedId('at_', bob, clip.id), exists: false } });
+
+    // the attachment's file, as alice's export reads it, then its frame
+    const [row] = await exported(alice, 'attachments');
+    const begun = (await ok(importAttachment(bob, row), 201)) as Json;
+    expect(begun).toMatchObject({ here: false, attachment: { id: where.attachments[clip.id].id, state: 'uploading' }, parts: 1 });
+    const file = await bytesAt(await alice.fetch(`/media/a/${clip.id}`));
+    const parts = await putParts(bob, begun as AttachmentUpload, file);
+    await ok(bob.post(`/api/attachments/${begun.attachment.id}/complete`, { parts }));
+    await putPoster(bob, begun.attachment.id, await bytesAt(await alice.fetch(`/media/a/${clip.id}/poster`)));
 
     const projects = await ok(
       bob.post<ImportRowsResponse>('/api/import/projects', {
@@ -297,6 +379,7 @@ describe('a round trip', () => {
             createdAt: '2026-11-16T01:00:00Z',
             updatedAt: '2026-11-16T02:00:00Z',
             media: [{ photoId: bobPhoto.id, caption: '桥' }],
+            attachments: [{ attachmentId: begun.attachment.id, caption: '湖边' }],
             tagIds: [],
             projectIds: [projectHere]
           }
@@ -309,6 +392,9 @@ describe('a round trip', () => {
     expect(detail).toMatchObject({ title: '西湖边', createdAt: '2026-11-16T01:00:00Z', updatedAt: '2026-11-16T02:00:00Z' });
     expect(detail.media.map((m) => m.photo.id)).toEqual([bobPhoto.id]);
     expect(detail.projectIds).toEqual([projectHere]);
+    const { caption: _caption, ...asAlice } = entry.attachments[0];
+    expect(detail.attachments).toEqual([{ ...asAlice, id: begun.attachment.id, caption: '湖边' }]);
+    expect(Buffer.compare(await bytesAt(await bob.fetch(`/media/a/${begun.attachment.id}`)), file)).toBe(0);
 
     const collections = await ok(
       bob.post<ImportRowsResponse>('/api/import/collections', {
@@ -346,6 +432,8 @@ describe('a round trip', () => {
       })
     );
     expect(again).toMatchObject({ created: 0, existing: 1, ids: { [entry.id]: entryHere } });
+    expect((await resolve(bob, { attachments: [clip.id] })).attachments[clip.id]).toEqual({ id: begun.attachment.id, exists: true });
+    expect(await ok(importAttachment(bob, row))).toMatchObject({ here: true, attachment: { id: begun.attachment.id, state: 'attached' } });
     const tags = await ok(
       bob.post<ImportIdsResponse>('/api/import/tags', {
         tags: [
@@ -376,6 +464,7 @@ describe('every endpoint', () => {
     ['/api/import/tags', { tags: [tagRow('t_A', 'lake', '断桥')] }],
     ['/api/import/places', { places: [placeRow('poi_A')] }],
     ['/api/import/zones', { zones: [zone('家', 30.27, 120.16)] }],
+    ['/api/import/attachments', attachmentRow('at_A')],
     ['/api/import/projects', { projects: [projectRow('pj_A')] }],
     ['/api/import/entries', { entries: [entryRow('en_A')] }],
     ['/api/import/collections', { collections: [collectionRow('th_A')] }]
@@ -391,15 +480,17 @@ describe('every endpoint', () => {
     const counts = await platform.env.DB.prepare(
       `SELECT (SELECT COUNT(*) FROM entries) AS entries, (SELECT COUNT(*) FROM projects) AS projects,
         (SELECT COUNT(*) FROM themes) AS themes, (SELECT COUNT(*) FROM pois) AS places,
-        (SELECT COUNT(*) FROM privacy_zones) AS zones, (SELECT COUNT(*) FROM tags WHERE owner_id IS NOT NULL) AS tags`
+        (SELECT COUNT(*) FROM privacy_zones) AS zones, (SELECT COUNT(*) FROM tags WHERE owner_id IS NOT NULL) AS tags,
+        (SELECT COUNT(*) FROM attachments) AS attachments`
     ).first();
-    expect(counts).toEqual({ entries: 0, projects: 0, themes: 0, places: 0, zones: 0, tags: 0 });
+    expect(counts).toEqual({ entries: 0, projects: 0, themes: 0, places: 0, zones: 0, tags: 0, attachments: 0 });
   });
 
   it('answers with Cache-Control: no-store', async () => {
     for (const [path, body] of requests()) {
       const res = await bob.post(path, body);
-      expect(res.status, `${path} ${JSON.stringify(res.body)}`).toBe(200);
+      // an attachment is begun
+      expect(res.status, `${path} ${JSON.stringify(res.body)}`).toBe(path === '/api/import/attachments' ? 201 : 200);
       expect(res.headers.get('cache-control'), path).toMatch(/\bno-store\b/);
     }
   });
@@ -501,6 +592,7 @@ describe('POST /api/import/resolve', () => {
     expect(await resolve(bob, { photos: [mineOnly.toUpperCase(), both, hersOnly, nobodys, shouted] })).toEqual({
       photos: { [mineOnly]: myPhoto.id, [both]: myCopy.id, [shouted]: myShouted.id },
       entries: {},
+      attachments: {},
       projects: {},
       collections: {}
     });
@@ -512,6 +604,7 @@ describe('POST /api/import/resolve', () => {
     expect(await resolve(alice, { entries: [e.id], projects: [p.id], collections: [c.id] })).toEqual({
       photos: {},
       entries: { [e.id]: { id: e.id, exists: true } },
+      attachments: {},
       projects: { [p.id]: { id: p.id, exists: true } },
       collections: { [c.id]: { id: c.id, exists: true } }
     });
@@ -529,7 +622,7 @@ describe('POST /api/import/resolve', () => {
       expect(target.id, `${part} ${id}`).toMatch(importId(PREFIX[part]));
       expect(target.id, `${part} ${id}`).not.toBe(id);
     }
-    expect(await resolve(bob, {})).toEqual({ photos: {}, entries: {}, projects: {}, collections: {} });
+    expect(await resolve(bob, {})).toEqual({ photos: {}, entries: {}, attachments: {}, projects: {}, collections: {} });
   });
 
   it('gives an item the same id each time and a different one in each account: the one the docs derive', async () => {
@@ -575,6 +668,24 @@ describe('POST /api/import/resolve', () => {
     expect((await resolve(bob, { entries: [here] })).entries).toEqual({ [here]: { id: here, exists: true } });
   });
 
+  it('lists an attachment as here once its file is: the importer’s own, or one an import uploaded in full', async () => {
+    const own = await uploadAttachment(alice);
+    const unfinished = await beginAttachment(alice);
+    expect((await resolve(alice, { attachments: [own.id, unfinished.attachment.id] })).attachments).toEqual({
+      [own.id]: { id: own.id, exists: true },
+      [unfinished.attachment.id]: { id: unfinished.attachment.id, exists: false }
+    });
+    const id = await importedId('at_', bob, own.id);
+    expect((await resolve(bob, { attachments: [own.id] })).attachments).toEqual({ [own.id]: { id, exists: false } });
+    // begun by an import, it is not here until its file is
+    const begun = expectStatus(await importAttachment(bob, attachmentRow(own.id)), 201) as AttachmentUpload;
+    expect(begun.attachment.id).toBe(id);
+    expect((await resolve(bob, { attachments: [own.id] })).attachments[own.id]).toEqual({ id, exists: false });
+    const parts = await putParts(bob, begun, bytesOf(1000));
+    expectStatus(await bob.post(`/api/attachments/${id}/complete`, { parts }), 200);
+    expect((await resolve(bob, { attachments: [own.id] })).attachments[own.id]).toEqual({ id, exists: true });
+  });
+
   it('does not list an item its owner deleted as here', async () => {
     const e = await newEntry(alice);
     expectStatus(await alice.del(`/api/entries/${e.id}`), 200);
@@ -606,7 +717,9 @@ describe('POST /api/import/resolve', () => {
       { projects: ['pj_ä'] },
       { projects: ids('pj_', IMPORT_LIMITS.resolve + 1) },
       { collections: [7] },
-      { collections: ids('th_', IMPORT_LIMITS.resolve + 1) }
+      { collections: ids('th_', IMPORT_LIMITS.resolve + 1) },
+      { attachments: ['at a'] },
+      { attachments: ids('at_', IMPORT_LIMITS.resolve + 1) }
     ];
     for (const body of bad) {
       const what = JSON.stringify(body).slice(0, 90);
@@ -1634,7 +1747,157 @@ describe('POST /api/import/projects', () => {
   });
 });
 
+describe('POST /api/import/attachments', () => {
+  it('begins an upload at the id the import gives it, with the export’s time, its parts to follow as any upload’s', async () => {
+    const row = attachmentRow('at_clip', {
+      kind: 'video',
+      name: '湖边.MOV',
+      mime: 'video/quicktime',
+      size: ATTACHMENT_PART_BYTES + 10,
+      duration: 4.5,
+      width: 640,
+      height: 360,
+      caption: '不在这里',
+      poster: true,
+      createdAt: '2025-01-02T03:04:05Z'
+    });
+    const res = await importAttachment(bob, row);
+    expect(expectStatus(res, 201)).toEqual({
+      here: false,
+      attachment: {
+        id: await importedId('at_', bob, 'at_clip'),
+        kind: 'video',
+        name: '湖边.MOV',
+        mime: 'video/quicktime',
+        size: ATTACHMENT_PART_BYTES + 10,
+        duration: 4.5,
+        width: 640,
+        height: 360,
+        poster: false,
+        createdAt: '2025-01-02T03:04:05Z',
+        state: 'uploading',
+        entryId: null
+      },
+      partBytes: ATTACHMENT_PART_BYTES,
+      parts: 2
+    });
+    // a time to come, or none, is now
+    for (const createdAt of ['2999-01-01T00:00:00Z', undefined, 'yesterday']) {
+      const begun = expectStatus(await importAttachment(bob, attachmentRow(`at_${String(createdAt).length}`, { createdAt })), 201);
+      expectNow(begun.attachment.createdAt, String(createdAt));
+    }
+  });
+
+  it('answers here once an import uploaded its file in full, and begins again one an import left unfinished, as the file now is', async () => {
+    const begun = expectStatus(await importAttachment(bob, attachmentRow('at_x')), 201) as AttachmentUpload;
+    const sent = await putParts(bob, begun, bytesOf(1000));
+    const before = await attachmentRowOf(begun.attachment.id);
+    const again = expectStatus(await importAttachment(bob, attachmentRow('at_x', { size: 2000, name: '新.m4a' })), 201) as AttachmentUpload;
+    expect(again.attachment).toMatchObject({ id: begun.attachment.id, size: 2000, name: '新.m4a', state: 'uploading' });
+    // the parts sent before are gone with their upload
+    const old = platform.env.MEDIA.resumeMultipartUpload(before?.file_key as string, before?.upload_id as string);
+    await expect(old.complete(sent as R2UploadedPart[])).rejects.toThrow();
+    expect((await putPart(bob, begun.attachment.id, 1, bytesOf(1000))).status).toBe(400);
+    const parts = await putParts(bob, again, bytesOf(2000));
+    const done = expectStatus(await bob.post(`/api/attachments/${again.attachment.id}/complete`, { parts }), 200).attachment;
+    const here = expectStatus(await importAttachment(bob, attachmentRow('at_x', { size: 5 })), 200);
+    expect(here).toEqual({ here: true, attachment: done });
+    expect((await bob.fetch(`/media/a/${done.id}`)).status).toBe(200);
+  });
+
+  it('leaves the importer’s own attachment as it is, when the export is of this account', async () => {
+    const own = await uploadAttachment(alice);
+    const e = await newEntry(alice, { attachments: [{ attachmentId: own.id }] });
+    const res = expectStatus(await importAttachment(alice, attachmentRow(own.id, { size: 5 })), 200);
+    expect(res).toEqual({ here: true, attachment: { ...own, state: 'attached', entryId: e.id } });
+    // anyone else's is not theirs: they get one of their own
+    const theirs = expectStatus(await importAttachment(bob, attachmentRow(own.id)), 201);
+    expect(theirs.attachment.id).toBe(await importedId('at_', bob, own.id));
+    expect((await attachmentRowOf(own.id))?.entry_id).toBe(e.id);
+  });
+
+  it('checks the attachment as POST /api/attachments does, and counts it among the uploads under way', async () => {
+    const bad: [Json, number, string][] = [
+      [attachmentRow('at_a', { size: 0 }), 400, '文件是空的'],
+      [attachmentRow('at_a', { kind: 'image' }), 400, ''],
+      [attachmentRow('at_a', { name: '' }), 400, '请填写文件名'],
+      [attachmentRow('at_a', { kind: 'video', mime: 'audio/mp4' }), 400, '视频的类型需要是 video/…'],
+      [attachmentRow('at_a', { size: ATTACHMENT_LIMITS.maxBytes + 1 }), 413, '一个附件最多 2 GB'],
+      [attachmentRow('at a'), 400, '第 1 个的 id 格式不对'],
+      [attachmentRow(7 as unknown as string), 400, '第 1 个的 id 格式不对']
+    ];
+    for (const [row, status, message] of bad) {
+      const res = await importAttachment(bob, row);
+      expect(res.status, JSON.stringify(row)).toBe(status);
+      if (message) expect(res.body.message, JSON.stringify(row)).toBe(message);
+    }
+    expect(await attachmentRowOf(await importedId('at_', bob, 'at_a'))).toBeNull();
+    for (let i = 1; i < ATTACHMENT_LIMITS.uploadingMax; i++) await beginAttachment(bob);
+    expectStatus(await importAttachment(bob, attachmentRow('at_b')), 201);
+    const full = await importAttachment(bob, attachmentRow('at_c'));
+    expect(full.status).toBe(429);
+    expect(full.body.error).toBe('rate_limited');
+    // one here already takes no room
+    const own = await uploadAttachment(alice);
+    expect((await importAttachment(alice, attachmentRow(own.id))).status).toBe(200);
+  });
+});
+
 describe('POST /api/import/entries', () => {
+  it('puts the attachments an import uploaded in an entry, in order, with their captions', async () => {
+    const one = await bring(bob, attachmentRow('at_one'));
+    const two = await bring(
+      bob,
+      attachmentRow('at_two', { kind: 'file', name: '票.pdf', mime: 'application/pdf', size: 20, duration: null })
+    );
+    const res = await importRows(bob, 'entries', [
+      entryRow('en_a', {
+        title: null,
+        body: null,
+        attachments: [
+          { attachmentId: two, caption: '车票' },
+          { attachmentId: one, caption: null }
+        ]
+      })
+    ]);
+    expect(res).toMatchObject({ created: 1, existing: 0, failed: [] });
+    const e = await entryOf(bob, res.ids.en_a);
+    expect(e.attachments.map((a) => [a.id, a.caption])).toEqual([
+      [two, '车票'],
+      [one, null]
+    ]);
+    expect(e.attachments[1]).toMatchObject({ kind: 'audio', name: '录音.m4a', size: 1000, duration: 3.5, createdAt: CREATED });
+    expect((await attachmentRowOf(one))?.loose_since).toBeNull();
+  });
+
+  it('keeps in an entry only attachments of the importer’s uploaded in full and in no entry, each in the first row that has it', async () => {
+    const theirs = (await uploadAttachment(alice)).id;
+    const held = (await uploadAttachment(bob)).id;
+    const other = await newEntry(bob, { attachments: [{ attachmentId: held }] });
+    const unfinished = (expectStatus(await importAttachment(bob, attachmentRow('at_half')), 201) as AttachmentUpload).attachment.id;
+    const loose = await bring(bob, attachmentRow('at_loose'));
+    const all = (...ids: string[]) => ids.map((attachmentId) => ({ attachmentId, caption: null }));
+    const res = await importRows(bob, 'entries', [
+      entryRow('en_none', { title: null, body: null, attachments: all(theirs, held, unfinished, 'at_nobody') }),
+      entryRow('en_first', { attachments: [...all(theirs), { attachmentId: loose, caption: '留下' }] }),
+      entryRow('en_second', { attachments: [{ attachmentId: loose, caption: '又一次' }] }),
+      entryRow('en_bad', { attachments: 'at_loose' })
+    ]);
+    expect(res).toMatchObject({
+      created: 2,
+      existing: 0,
+      failed: [
+        { id: 'en_bad', message: '附件需要是数组' },
+        { id: 'en_none', message: EMPTY }
+      ]
+    });
+    expect((await entryOf(bob, res.ids.en_first)).attachments.map((a) => [a.id, a.caption])).toEqual([[loose, '留下']]);
+    expect((await entryOf(bob, res.ids.en_second)).attachments).toEqual([]);
+    expect((await attachmentRowOf(held))?.entry_id).toBe(other.id);
+    expect((await attachmentRowOf(theirs))?.entry_id).toBeNull();
+    expect((await attachmentRowOf(unfinished))?.entry_id).toBeNull();
+  });
+
   it('creates an entry with the fields of its row', async () => {
     const [p1, p2] = [await upload(bob), await upload(bob)];
     const tag = await newTag(bob, '散步', 'lake');

@@ -156,7 +156,7 @@ describe('assertNotEmpty', () => {
   });
 
   it('refuses an entry with nothing in it', () => {
-    expect(invalidMessage(() => assertNotEmpty(null, null, 0))).toBe('记录不能是空的：写点文字，或者加一张照片');
-    expect(invalidMessage(() => assertNotEmpty(undefined, '', 0))).toBe('记录不能是空的：写点文字，或者加一张照片');
+    expect(invalidMessage(() => assertNotEmpty(null, null, 0))).toBe('记录不能是空的：写点文字，或者加一张照片、一个附件');
+    expect(invalidMessage(() => assertNotEmpty(undefined, '', 0))).toBe('记录不能是空的：写点文字，或者加一张照片、一个附件');
   });
 });

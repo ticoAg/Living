@@ -3,10 +3,12 @@
 // saving. Docs: /docs/product/features/entries.md
 
 import { hasTime } from '../../shared/entries';
-import { ENTRY_LIMITS } from '../../shared/limits';
+import { ATTACHMENT_LIMITS, ENTRY_LIMITS } from '../../shared/limits';
 import {
+  ATTACHMENT_KINDS,
   ENTRY_TYPES,
   VISIBILITIES,
+  type Attachment,
   type CreateEntryBody,
   type EntryDetail,
   type EntryPlace,
@@ -24,6 +26,13 @@ export interface DraftMedia {
   photo: PhotoSummary | null;
 }
 
+export interface DraftAttachment {
+  attachmentId: string;
+  caption: string;
+  /** what its row shows */
+  attachment: Attachment;
+}
+
 export interface EntryDraft {
   type: EntryType;
   title: string;
@@ -36,6 +45,8 @@ export interface EntryDraft {
   heldTime: string;
   visibility: Visibility;
   media: DraftMedia[];
+  /** uploaded in full; one still uploading is the editor's until it is */
+  attachments: DraftAttachment[];
   tagIds: string[];
   projectIds: string[];
   /** where it happened; null for no place */
@@ -62,6 +73,7 @@ export function emptyDraft(now = new Date(), body = '', start: Partial<Pick<Entr
     heldTime: timed ? at.slice(11) : '',
     visibility: 'private',
     media: [],
+    attachments: [],
     tagIds: [],
     projectIds: start.projectIds ?? [],
     poi: null
@@ -79,6 +91,7 @@ export function draftFromEntry(e: EntryDetail): EntryDraft {
     heldTime: time,
     visibility: e.visibility,
     media: e.media.map((m) => ({ photoId: m.photoId, caption: m.caption ?? '', photo: m.photo })),
+    attachments: e.attachments.map(({ caption, ...a }) => ({ attachmentId: a.id, caption: caption ?? '', attachment: a })),
     tagIds: [...e.tagIds],
     projectIds: [...e.projectIds],
     poi: e.poi
@@ -99,6 +112,7 @@ export function payloadOf(d: EntryDraft): EntryPayload {
     occurredAt: occurredAtOf(d),
     visibility: d.visibility,
     media: d.media.map((m) => ({ photoId: m.photoId, caption: m.caption.trim() || null })),
+    attachments: d.attachments.map((a) => ({ attachmentId: a.attachmentId, caption: a.caption.trim() || null })),
     tagIds: d.tagIds,
     // in the order the server answers with (the projects' creation), so choosing them in another order changes nothing
     projectIds: [...d.projectIds].sort(),
@@ -116,8 +130,9 @@ export function changedFields(next: EntryPayload, prev: EntryPayload | null): Pa
   return out;
 }
 
-/** Nothing written and no photo: the server takes no such entry. */
-export const isEmptyDraft = (d: EntryDraft): boolean => !d.title.trim() && !d.body.trim() && d.media.length === 0;
+/** Nothing written, no photo and no attachment: the server takes no such entry. */
+export const isEmptyDraft = (d: EntryDraft): boolean =>
+  !d.title.trim() && !d.body.trim() && d.media.length === 0 && d.attachments.length === 0;
 
 const cps = (s: string) => [...s].length;
 
@@ -130,6 +145,9 @@ export function draftProblem(d: EntryDraft): string | null {
   if (d.media.length > ENTRY_LIMITS.mediaCount) return `一条记录最多 ${ENTRY_LIMITS.mediaCount} 张照片`;
   const long = d.media.findIndex((m) => cps(m.caption.trim()) > ENTRY_LIMITS.captionMax);
   if (long >= 0) return `第 ${long + 1} 张照片的说明最多 ${ENTRY_LIMITS.captionMax} 个字符`;
+  if (d.attachments.length > ATTACHMENT_LIMITS.perEntry) return `一条记录最多 ${ATTACHMENT_LIMITS.perEntry} 个附件`;
+  const longer = d.attachments.findIndex((a) => cps(a.caption.trim()) > ATTACHMENT_LIMITS.captionMax);
+  if (longer >= 0) return `第 ${longer + 1} 个附件的说明最多 ${ATTACHMENT_LIMITS.captionMax} 个字符`;
   return null;
 }
 
@@ -147,13 +165,25 @@ export function addMedia(media: readonly DraftMedia[], photos: readonly PhotoSum
   return out;
 }
 
-/** The photo at `from` moved by `by` places, kept within the list. */
-export function moveMedia(media: readonly DraftMedia[], from: number, by: number): DraftMedia[] {
+/** The photo (or attachment) at `from` moved by `by` places, kept within the list. */
+export function moveMedia<T>(media: readonly T[], from: number, by: number): T[] {
   const to = Math.min(media.length - 1, Math.max(0, from + by));
   if (to === from || !media[from]) return [...media];
   const out = [...media];
   const [m] = out.splice(from, 1);
   out.splice(to, 0, m);
+  return out;
+}
+
+/** Attachments added at the end; one already there stays where it is. */
+export function addAttachments(list: readonly DraftAttachment[], added: readonly Attachment[]): DraftAttachment[] {
+  const have = new Set(list.map((a) => a.attachmentId));
+  const out = [...list];
+  for (const a of added) {
+    if (have.has(a.id)) continue;
+    have.add(a.id);
+    out.push({ attachmentId: a.id, caption: '', attachment: a });
+  }
   return out;
 }
 
@@ -168,6 +198,18 @@ export interface Backup {
 
 const str = (v: unknown): v is string => typeof v === 'string';
 const strOrNull = (v: unknown): v is string | null => v === null || str(v);
+
+const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const numOrNull = (v: unknown): v is number | null => v === null || num(v);
+
+/** A stored attachment's row, or null when it is not one. */
+function attachmentOf(v: unknown): Attachment | null {
+  if (!v || typeof v !== 'object') return null;
+  const { id, kind, name, mime, size, duration, width, height, poster, createdAt } = v as Record<string, unknown>;
+  if (!str(id) || !(ATTACHMENT_KINDS as readonly unknown[]).includes(kind) || !str(name) || !str(mime) || !num(size)) return null;
+  if (!numOrNull(duration) || !numOrNull(width) || !numOrNull(height) || typeof poster !== 'boolean' || !str(createdAt)) return null;
+  return { id, kind: kind as Attachment['kind'], name, mime, size, duration, width, height, poster, createdAt };
+}
 
 /** A stored place: null for none (or none kept), undefined when it is not one. */
 function placeOf(v: unknown): EntryPlace | null | undefined {
@@ -202,11 +244,21 @@ export function parseBackup(raw: string | null): Backup | null {
     if (!str(photoId) || !str(caption)) return null;
     media.push({ photoId, caption, photo: photo && typeof photo === 'object' ? (photo as PhotoSummary) : null });
   }
+  // nor attachments, from before entries had them
+  if (d.attachments !== undefined && !Array.isArray(d.attachments)) return null;
+  const attachments: DraftAttachment[] = [];
+  for (const a of (d.attachments ?? []) as unknown[]) {
+    if (!a || typeof a !== 'object') return null;
+    const { attachmentId, caption, attachment } = a as Record<string, unknown>;
+    const row = attachmentOf(attachment);
+    if (!str(attachmentId) || !str(caption) || !row || row.id !== attachmentId) return null;
+    attachments.push({ attachmentId, caption, attachment: row });
+  }
   const projectIds = Array.isArray(d.projectIds) ? [...(d.projectIds as string[])] : [];
   // nor a place, from before entries had places
   const poi = placeOf(d.poi);
   if (poi === undefined) return null;
-  return { draft: { ...(d as unknown as EntryDraft), media, tagIds: [...(d.tagIds as string[])], projectIds, poi }, at };
+  return { draft: { ...(d as unknown as EntryDraft), media, attachments, tagIds: [...(d.tagIds as string[])], projectIds, poi }, at };
 }
 
 /** The storage slot of a backup: the author's, for an entry or (`new`) for one not yet created. */

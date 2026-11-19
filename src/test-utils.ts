@@ -1,6 +1,7 @@
 // Fixtures shared by the front end's unit tests. Nothing in the app imports this file.
 
 import type {
+  Attachment,
   EntryDetail,
   EntrySummary,
   ExportEntry,
@@ -118,6 +119,23 @@ export function themeDetail(over: Partial<ThemeDetail> = {}): ThemeDetail {
   };
 }
 
+/** A video of ada's, uploaded in full: 3 MB, 12.5 seconds, with a frame. */
+export function attachment(id: string, over: Partial<Attachment> = {}): Attachment {
+  return {
+    id,
+    kind: 'video',
+    name: '湖边.mp4',
+    mime: 'video/mp4',
+    size: 3_000_000,
+    duration: 12.5,
+    width: 1920,
+    height: 1080,
+    poster: true,
+    createdAt: '2026-11-16T01:00:00Z',
+    ...over
+  };
+}
+
 /** A finished private note of ada's, written when it happened; override what a test cares about. */
 export function entry(id: string, over: Partial<EntrySummary> = {}): EntrySummary {
   return {
@@ -136,6 +154,7 @@ export function entry(id: string, over: Partial<EntrySummary> = {}): EntrySummar
     tagIds: [],
     projectIds: [],
     poi: null,
+    attachments: [],
     createdAt: '2026-11-16T01:00:00Z',
     updatedAt: '2026-11-16T01:00:00Z',
     ...over
@@ -143,7 +162,7 @@ export function entry(id: string, over: Partial<EntrySummary> = {}): EntrySummar
 }
 
 export function entryDetail(id: string, over: Partial<EntryDetail> = {}): EntryDetail {
-  return { ...entry(id), body: '今天', media: [], revision: 1, themes: [], ...over };
+  return { ...entry(id), body: '今天', media: [], attachments: [], revision: 1, themes: [], ...over };
 }
 
 // ---- export ----
@@ -287,6 +306,7 @@ export function exportData(over: Partial<Omit<ExportData, 'summary'>> = {}): Exp
     entryMedia: [],
     entryTags: [],
     entryProjects: [],
+    attachments: [],
     projects: [],
     milestones: [],
     themes: [],
@@ -299,7 +319,8 @@ export function exportData(over: Partial<Omit<ExportData, 'summary'>> = {}): Exp
   };
   const counts = Object.fromEntries(Object.entries(rows).map(([k, v]) => [k, v.length])) as ExportData['summary']['counts'];
   const originalBytes = rows.photos.reduce((n, p) => n + (p.fileSize ?? 0), 0);
-  return { summary: { profile: EXPORT_PROFILE, counts, originalBytes }, ...rows };
+  const attachmentBytes = rows.attachments.reduce((n, a) => n + a.size, 0);
+  return { summary: { profile: EXPORT_PROFILE, counts, originalBytes, attachmentBytes }, ...rows };
 }
 
 /** A folder in memory that answers like a FileSystemDirectoryHandle, as far as the export uses one. */

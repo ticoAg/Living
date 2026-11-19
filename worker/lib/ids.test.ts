@@ -133,7 +133,8 @@ describe('newId', () => {
     milestone: 'ms_',
     tag: 't_',
     zone: 'pz_',
-    share: 'sl_'
+    share: 'sl_',
+    attachment: 'at_'
   } as const;
 
   it('has a generator for every kind of record', () => {

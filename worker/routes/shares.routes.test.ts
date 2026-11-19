@@ -18,31 +18,9 @@ import {
   type ThemeDetail,
   type ThemeItem
 } from '../../shared/types';
-import { Client, expectStatus, newUser, upload, usePlatform, type Json } from '../test-platform';
+import { Browser, Client, expectStatus, newUser, upload, usePlatform, type Json } from '../test-platform';
 
 const platform = usePlatform();
-
-/**
- * A browser that also keeps the share links it opened: the `living_shares` cookie the Worker sets goes back with every
- * request, as a real browser sends it (it is HttpOnly, so no page script ever sees it). `Client` carries the session only.
- */
-class Browser extends Client {
-  shares: string | null = null;
-
-  override async fetch(path: string, init: RequestInit = {}): Promise<Response> {
-    const headers = new Headers(init.headers);
-    if (this.shares && !headers.has('cookie')) {
-      const session = this.cookie ? `living_session=${this.cookie}; ` : '';
-      headers.set('cookie', `${session}living_shares=${this.shares}`);
-    }
-    const res = await super.fetch(path, { ...init, headers });
-    for (const line of res.headers.getSetCookie()) {
-      const m = /^living_shares=([^;]*)/.exec(line);
-      if (m) this.shares = m[1] && !/max-age=0\b/i.test(line) ? m[1] : null;
-    }
-    return res;
-  }
-}
 
 let alice: Client;
 let bob: Client;
@@ -52,12 +30,7 @@ beforeEach(async () => {
 });
 
 /** A browser with `client`'s session, or a visitor's. */
-function browser(client?: Client): Browser {
-  const b = new Browser(platform);
-  b.cookie = client?.cookie ?? null;
-  b.user = client?.user ?? null;
-  return b;
-}
+const browser = (client?: Client): Browser => Browser.of(platform, client);
 /** Two browsers to open a link in: a visitor's, and bob's while he is signed in. */
 const holders = (): Browser[] => [browser(), browser(bob)];
 /** The same two people without the link. */
@@ -899,6 +872,24 @@ describe('whose content a link opens', () => {
     }
     expect(await statusAt(b, `/api/themes/${unshared.theme.id}`)).toBe(404);
     expect(await statusAt(b, `/api/projects/${unshared.project.id}`)).toBe(404);
+  });
+
+  it('what each link it holds reaches, whatever the others are and in whatever order they were opened', async () => {
+    const p = await project(alice);
+    const t = await collection(alice);
+    const shot = await upload(alice, { visibility: 'private' });
+    const own = await entry(alice);
+    const viaTheme = await entry(alice, { media: showing(shot) });
+    const viaProject = await entry(alice, { projectIds: [p.id] });
+    await setItems(alice, t.id, [{ kind: 'entry', entryId: viaTheme.id }]);
+    const links = [await share(alice, 'entry', own.id), await share(alice, 'theme', t.id), await share(alice, 'project', p.id)];
+    for (const order of [links, [...links].reverse()]) {
+      const b = browser();
+      for (const link of order) await open(b, link);
+      for (const e of [own, viaTheme, viaProject]) await shared(b, `/api/entries/${e.id}`);
+      await shared(b, `/api/photos/${shot.id}`);
+      await sizesLoad(b, shot);
+    }
   });
 });
 

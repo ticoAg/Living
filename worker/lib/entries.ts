@@ -12,6 +12,7 @@ import {
   type EntryType,
   type Visibility
 } from '../../shared/types';
+import { ATTACHMENTS_BRIEF_SQL, attachmentsOfEntry, parseBriefs } from './attachments';
 import type { MediaField } from './entryInput';
 import { invalid } from './http';
 import { summariesByIds } from './photos';
@@ -45,6 +46,8 @@ export interface EntryRow {
   poi_district: string | null;
   poi_lat: number | null;
   poi_lng: number | null;
+  /** AttachmentBrief[] as JSON */
+  attachments_json: string | null;
   body?: string | null;
   revision?: number;
 }
@@ -66,7 +69,8 @@ export function entryCols(q: Sql, viewer: string | null, grant: string | null = 
        WHERE em.entry_id = e.id AND ${photoById(q, viewer, 'p', grant)} ORDER BY em.position)) AS photo_ids,
     (SELECT group_concat(et.tag_id) FROM entry_tags et WHERE et.entry_id = e.id) AS tag_ids,
     (SELECT group_concat(project_id) FROM (SELECT ep.project_id FROM entry_projects ep JOIN projects pj ON pj.id = ep.project_id
-       WHERE ep.entry_id = e.id AND ${projectList(q, viewer, 'pj')} ORDER BY ep.project_id)) AS project_ids`;
+       WHERE ep.entry_id = e.id AND ${projectList(q, viewer, 'pj')} ORDER BY ep.project_id)) AS project_ids,
+    ${ATTACHMENTS_BRIEF_SQL} AS attachments_json`;
 }
 
 const ids = (s: string | null): string[] => (s ? s.split(',') : []);
@@ -101,6 +105,7 @@ export function toEntrySummary(r: EntryRow): EntrySummary {
             lng: r.poi_lng
           }
         : null,
+    attachments: parseBriefs(r.attachments_json),
     createdAt: r.created_at,
     updatedAt: r.updated_at
   };
@@ -126,7 +131,7 @@ export async function loadEntryDetail(
   // Themes holding it, as a photo page lists its themes: those the viewer may see in lists, latest first. An unlisted
   // theme is not advertised from its entries.
   const qt = new Sql();
-  const [media, themes] = await Promise.all([
+  const [media, themes, attachments] = await Promise.all([
     db
       .prepare('SELECT photo_id, caption FROM entry_media WHERE entry_id = ?1 ORDER BY position')
       .bind(id)
@@ -136,7 +141,9 @@ export async function loadEntryDetail(
       `SELECT DISTINCT th.id, th.title, th.updated_at FROM theme_items ti JOIN themes th ON th.id = ti.theme_id
        WHERE ti.entry_id = ${qt.p(id)} AND ${themeList(qt, viewer)} ORDER BY th.updated_at DESC, th.id DESC`,
       qt
-    ).all<{ id: string; title: string }>()
+    ).all<{ id: string; title: string }>(),
+    // an entry's attachments are whoever may open it's to see: none is left out
+    attachmentsOfEntry(db, id)
   ]);
   const photos = await summariesByIds(
     db,
@@ -152,10 +159,12 @@ export async function loadEntryDetail(
     const { note: _note, ...photo } = p;
     shown.push({ photoId: m.photo_id, caption: m.caption, photo });
   }
+  const { attachments: _briefs, ...summary } = toEntrySummary(row);
   return {
-    ...toEntrySummary(row),
+    ...summary,
     body: row.body ?? null,
     media: shown,
+    attachments,
     revision: row.revision ?? 1,
     themes: themes.results.map((t) => ({ id: t.id, title: t.title }))
   };

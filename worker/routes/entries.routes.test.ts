@@ -84,7 +84,7 @@ describe('POST /api/entries', () => {
     expect((await alice.post('/api/entries', { body: '一句话' })).status).toBe(400);
     expect((await alice.post('/api/entries', { occurredAt: AT })).status).toBe(400);
     const empty = await alice.post('/api/entries', { occurredAt: AT, title: '  ', body: '\n\n', media: [] });
-    expect(expectStatus(empty, 400).message).toBe('记录不能是空的：写点文字，或者加一张照片');
+    expect(expectStatus(empty, 400).message).toBe('记录不能是空的：写点文字，或者加一张照片、一个附件');
     expect(await list(alice, 'mine=1')).toEqual([]);
   });
 
@@ -477,11 +477,11 @@ describe('PATCH /api/entries/:id', () => {
     const photo = await upload(alice);
     const e = await create(alice, { body: '只有正文' });
     expect(expectStatus(await alice.patch(`/api/entries/${e.id}`, { body: '' }), 400).message).toBe(
-      '记录不能是空的：写点文字，或者加一张照片'
+      '记录不能是空的：写点文字，或者加一张照片、一个附件'
     );
     expectStatus(await alice.patch(`/api/entries/${e.id}`, { body: '', media: [{ photoId: photo.id }] }), 200);
     expect(expectStatus(await alice.patch(`/api/entries/${e.id}`, { media: [] }), 400).message).toBe(
-      '记录不能是空的：写点文字，或者加一张照片'
+      '记录不能是空的：写点文字，或者加一张照片、一个附件'
     );
   });
 

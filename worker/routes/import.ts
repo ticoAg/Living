@@ -1,6 +1,7 @@
 // Import (导入): an export (docs/api/export.md#导出的文件) brought into the signed-in account. The browser reads
 // living.json and the files and sends the rows a batch at a time: tags, places and privacy zones first; the photos
-// through POST /api/photos, as an upload; then projects, entries and collections. Contract: /docs/api/import.md
+// through POST /api/photos, as an upload, and the attachments' files in parts; then projects, entries and collections.
+// Contract: /docs/api/import.md
 //
 // Nothing here is overwritten. An item that is here already, its id in the export being the user's own (an export of
 // this account) or the id an earlier import gave it, stays as it is. A new one gets an id worked out from the account
@@ -9,9 +10,10 @@
 // place that does not exist, is dropped rather than followed.
 
 import { Hono } from 'hono';
-import { IMPORT_LIMITS, MILESTONE_LIMITS, PRIVACY_ZONE_LIMITS, TAG_LIMITS } from '../../shared/limits';
+import { ATTACHMENT_PART_BYTES, IMPORT_LIMITS, MILESTONE_LIMITS, PRIVACY_ZONE_LIMITS, TAG_LIMITS } from '../../shared/limits';
 import {
   POI_LIMITS,
+  type ImportAttachmentResponse,
   type ImportIdsResponse,
   type ImportResolveResponse,
   type ImportRowsResponse,
@@ -21,9 +23,20 @@ import {
   type Visibility
 } from '../../shared/types';
 import type { AppEnv } from '../env';
+import {
+  ATTACHMENT_COLS,
+  assertCanBegin,
+  beginUpload,
+  deleteAttachmentFiles,
+  parseAttachmentMeta,
+  partsOf,
+  toOwnAttachment,
+  writeAttachments,
+  type AttachmentRow
+} from '../lib/attachments';
 import { writeMedia, writeProjects, writeTags } from '../lib/entries';
 import { assertNotEmpty, parseEntryFields } from '../lib/entryInput';
-import { HttpError, ID_RE, invalid, readJson } from '../lib/http';
+import { HttpError, ID_RE, conflict, invalid, readJson } from '../lib/http';
 import { importedId, newId } from '../lib/ids';
 import { defaultRadius, parseNewPoi } from '../lib/poi';
 import { photosToHide } from '../lib/privacy';
@@ -83,29 +96,34 @@ function why(e: unknown): string {
   throw e;
 }
 
-type Owned = 'entries' | 'projects' | 'themes';
-const PREFIX: Record<Owned, string> = { entries: 'en', projects: 'pj', themes: 'th' };
+type Owned = 'entries' | 'projects' | 'themes' | 'attachments';
+const PREFIX: Record<Owned, string> = { entries: 'en', projects: 'pj', themes: 'th', attachments: 'at' };
 
 interface Where extends ImportTarget {
   /** the id this account's import would give it belongs to someone else: cannot happen short of a hash collision */
   taken: boolean;
 }
 
-/** Where each of the export's items is, or is to be, in this account (see the top of this file). */
+/**
+ * Where each of the export's items is, or is to be, in this account (see the top of this file). An attachment is here
+ * once its file is: one whose upload an earlier import left unfinished is to be uploaded again, under the same id.
+ */
 async function targets(db: D1Database, table: Owned, ownerId: string, sources: string[]): Promise<Map<string, Where>> {
   const out = new Map<string, Where>();
   if (!sources.length) return out;
   const derived = await Promise.all(sources.map((s) => importedId(PREFIX[table], ownerId, s)));
+  const done = table === 'attachments' ? 'uploaded_at IS NOT NULL' : '1';
   const res = await db
-    .prepare(`SELECT id, owner_id FROM ${table} WHERE id IN (SELECT value FROM json_each(?1))`)
+    .prepare(`SELECT id, owner_id, ${done} AS done FROM ${table} WHERE id IN (SELECT value FROM json_each(?1))`)
     .bind(JSON.stringify([...new Set([...sources, ...derived])]))
-    .all<{ id: string; owner_id: string }>();
-  const owner = new Map(res.results.map((r) => [r.id, r.owner_id]));
+    .all<{ id: string; owner_id: string; done: number }>();
+  const byId = new Map(res.results.map((r) => [r.id, r]));
   sources.forEach((s, i) => {
-    if (owner.get(s) === ownerId) out.set(s, { id: s, exists: true, taken: false });
+    const own = byId.get(s);
+    if (own?.owner_id === ownerId) out.set(s, { id: s, exists: own.done === 1, taken: false });
     else {
-      const o = owner.get(derived[i]);
-      out.set(s, { id: derived[i], exists: o === ownerId, taken: o !== undefined && o !== ownerId });
+      const o = byId.get(derived[i]);
+      out.set(s, { id: derived[i], exists: o?.owner_id === ownerId && o.done === 1, taken: o !== undefined && o.owner_id !== ownerId });
     }
   });
   return out;
@@ -120,6 +138,9 @@ async function present(db: D1Database, sql: string, ids: string[], ...params: un
 
 const MY_PHOTOS = 'SELECT id FROM photos WHERE id IN (SELECT value FROM json_each(?1)) AND owner_id = ?2';
 const MY_ENTRIES = 'SELECT id FROM entries WHERE id IN (SELECT value FROM json_each(?1)) AND owner_id = ?2';
+/** uploaded in full and in no entry yet, as an import leaves them */
+const MY_LOOSE_ATTACHMENTS = `SELECT id FROM attachments WHERE id IN (SELECT value FROM json_each(?1)) AND owner_id = ?2
+  AND uploaded_at IS NOT NULL AND entry_id IS NULL`;
 const PLACES = 'SELECT id FROM pois WHERE id IN (SELECT value FROM json_each(?1))';
 
 /** Rows of a batch: which were made, which were here, which could not be. */
@@ -180,7 +201,7 @@ imports.post('/resolve', async (c) => {
   };
   const shas = list('photos', /^[0-9a-fA-F]{64}$/).map((s) => s.toLowerCase());
   const db = c.env.DB;
-  const [photos, entries, projects, themes] = await Promise.all([
+  const [photos, entries, attachments, projects, themes] = await Promise.all([
     shas.length
       ? db
           .prepare('SELECT id, sha256 FROM photos WHERE owner_id = ?1 AND sha256 IN (SELECT value FROM json_each(?2))')
@@ -189,6 +210,7 @@ imports.post('/resolve', async (c) => {
           .then((r) => r.results)
       : [],
     targets(db, 'entries', user.id, list('entries', ID_RE)),
+    targets(db, 'attachments', user.id, list('attachments', ID_RE)),
     targets(db, 'projects', user.id, list('projects', ID_RE)),
     targets(db, 'themes', user.id, list('collections', ID_RE))
   ]);
@@ -196,6 +218,7 @@ imports.post('/resolve', async (c) => {
   return c.json({
     photos: Object.fromEntries(photos.map((p) => [p.sha256, p.id])),
     entries: plain(entries),
+    attachments: plain(attachments),
     projects: plain(projects),
     collections: plain(themes)
   } satisfies ImportResolveResponse);
@@ -582,6 +605,45 @@ imports.post('/projects', async (c) => {
   return c.json(out.json());
 });
 
+// ---- attachments --------------------------------------------------------------------------------------------------
+
+/**
+ * One attachment of an export, before the entries: here already once an earlier import uploaded its file in full;
+ * otherwise begun (as `POST /api/attachments` does, its time the export's), its parts to follow through
+ * `/api/attachments/:id/parts/:n` and `/complete`. An upload an earlier import left unfinished starts again.
+ */
+imports.post('/attachments', async (c) => {
+  const user = await requireUser(c);
+  const body = await readJson(c);
+  const [source] = sourceIds([body]);
+  const meta = parseAttachmentMeta(body);
+  const db = c.env.DB;
+  const now = nowIso();
+  const w = (await targets(db, 'attachments', user.id, [source])).get(source) as Where;
+  if (w.taken) throw invalid('这一项的 id 在这个站点已被占用');
+  const row = await db
+    .prepare(`SELECT ${ATTACHMENT_COLS} FROM attachments WHERE id = ?1 AND owner_id = ?2`)
+    .bind(w.id, user.id)
+    .first<AttachmentRow>();
+  if (row?.uploaded_at) return c.json({ here: true, attachment: toOwnAttachment(row) } satisfies ImportAttachmentResponse);
+  if (row) {
+    const gone = await db.prepare('DELETE FROM attachments WHERE id = ?1 AND uploaded_at IS NULL').bind(row.id).run();
+    if (!gone.meta.changes) throw conflict('这个附件刚刚在别处传完了，请重新开始导入');
+    await deleteAttachmentFiles(c.env.MEDIA, [row]);
+  }
+  await assertCanBegin(db, user.id);
+  const begun = await beginUpload(db, c.env.MEDIA, user.id, w.id, meta, pastIso(body.createdAt, now) ?? now, now);
+  return c.json(
+    {
+      here: false,
+      attachment: toOwnAttachment(begun),
+      partBytes: ATTACHMENT_PART_BYTES,
+      parts: partsOf(meta.size)
+    } satisfies ImportAttachmentResponse,
+    201
+  );
+});
+
 // ---- entries ------------------------------------------------------------------------------------------------------
 
 imports.post('/entries', async (c) => {
@@ -614,16 +676,25 @@ imports.post('/entries', async (c) => {
     PLACES,
     parsed.flatMap((p) => (p.f.poiId ? [p.f.poiId] : []))
   );
+  const loose = await present(
+    db,
+    MY_LOOSE_ATTACHMENTS,
+    parsed.flatMap((p) => (p.f.attachments ?? []).map((x) => x.attachmentId)),
+    user.id
+  );
 
   const statements: D1PreparedStatement[] = [];
   for (const { source, id, row, f } of parsed) {
     const media = (f.media ?? []).filter((m) => photos.has(m.photoId));
+    // one in another entry, or not uploaded in full, is left out; one goes to the first entry of the batch that has it
+    const attached = (f.attachments ?? []).filter((a) => loose.has(a.attachmentId));
     try {
-      assertNotEmpty(f.title, f.body, media.length);
+      assertNotEmpty(f.title, f.body, media.length + attached.length);
     } catch (e) {
       out.failed.push({ id: source, message: why(e) });
       continue;
     }
+    for (const a of attached) loose.delete(a.attachmentId);
     const t = times(row, now);
     statements.push(
       prepInsert(db, 'entries', {
@@ -641,6 +712,7 @@ imports.post('/entries', async (c) => {
         updated_at: t.updated
       }),
       ...writeMedia(db, id, media),
+      ...writeAttachments(db, id, attached, now),
       ...writeTags(
         db,
         id,

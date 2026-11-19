@@ -438,6 +438,8 @@ export interface EntrySummary {
   projectIds: string[];
   /** Where it happened, as its author chose; shown to whoever may see the entry, with where it is on the map. */
   poi: LocatedPlace | null;
+  /** Its videos, recordings and files, in order: whoever may see the entry may play or download them. */
+  attachments: AttachmentBrief[];
   createdAt: string;
   updatedAt: string;
 }
@@ -460,10 +462,12 @@ export interface EntryMedia {
   photo: PhotoSummary;
 }
 
-export interface EntryDetail extends EntrySummary {
+export interface EntryDetail extends Omit<EntrySummary, 'attachments'> {
   body: string | null;
   /** Its photos the requester may see, in order, with their captions; the others are left out. */
   media: EntryMedia[];
+  /** Its attachments, in order, with their captions. */
+  attachments: EntryAttachment[];
   /** One more with every change. Send it back with `PATCH` to hear (409) about a change made elsewhere meanwhile. */
   revision: number;
   /** Themes (合集) holding it that the requester may see in lists: public ones, or all of one's own. */
@@ -489,6 +493,8 @@ export interface CreateEntryBody {
   status?: EntryStatus;
   /** One's own photos, in order. */
   media?: EntryMediaInput[];
+  /** One's own uploaded attachments, in order: loose ones, or ones this entry has already. */
+  attachments?: EntryAttachmentInput[];
   tagIds?: string[];
   /** One's own projects; other ids are dropped. */
   projectIds?: string[];
@@ -496,10 +502,95 @@ export interface CreateEntryBody {
   poiId?: string | null;
 }
 
-/** `PATCH /api/entries/:id`: what is given changes; `media` and `tagIds` replace the whole list. */
+/** `PATCH /api/entries/:id`: what is given changes; `media`, `attachments` and `tagIds` replace the whole list. */
 export interface UpdateEntryBody extends Partial<CreateEntryBody> {
   /** The revision this edit started from; when the entry has moved on, the answer is 409 and nothing changes. */
   revision?: number;
+}
+
+// ---- attachments (docs/api/attachments.md) --------------------------------------------------------------------------
+// Videos, recordings and other files, kept as uploaded. An attachment is its author's and belongs to one entry; it has
+// no visibility of its own: whoever may open the entry may play or download it.
+
+/** A video, a recording (or any sound), or another file. */
+export const ATTACHMENT_KINDS = ['video', 'audio', 'file'] as const;
+export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
+
+/** An attachment. Its file is at `/media/a/<id>` (`?download=1` to save it), a video's frame at `/media/a/<id>/poster`. */
+export interface Attachment {
+  id: string;
+  kind: AttachmentKind;
+  /** the file's name as uploaded */
+  name: string;
+  mime: string;
+  /** bytes */
+  size: number;
+  /** seconds; null when the browser that uploaded it could not tell */
+  duration: number | null;
+  /** a video's, in pixels */
+  width: number | null;
+  height: number | null;
+  /** a video has a frame to show before it plays */
+  poster: boolean;
+  createdAt: string;
+}
+
+/** One of an entry's attachments, with what the entry says under it. */
+export interface EntryAttachment extends Attachment {
+  caption: string | null;
+}
+
+/** What a list says of an entry's attachments: enough for a card. */
+export type AttachmentBrief = Pick<Attachment, 'id' | 'kind' | 'duration' | 'poster'>;
+
+export interface EntryAttachmentInput {
+  attachmentId: string;
+  caption?: string | null;
+}
+
+/** Where an attachment is: its file still coming in, uploaded but in no entry, or in one. */
+export type AttachmentState = 'uploading' | 'loose' | 'attached';
+
+/** An attachment as its author's upload sees it. */
+export interface OwnAttachment extends Attachment {
+  state: AttachmentState;
+  entryId: string | null;
+}
+
+/** `POST /api/attachments`: a file about to be uploaded. */
+export interface CreateAttachmentBody {
+  kind: AttachmentKind;
+  name: string;
+  /** what the file is, `type/subtype`; a video's must be `video/…`, a recording's `audio/…` */
+  mime: string;
+  /** bytes */
+  size: number;
+  duration?: number | null;
+  width?: number | null;
+  height?: number | null;
+}
+
+/** `POST /api/attachments` (201): the file goes up as `parts` parts, each `partBytes` long but the last. */
+export interface AttachmentUpload {
+  attachment: OwnAttachment;
+  partBytes: number;
+  parts: number;
+}
+
+/** `PUT /api/attachments/:id/parts/:n`. */
+export interface AttachmentPart {
+  partNumber: number;
+  etag: string;
+}
+
+/** `POST /api/attachments/:id/complete`: every part, as the part uploads answered. */
+export interface CompleteAttachmentBody {
+  parts: AttachmentPart[];
+}
+
+/** `POST /api/attachments/:id/complete`, `PUT /api/attachments/:id/poster`. */
+export interface AttachmentResponse {
+  attachment: OwnAttachment;
 }
 
 // ---- share links (docs/api/shares.md) -------------------------------------------------------------------------------
@@ -730,6 +821,7 @@ export const EXPORT_PARTS = [
   'entryMedia',
   'entryTags',
   'entryProjects',
+  'attachments',
   'projects',
   'milestones',
   'themes',
@@ -748,6 +840,8 @@ export interface ExportSummary {
   counts: Record<ExportPart, number>;
   /** the photos' original files, in bytes */
   originalBytes: number;
+  /** the attachments' files, in bytes */
+  attachmentBytes: number;
 }
 
 /** `GET /api/export/:part?after=`: up to a page of rows (fields per part: docs/api/export.md); `next` reads on. */
@@ -844,6 +938,23 @@ export interface ExportEntryTag {
 export interface ExportEntryProject {
   entryId: string;
   projectId: string;
+}
+
+/** An attachment in an entry; its file is read from `/media/a/<id>`. */
+export interface ExportAttachment {
+  id: string;
+  entryId: string;
+  position: number;
+  caption: string | null;
+  kind: AttachmentKind;
+  name: string;
+  mime: string;
+  size: number;
+  duration: number | null;
+  width: number | null;
+  height: number | null;
+  poster: boolean;
+  createdAt: string;
 }
 
 export interface ExportProject {
@@ -957,6 +1068,7 @@ export interface ImportTarget {
 export interface ImportResolveBody {
   photos?: string[];
   entries?: string[];
+  attachments?: string[];
   projects?: string[];
   collections?: string[];
 }
@@ -965,6 +1077,8 @@ export interface ImportResolveResponse {
   /** this account's photo with those bytes, by SHA-256; a hash left out has none */
   photos: Record<string, string>;
   entries: Record<string, ImportTarget>;
+  /** here: uploaded in full; one whose upload an earlier import left unfinished is not */
+  attachments: Record<string, ImportTarget>;
   projects: Record<string, ImportTarget>;
   collections: Record<string, ImportTarget>;
 }
@@ -991,12 +1105,20 @@ export interface ImportProject extends ExportProject {
   milestones: ImportMilestone[];
 }
 
-/** An entry of an export; `media`, `tagIds`, `projectIds` and `poiId` are ids here. */
+/** An entry of an export; `media`, `attachments`, `tagIds`, `projectIds` and `poiId` are ids here. */
 export interface ImportEntry extends Omit<ExportEntry, 'revision'> {
   media: { photoId: string; caption: string | null }[];
+  /** attachments uploaded for it (`POST /api/import/attachments`), in order */
+  attachments?: { attachmentId: string; caption: string | null }[];
   tagIds: string[];
   projectIds: string[];
 }
+
+/** `POST /api/import/attachments`: one attachment of an export, its file to follow. */
+export type ImportAttachmentBody = CreateAttachmentBody & { id: string; createdAt?: string };
+
+/** Here already (uploaded in full by an earlier import), or where its parts go. */
+export type ImportAttachmentResponse = ({ here: true } & AttachmentResponse) | ({ here: false } & AttachmentUpload);
 
 export type ImportCollectionItem = Pick<ExportThemeItem, 'kind' | 'photoId' | 'entryId' | 'text' | 'day'>;
 
