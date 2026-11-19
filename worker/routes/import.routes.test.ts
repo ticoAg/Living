@@ -1881,6 +1881,8 @@ describe('POST /api/import/entries', () => {
       entryRow('en_none', { title: null, body: null, attachments: all(theirs, held, unfinished, 'at_nobody') }),
       entryRow('en_first', { attachments: [...all(theirs), { attachmentId: loose, caption: '留下' }] }),
       entryRow('en_second', { attachments: [{ attachmentId: loose, caption: '又一次' }] }),
+      // nothing but the one the first took: nothing left to be an entry
+      entryRow('en_alone', { title: null, body: null, attachments: all(loose) }),
       entryRow('en_bad', { attachments: 'at_loose' })
     ]);
     expect(res).toMatchObject({
@@ -1888,7 +1890,8 @@ describe('POST /api/import/entries', () => {
       existing: 0,
       failed: [
         { id: 'en_bad', message: '附件需要是数组' },
-        { id: 'en_none', message: EMPTY }
+        { id: 'en_none', message: EMPTY },
+        { id: 'en_alone', message: EMPTY }
       ]
     });
     expect((await entryOf(bob, res.ids.en_first)).attachments.map((a) => [a.id, a.caption])).toEqual([[loose, '留下']]);

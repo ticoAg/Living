@@ -305,6 +305,19 @@ describe('POST /api/attachments/:id/complete', () => {
     );
   });
 
+  it('drops a file that came out another size than it said, row and all', async () => {
+    const begun = await beginAttachment(alice, { size: 10 });
+    const r = await row(begun.attachment.id);
+    // a part that reached the store some other way than through the parts, which are checked for their length
+    const part = await platform.env.MEDIA.resumeMultipartUpload(r?.file_key as string, r?.upload_id as string).uploadPart(1, bytesOf(9));
+    const res = await alice.post(`/api/attachments/${begun.attachment.id}/complete`, {
+      parts: [{ partNumber: part.partNumber, etag: part.etag }]
+    });
+    expect(expectStatus(res, 400).message).toBe('传上来的文件和说好的大小不一样，请重新上传');
+    expect(await row(begun.attachment.id)).toBeNull();
+    expect(await stored(r?.file_key as string)).toBe(false);
+  });
+
   it('is nobody else’s to complete', async () => {
     const begun = await beginAttachment(alice, { size: 10 });
     const parts = await putParts(alice, begun, bytesOf(10));
@@ -334,6 +347,14 @@ describe('PUT /api/attachments/:id/poster', () => {
     // the same kind again replaces it in place
     expectStatus(await poster(alice, a.id, JPEG, 'image/jpeg'), 200);
     expect(await stored(second)).toBe(true);
+    // in an entry, and saying so
+    const e = await entry(alice, { attachments: holding(a) });
+    expect(expectStatus(await poster(alice, a.id, WEBP, 'image/webp'), 200).attachment).toEqual({
+      ...a,
+      poster: true,
+      state: 'attached',
+      entryId: e.id
+    });
   });
 
   it('takes a frame while the video is still uploading', async () => {
@@ -487,6 +508,8 @@ describe('entries with attachments', () => {
   it('change with PATCH: in another order, other captions, some added and some taken out, which come loose', async () => {
     const [a, b, c] = [await uploadAttachment(alice), await uploadAttachment(alice), await uploadAttachment(alice)];
     const e = await entry(alice, { body: 'x', attachments: holding(a, b) });
+    // put up a month ago: its week starts when it is taken out, not from then
+    await run('UPDATE attachments SET uploaded_at = ?1 WHERE id = ?2', iso(Date.now() - 30 * DAY), a.id);
     const before = Date.now() - 1000;
     const res = await alice.patch(`/api/entries/${e.id}`, {
       attachments: [{ attachmentId: b.id, caption: '后来' }, { attachmentId: c.id }]
@@ -562,9 +585,12 @@ describe('/media/a/:id: who may play or download it', () => {
       expect(await statusOf(viewer, `/media/a/${loose.id}`)).toBe(404);
       expect(await statusOf(viewer, `/media/a/${loose.id}/poster`)).toBe(404);
     }
-    const begun = await beginAttachment(alice, { size: 10 });
+    const begun = await beginAttachment(alice, { kind: 'video', name: 'v.mp4', mime: 'video/mp4', size: 10 });
     await putParts(alice, begun, bytesOf(10));
+    // its frame may come before the parts are put together, and is no more to be seen than its file
+    expectStatus(await poster(alice, begun.attachment.id, WEBP, 'image/webp'), 200);
     expect(await statusOf(alice, `/media/a/${begun.attachment.id}`)).toBe(404);
+    expect(await statusOf(alice, `/media/a/${begun.attachment.id}/poster`)).toBe(404);
   });
 
   it('follows its entry as it changes, and leaves it when taken out', async () => {
@@ -732,6 +758,12 @@ describe('/media/a/:id: what it sends', () => {
     await entry(alice, { visibility: 'unlisted', attachments: holding(shared) });
     const own = await video();
     await entry(alice, { attachments: holding(own) });
+    // public, but a draft or archived: its author's alone for now
+    const draft = await video();
+    await entry(alice, { visibility: 'public', status: 'draft', attachments: holding(draft) });
+    const archived = await video();
+    await entry(alice, { visibility: 'public', status: 'archived', attachments: holding(archived) });
+    const loose = await video();
     for (const viewer of [alice, bob, visitor]) {
       const res = await viewer.fetch(`/media/a/${pub.id}/poster`);
       expect(res.headers.get('cache-control')).toBe('private, max-age=3600');
@@ -740,7 +772,11 @@ describe('/media/a/:id: what it sends', () => {
       expect((await viewer.fetch(`/media/a/${pub.id}`)).headers.get('cache-control')).toBe(NO_STORE);
     }
     expect((await bob.fetch(`/media/a/${shared.id}/poster`)).headers.get('cache-control')).toBe(NO_STORE);
-    expect((await alice.fetch(`/media/a/${own.id}/poster`)).headers.get('cache-control')).toBe(NO_STORE);
+    for (const a of [own, draft, archived, loose]) {
+      const res = await alice.fetch(`/media/a/${a.id}/poster`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('cache-control')).toBe(NO_STORE);
+    }
   });
 });
 
