@@ -45,7 +45,9 @@ export default defineConfig({
     // registers the owner, uploads and publishes the sample photos, walks every page and saves the session
     { name: 'story', testMatch: 'story.spec.ts', use: desktop },
     // fixes worth guarding, run on the story's data and session
-    { name: 'regressions', testMatch: 'regressions.spec.ts', dependencies: ['story'], use: desktop }
+    { name: 'regressions', testMatch: 'regressions.spec.ts', dependencies: ['story'], use: desktop },
+    // videos, recordings and files; after the regressions, which count the story's entries
+    { name: 'attachments', testMatch: 'attachments.spec.ts', dependencies: ['regressions'], use: desktop }
   ],
   webServer: {
     // a fresh database on every run, then the build `npm run test:e2e` has just made

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { entryLabel, entryTypeLabel, occurredDay } from '../../shared/entries';
 import type { EntrySummary, PhotoSummary, ThemeEntry } from '../../shared/types';
+import { attachmentsLabel } from '../attachments/kinds';
 import { Icon } from '../components/icons';
 import Img from '../components/Img';
 import PickerDialog from '../components/PickerDialog';
@@ -189,6 +190,7 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
                             <span key={m}>{m}</span>
                           ))}
                           {e.photoIds.length > 0 && <span>{e.photoIds.length} 张照片</span>}
+                          {e.attachments.length > 0 && <span>{attachmentsLabel(e.attachments)}</span>}
                         </span>
                         <span className="ep-label">{label}</span>
                       </span>

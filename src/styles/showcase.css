@@ -19,7 +19,10 @@
 .sc-work { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: var(--ink); text-decoration: none; }
 .sc-work:hover { color: var(--ink); }
 .sc-work:focus-visible { outline: 2px solid var(--hydro); outline-offset: 4px; border-radius: var(--r-img); }
-.sc-work > .img, .sc-work-text { width: 100%; border-radius: var(--r-img); }
+.sc-work > .img, .sc-work-text, .sc-work-film { width: 100%; border-radius: var(--r-img); }
+.sc-work-film { display: block; aspect-ratio: 4 / 5; overflow: hidden; background: var(--mat); }
+.sc-work-film > img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.9s var(--ease); }
+@media (hover: hover) { .sc-work:hover > .sc-work-film > img { transform: scale(1.035); } }
 .sc-work > .img > img { transition: opacity 0.5s ease, transform 0.9s var(--ease); }
 @media (hover: hover) { .sc-work:hover > .img > img { transform: scale(1.035); } }
 /* a work without a photo the viewer may see: the start of its text on a mat, fading out at the foot */

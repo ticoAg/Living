@@ -51,6 +51,14 @@ describe('emptyDraft', () => {
     expect(payloadOf(past).occurredAt).toBe('2026-03-02');
     expect(emptyDraft(at, '', { date: '2026-11-16' })).toMatchObject({ date: '2026-11-16', time: '08:30' });
   });
+
+  it('starts with the recordings a quick note hands over, each once', () => {
+    const rec = attachment('at_r', { kind: 'audio', name: '录音.webm', mime: 'audio/webm', poster: false });
+    const d = emptyDraft(at, '路上想到的', { attachments: [rec, rec] });
+    expect(d.attachments).toEqual([{ attachmentId: 'at_r', caption: '', attachment: rec }]);
+    expect(payloadOf(d).attachments).toEqual([{ attachmentId: 'at_r', caption: null }]);
+    expect(isEmptyDraft(emptyDraft(at, '', { attachments: [rec] }))).toBe(false);
+  });
 });
 
 describe('draftFromEntry', () => {

@@ -20,11 +20,14 @@ import AutoTextarea from '../components/AutoTextarea';
 import { Icon } from '../components/icons';
 import Img from '../components/Img';
 import PhotoPicker from '../components/PhotoPicker';
+import AttachmentsField from '../attachments/AttachmentsField';
 import {
+  addAttachments,
   addMedia,
   clearBackup,
   draftFromEntry,
   emptyDraft,
+  isEmptyDraft,
   moveMedia,
   payloadOf,
   readBackup,
@@ -33,7 +36,7 @@ import {
 } from '../entries/draft';
 import EntryPlaceField from '../entries/EntryPlaceField';
 import Markdown from '../entries/Markdown';
-import { handoffBody } from '../entries/QuickCapture';
+import { handoffOf } from '../entries/QuickCapture';
 import { SignedOut } from '../entries/ui';
 import { useEntryAutosave, type SaveState } from '../entries/useEntryAutosave';
 import { ApiError } from '../lib/api';
@@ -69,7 +72,7 @@ function statusLine(state: SaveState): { text: string; kind?: 'ok' | 'error' | '
     case 'pending':
       return { text: '有改动', kind: 'dirty' };
     case 'empty':
-      return { text: '写点什么，或者加一张照片' };
+      return { text: '写点什么，或者加照片、附件' };
     case 'invalid':
     case 'error':
       return { text: state.text, kind: 'error' };
@@ -90,8 +93,8 @@ function fmtBackupTime(iso: string): string {
 interface EditorProps {
   user: SessionUser;
   initial: EntryDetail | null;
-  /** text carried over from the quick note */
-  handoff: string;
+  /** what the quick note carried over */
+  handoff: ReturnType<typeof handoffOf>;
   /** a new entry's project, when it is written from the project's page */
   project: ProjectDetail | null;
   /** the day a new entry starts on, when not today */
@@ -105,14 +108,15 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
   const [draft, setDraft] = useState<EntryDraft>(() =>
     initial
       ? draftFromEntry(initial)
-      : emptyDraft(new Date(), handoff, {
+      : emptyDraft(new Date(), handoff.body, {
           ...(project ? { projectIds: [project.id], type: entryTypeFor(project.type) } : {}),
-          ...(startDate ? { date: startDate } : {})
+          ...(startDate ? { date: startDate } : {}),
+          attachments: handoff.attachments
         })
   );
   // a copy kept on this device that the server does not have: offered once, as the editor opens
   const [offer, setOffer] = useState<Backup | null>(() => {
-    if (!initial && handoff) return null;
+    if (!initial && (handoff.body || handoff.attachments.length)) return null;
     const b = readBackup(user.id, initial?.id ?? null);
     if (!b) return null;
     const server = JSON.stringify(payloadOf(initial ? draftFromEntry(initial) : emptyDraft()));
@@ -123,6 +127,8 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // files going up, or a recording on: finished only once they are in
+  const [attaching, setAttaching] = useState(false);
 
   const { entry, state, unsaved, save, keepMine, takeTheirs, saveAsNew, remove } = useEntryAutosave({
     userId: user.id,
@@ -135,10 +141,11 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
   const set = <K extends keyof EntryDraft>(k: K, v: EntryDraft[K]) => setDraft((d) => ({ ...d, [k]: v }));
   useDocumentTitle(entryLabel(draft.title, draft.body) || (initial ? '编辑记录' : '新记录'));
 
-  const empty = !draft.title.trim() && !draft.body.trim() && draft.media.length === 0;
+  const empty = isEmptyDraft(draft);
   const blocked = state.kind === 'conflict' || state.kind === 'gone';
 
   async function finish() {
+    if (attaching) return;
     const done = await save(status === 'draft' ? 'published' : undefined);
     if (done) navigate(`/e/${done.id}`);
   }
@@ -180,7 +187,8 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
   const photoIds = useMemo(() => new Set(draft.media.map((m) => m.photoId)), [draft.media]);
   const mediaPhotos = useMemo(() => draft.media.map((m) => m.photo), [draft.media]);
   const hiddenPhotos = draft.media.filter((m) => m.photo?.visibility === 'private').length;
-  const line = statusLine(state);
+  const saveLine = statusLine(state);
+  const line = attaching && saveLine.kind !== 'error' ? { text: '附件上传中…', kind: undefined } : saveLine;
   const bodyLeft = ENTRY_LIMITS.bodyMax - [...draft.body].length;
 
   return (
@@ -377,6 +385,18 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
         )}
       </section>
 
+      <AttachmentsField
+        id={id}
+        value={draft.attachments}
+        onAdd={(a) => setDraft((d) => ({ ...d, attachments: addAttachments(d.attachments, [a]) }))}
+        onCaption={(attachmentId, caption) =>
+          setDraft((d) => ({ ...d, attachments: d.attachments.map((x) => (x.attachmentId === attachmentId ? { ...x, caption } : x)) }))
+        }
+        onMove={(i, by) => setDraft((d) => ({ ...d, attachments: moveMedia(d.attachments, i, by) }))}
+        onRemove={(attachmentId) => setDraft((d) => ({ ...d, attachments: d.attachments.filter((x) => x.attachmentId !== attachmentId) }))}
+        onBusyChange={setAttaching}
+      />
+
       <EntryPlaceField value={draft.poi} photos={mediaPhotos} onChange={(poi) => set('poi', poi)} />
 
       <EntryProjects id={`${id}-projects`} value={draft.projectIds} onChange={(ids) => set('projectIds', ids)} />
@@ -399,7 +419,9 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
             </button>
           ))}
         </div>
-        <p className="small muted">{VISIBILITY_HINT[draft.visibility]}照片各有自己的公开范围，不随记录改变。</p>
+        <p className="small muted">
+          {VISIBILITY_HINT[draft.visibility]}照片各有自己的公开范围，不随记录改变{draft.attachments.length > 0 && '；附件随记录'}。
+        </p>
         {draft.visibility !== 'private' && hiddenPhotos > 0 && (
           <p className="small ee-warn" role="note">
             有 {hiddenPhotos} 张照片仅自己可见，读者看不到它们。
@@ -480,7 +502,7 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
             <button
               type="button"
               className="btn btn-primary"
-              disabled={empty || blocked || state.kind === 'saving'}
+              disabled={empty || blocked || attaching || state.kind === 'saving'}
               onClick={() => void finish()}
               aria-keyshortcuts="Control+Enter Meta+Enter"
             >
@@ -503,6 +525,8 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
   );
 }
 
+const NO_HANDOFF: ReturnType<typeof handoffOf> = { body: '', attachments: [] };
+
 /** Which editor is open: a new address starts a new one, except the address the editor's own entry has just moved to. */
 function useEditorSlot(id: string | null) {
   const [slot, setSlot] = useState<{ id: string | null; key: number; adopt: string | null }>({ id, key: 0, adopt: null });
@@ -521,7 +545,7 @@ export default function EntryEditor() {
   const { key, adopt } = useEditorSlot(id);
   // read once per editor: later changes to the cached copy are this editor's own saves
   const { data, error, reload } = useApi<EntryDetail>(id && user ? `/api/entries/${encodeURIComponent(id)}` : null);
-  const [handoff] = useState(() => handoffBody(history.state));
+  const [handoff] = useState(() => handoffOf(history.state));
   // /entries/new?project=… starts the entry in that project, as the kind of entry the project keeps; ?date=YYYY-MM-DD
   // on that day
   const query = useQuery();
@@ -571,7 +595,7 @@ export default function EntryEditor() {
       key={key}
       user={user}
       initial={id ? (data ?? null) : null}
-      handoff={id ? '' : handoff}
+      handoff={id ? NO_HANDOFF : handoff}
       project={project.data?.ownerId === user.id ? project.data : null}
       startDate={startDate}
       onCreated={(e) => {

@@ -58,9 +58,14 @@ export type EntryPayload = Required<Omit<CreateEntryBody, 'status'>>;
 
 /**
  * A new entry: a note of this moment, for the author alone. `start` for one begun from a project, or on another day
- * (the calendar's empty days): a day other than today is the whole day, its time unknown.
+ * (the calendar's empty days): a day other than today is the whole day, its time unknown; or with the recordings of a
+ * quick note.
  */
-export function emptyDraft(now = new Date(), body = '', start: Partial<Pick<EntryDraft, 'type' | 'projectIds' | 'date'>> = {}): EntryDraft {
+export function emptyDraft(
+  now = new Date(),
+  body = '',
+  start: Partial<Pick<EntryDraft, 'type' | 'projectIds' | 'date'>> & { attachments?: readonly Attachment[] } = {}
+): EntryDraft {
   const at = localDateTime(now);
   const date = start.date ?? at.slice(0, 10);
   const timed = date === at.slice(0, 10);
@@ -73,7 +78,7 @@ export function emptyDraft(now = new Date(), body = '', start: Partial<Pick<Entr
     heldTime: timed ? at.slice(11) : '',
     visibility: 'private',
     media: [],
-    attachments: [],
+    attachments: addAttachments([], start.attachments ?? []),
     tagIds: [],
     projectIds: start.projectIds ?? [],
     poi: null
@@ -203,7 +208,7 @@ const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinit
 const numOrNull = (v: unknown): v is number | null => v === null || num(v);
 
 /** A stored attachment's row, or null when it is not one. */
-function attachmentOf(v: unknown): Attachment | null {
+export function attachmentOf(v: unknown): Attachment | null {
   if (!v || typeof v !== 'object') return null;
   const { id, kind, name, mime, size, duration, width, height, poster, createdAt } = v as Record<string, unknown>;
   if (!str(id) || !(ATTACHMENT_KINDS as readonly unknown[]).includes(kind) || !str(name) || !str(mime) || !num(size)) return null;

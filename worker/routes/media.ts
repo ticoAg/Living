@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { Variants, Visibility } from '../../shared/types';
 import type { AppEnv } from '../env';
-import { attachmentCols, contentDisposition, parseRange, servedAs, type AttachmentRow } from '../lib/attachments';
+import { servedAs } from '../../shared/attachments';
+import { attachmentCols, contentDisposition, parseRange, type AttachmentRow } from '../lib/attachments';
 import { etagMatches, notFound, ID_RE, REFERRER_POLICY, type Ctx } from '../lib/http';
 import { mediaCacheKey } from '../lib/mediaCache';
 import { viewerId } from '../lib/session';

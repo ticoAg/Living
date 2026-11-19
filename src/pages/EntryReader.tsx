@@ -4,6 +4,7 @@ import type { EntryDetail, EntryStatus } from '../../shared/types';
 import { LoadError, Loading } from '../browse/ui';
 import { useTagMap } from '../entries/api';
 import Markdown from '../entries/Markdown';
+import AttachmentView from '../attachments/AttachmentView';
 import { Icon } from '../components/icons';
 import Img from '../components/Img';
 import { fmtLongDay, fmtTime } from '../lib/format';
@@ -17,9 +18,9 @@ import { VISIBILITY_LABEL } from '../themes/util';
 import '../styles/browse.css';
 import '../styles/entries.css';
 
-// /e/:id — an entry to read: the projects it is in, its text as Markdown, its photos with their captions, the
-// collections holding it and its tags. Others see it only once it
-// is finished and not private; its photos are each shown or left out by their own visibility. Docs: /docs/product/features/entries.md
+// /e/:id — an entry to read: the projects it is in, its text as Markdown, its photos and attachments with their
+// captions, the collections holding it and its tags. Others see it only once it is finished and not private; its photos
+// are each shown or left out by their own visibility, its attachments go with it. Docs: /docs/product/features/entries.md
 
 /** A link to an entry opens only while it is finished. */
 const SHARE_NOTICE: Record<EntryStatus, string | undefined> = {
@@ -98,6 +99,14 @@ function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
               </Link>
               {m.caption && <figcaption>{m.caption}</figcaption>}
             </figure>
+          ))}
+        </div>
+      )}
+
+      {e.attachments.length > 0 && (
+        <div className="er-media er-attachments">
+          {e.attachments.map((a) => (
+            <AttachmentView key={a.id} a={a} />
           ))}
         </div>
       )}
