@@ -1,12 +1,14 @@
 // Runs an import (docs/product/features/import.md). First the plan: living.json read, and the Worker asked which of
-// its photos, entries, projects and collections are here already. Then the rest goes up a batch at a time, in the
-// order things point to each other: tags, places and privacy zones; the photos, each read from the export, resized as
-// an upload is (studio/process.ts) and uploaded with what living.json says of it; projects, entries, collections.
+// its photos, attachments, entries, projects and collections are here already. Then the rest goes up a batch at a
+// time, in the order things point to each other: tags, places and privacy zones; the photos, each read from the
+// export, resized as an upload is (studio/process.ts) and uploaded with what living.json says of it; the attachments'
+// files, in parts as an attachment goes up; projects, entries, collections.
 // Each step takes this site's ids from the steps before it. Stopping half-way loses nothing: a second import skips
 // what the first one brought. The contract: /docs/api/import.md
 
 import { IMPORT_LIMITS } from '../../shared/limits';
 import type {
+  ImportAttachmentResponse,
   ImportIdsResponse,
   ImportResolveResponse,
   ImportRowsResponse,
@@ -14,10 +16,12 @@ import type {
   ImportZonesResponse,
   PhotoDetail
 } from '../../shared/types';
+import { sendParts, sendPoster, type PutBytes } from '../attachments/upload';
 import { api, ApiError } from '../lib/api';
 import type { Processed } from '../studio/process';
 import type { PublishResult } from '../studio/publish';
 import {
+  attachmentBody,
   batches,
   byCreated,
   collectionRow,
@@ -29,6 +33,7 @@ import {
   relinker,
   zoneRow,
   type Archive,
+  type ArchiveAttachment,
   type ArchivePhoto,
   type IdMaps
 } from './archive';
@@ -49,35 +54,58 @@ export interface ImportPlan {
   noFile: number;
   /** photos whose file the export has, but not among the files picked (a ZIP part left out) */
   notPicked: number;
+  /** attachments here already, of entries still to bring: id in the export → id here */
+  attachmentsHere: Map<string, string>;
+  /** attachments of entries still to bring, their file among the files picked */
+  attachments: ArchiveAttachment[];
+  /** bytes of their files */
+  attachmentBytes: number;
+  /** attachments without a file in the export, or with one not picked */
+  attachmentsNoFile: number;
+  attachmentsNotPicked: number;
 }
 
-export type ImportPhase = 'tags' | 'places' | 'zones' | 'photos' | 'projects' | 'entries' | 'collections';
-export const PHASES: readonly ImportPhase[] = ['tags', 'places', 'zones', 'photos', 'projects', 'entries', 'collections'];
+export type ImportPhase = 'tags' | 'places' | 'zones' | 'photos' | 'attachments' | 'projects' | 'entries' | 'collections';
+export const PHASES: readonly ImportPhase[] = ['tags', 'places', 'zones', 'photos', 'attachments', 'projects', 'entries', 'collections'];
 
 export interface ImportProgress {
   phase: ImportPhase;
   /** photos done (uploaded, found here, or failed), of those to bring */
   photos: number;
   totalPhotos: number;
-  /** bytes of their files sent, of all */
+  /** attachments done, the same way */
+  attachments: number;
+  totalAttachments: number;
+  /** bytes of the photos' and attachments' files sent, of all */
   bytes: number;
   totalBytes: number;
 }
 
 export interface Failure {
-  kind: 'photo' | 'entry' | 'project' | 'collection';
-  /** the photo's file name, or the row's title */
+  kind: 'photo' | 'attachment' | 'entry' | 'project' | 'collection';
+  /** the photo's or attachment's file name, or the row's title */
   label: string;
   message: string;
 }
 
 export interface ImportOutcome {
-  created: { photos: number; entries: number; projects: number; collections: number; tags: number; places: number; zones: number };
+  created: {
+    photos: number;
+    attachments: number;
+    entries: number;
+    projects: number;
+    collections: number;
+    tags: number;
+    places: number;
+    zones: number;
+  };
   /** here already, left as they are */
-  existing: { photos: number; entries: number; projects: number; collections: number; zones: number };
+  existing: { photos: number; attachments: number; entries: number; projects: number; collections: number; zones: number };
   failed: Failure[];
   noFile: number;
   notPicked: number;
+  attachmentsNoFile: number;
+  attachmentsNotPicked: number;
   /** privacy zones over the 50 an account may have */
   zonesFull: number;
   /** share links of the export: never brought, an export has no addresses */
@@ -109,6 +137,8 @@ export interface ImportOptions {
   send: (form: FormData, onProgress: (fraction: number) => void, signal: AbortSignal) => Promise<PublishResult>;
   /** photos in flight at once */
   parallel?: number;
+  /** sends an attachment's part (attachments/upload.ts); tests pass their own */
+  putPart?: PutBytes;
   /** waits before a retry; tests pass one that does not */
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
 }
@@ -165,21 +195,30 @@ export async function planImport(source: ImportSource, signal: AbortSignal, slee
   for (const p of archive.photos) if (p.sha256 && !p.large) byHash.set(p.sha256, p.id);
   const hashes = [...byHash.keys()];
   const entryIds = archive.entries.map((e) => e.id);
+  const attachmentIds = archive.entries.flatMap((e) => e.attachments.map((a) => a.id));
   const projectIds = archive.projects.map((p) => p.id);
   const collectionIds = archive.collections.map((c) => c.id);
   const photosHere = new Map<string, string>();
   const entries = new Map<string, ImportTarget>();
   const projects = new Map<string, ImportTarget>();
   const collections = new Map<string, ImportTarget>();
+  const attachmentTargets = new Map<string, ImportTarget>();
   const n = IMPORT_LIMITS.resolve;
-  const rounds = Math.ceil(Math.max(hashes.length, entryIds.length, projectIds.length, collectionIds.length) / n);
+  const longest = Math.max(hashes.length, entryIds.length, attachmentIds.length, projectIds.length, collectionIds.length);
+  const rounds = Math.ceil(longest / n);
   for (let i = 0; i < rounds; i++) {
     const slice = (list: string[]) => list.slice(i * n, (i + 1) * n);
     const got = await retrying(
       () =>
         post<ImportResolveResponse>(
           '/api/import/resolve',
-          { photos: slice(hashes), entries: slice(entryIds), projects: slice(projectIds), collections: slice(collectionIds) },
+          {
+            photos: slice(hashes),
+            entries: slice(entryIds),
+            attachments: slice(attachmentIds),
+            projects: slice(projectIds),
+            collections: slice(collectionIds)
+          },
           signal
         ),
       signal,
@@ -187,6 +226,7 @@ export async function planImport(source: ImportSource, signal: AbortSignal, slee
     );
     for (const [sha, id] of Object.entries(got.photos)) photosHere.set(byHash.get(sha) as string, id);
     for (const [k, v] of Object.entries(got.entries)) entries.set(k, v);
+    for (const [k, v] of Object.entries(got.attachments ?? {})) attachmentTargets.set(k, v);
     for (const [k, v] of Object.entries(got.projects)) projects.set(k, v);
     for (const [k, v] of Object.entries(got.collections)) collections.set(k, v);
   }
@@ -202,6 +242,22 @@ export async function planImport(source: ImportSource, signal: AbortSignal, slee
   }
   // in the order they were uploaded there, so that photos without a time taken keep their order in the gallery
   upload.sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt) || a.id.localeCompare(b.id));
+
+  // the attachments of entries to bring: an entry here already stays as it is, with what it holds
+  const attachmentsHere = new Map<string, string>();
+  const attachments: ArchiveAttachment[] = [];
+  let attachmentsNoFile = 0;
+  let attachmentsNotPicked = 0;
+  for (const e of archive.entries) {
+    if (entries.get(e.id)?.exists) continue;
+    for (const a of e.attachments) {
+      const t = attachmentTargets.get(a.id);
+      if (t?.exists) attachmentsHere.set(a.id, t.id);
+      else if (!a.file) attachmentsNoFile++;
+      else if (!source.files.has(a.file)) attachmentsNotPicked++;
+      else attachments.push(a);
+    }
+  }
   return {
     archive,
     photosHere,
@@ -211,7 +267,12 @@ export async function planImport(source: ImportSource, signal: AbortSignal, slee
     upload,
     bytes: upload.reduce((s, p) => s + (source.files.get(p.file as string)?.size ?? 0), 0),
     noFile,
-    notPicked
+    notPicked,
+    attachmentsHere,
+    attachments,
+    attachmentBytes: attachments.reduce((s, a) => s + (source.files.get(a.file as string)?.size ?? 0), 0),
+    attachmentsNoFile,
+    attachmentsNotPicked
   };
 }
 
@@ -230,6 +291,8 @@ const TYPES: Record<string, string> = {
 };
 /** The type a file goes up as, from its name: a file read out of a ZIP has none of its own. */
 export const typeOf = (name: string): string => TYPES[name.split('.').pop()?.toLowerCase() ?? ''] ?? '';
+/** A video's frame, by the name the export gave it. */
+const posterType = (path: string) => (path.toLowerCase().endsWith('.jpg') ? 'image/jpeg' : 'image/webp');
 
 const titleOf = (row: Record<string, unknown>, fallback: string) =>
   typeof row.title === 'string' && row.title.trim() ? row.title.trim() : fallback;
@@ -239,15 +302,25 @@ export async function runImport(o: ImportOptions): Promise<ImportOutcome> {
   const sleep = o.sleep ?? wait;
   const archive = plan.archive;
   const outcome: ImportOutcome = {
-    created: { photos: 0, entries: 0, projects: 0, collections: 0, tags: 0, places: 0, zones: 0 },
-    existing: { photos: plan.photosHere.size, entries: 0, projects: 0, collections: 0, zones: 0 },
+    created: { photos: 0, attachments: 0, entries: 0, projects: 0, collections: 0, tags: 0, places: 0, zones: 0 },
+    existing: { photos: plan.photosHere.size, attachments: plan.attachmentsHere.size, entries: 0, projects: 0, collections: 0, zones: 0 },
     failed: [],
     noFile: plan.noFile,
     notPicked: plan.notPicked,
+    attachmentsNoFile: plan.attachmentsNoFile,
+    attachmentsNotPicked: plan.attachmentsNotPicked,
     zonesFull: 0,
     shareLinks: archive.shareLinks
   };
-  const progress: ImportProgress = { phase: 'tags', photos: 0, totalPhotos: plan.upload.length, bytes: 0, totalBytes: plan.bytes };
+  const progress: ImportProgress = {
+    phase: 'tags',
+    photos: 0,
+    totalPhotos: plan.upload.length,
+    attachments: 0,
+    totalAttachments: plan.attachments.length,
+    bytes: 0,
+    totalBytes: plan.bytes + plan.attachmentBytes
+  };
   const report = () => o.onProgress?.({ ...progress });
   const stop = (message: string) => new ImportStopped(message, outcome);
 
@@ -264,6 +337,7 @@ export async function runImport(o: ImportOptions): Promise<ImportOutcome> {
 
   const maps: IdMaps = emptyMaps();
   for (const [k, v] of plan.photosHere) maps.photos.set(k, v);
+  for (const [k, v] of plan.attachmentsHere) maps.attachments.set(k, v);
   for (const [k, t] of plan.entries) maps.entries.set(k, t.id);
   for (const [k, t] of plan.projects) maps.projects.set(k, t.id);
   for (const [k, t] of plan.collections) maps.collections.set(k, t.id);
@@ -387,6 +461,80 @@ export async function runImport(o: ImportOptions): Promise<ImportOutcome> {
     await Promise.all(Array.from({ length: Math.max(1, o.parallel ?? 2) }, worker));
     if (signal.aborted) throw stop('已取消');
     if (fatalStop) throw fatalStop;
+
+    // ---- attachments: one after another, each file in parts, a video's frame after it
+    progress.phase = 'attachments';
+    report();
+    for (const a of plan.attachments) {
+      const path = a.file as string;
+      const name = typeof a.row.name === 'string' ? a.row.name : (path.split('/').pop() as string);
+      const entry = source.files.get(path);
+      const size = entry?.size ?? 0;
+      try {
+        let file: Blob;
+        try {
+          file = await (entry as NonNullable<typeof entry>).read();
+        } catch {
+          outcome.failed.push({ kind: 'attachment', label: name, message: '读不出这个附件的文件' });
+          continue;
+        }
+        let begun: ImportAttachmentResponse;
+        try {
+          begun = await retrying(
+            () => post<ImportAttachmentResponse>('/api/import/attachments', attachmentBody(a, file.size), signal),
+            signal,
+            sleep
+          );
+        } catch (e) {
+          if (signal.aborted) throw stop('已取消');
+          if (e instanceof ApiError) {
+            const why = fatal(e.status, e.code, e.message);
+            if (why) throw stop(why);
+            outcome.failed.push({ kind: 'attachment', label: name, message: e.message });
+            continue;
+          }
+          throw stop(`网络中断了。${AGAIN}`);
+        }
+        if (begun.here) {
+          maps.attachments.set(a.id, begun.attachment.id);
+          outcome.existing.attachments++;
+          continue;
+        }
+        try {
+          const up = await sendParts({ upload: begun, done: [] }, file, {
+            signal,
+            put: o.putPart,
+            sleep: (ms) => sleep(ms, signal),
+            onProgress: (sent) => {
+              progress.bytes = doneBytes + sent;
+              report();
+            }
+          });
+          maps.attachments.set(a.id, up.id);
+          outcome.created.attachments++;
+        } catch (e) {
+          if (signal.aborted) throw stop('已取消');
+          if (e instanceof ApiError) {
+            const why = fatal(e.status, e.code, e.message);
+            if (why) throw stop(why);
+            outcome.failed.push({ kind: 'attachment', label: name, message: e.message });
+            continue;
+          }
+          throw stop(`网络中断了。${AGAIN}`);
+        }
+        const poster = a.posterFile ? source.files.get(a.posterFile) : undefined;
+        if (poster) {
+          const frame = await poster.read().catch(() => null);
+          if (frame)
+            await sendPoster(maps.attachments.get(a.id) as string, new Blob([frame], { type: posterType(a.posterFile as string) }), signal);
+        }
+      } finally {
+        doneBytes += size;
+        progress.bytes = doneBytes;
+        progress.attachments++;
+        report();
+      }
+    }
 
     // ---- the rows, now that what they point to has its id here
     const rowsOf = async (

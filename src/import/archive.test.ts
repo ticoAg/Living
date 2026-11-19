@@ -3,6 +3,7 @@ import { FORMAT, FORMAT_VERSION, textFiles } from '../export/archive';
 import { exportData, exportEntry, exportPhoto, exportPlace, exportProject, exportTheme, EXPORT_PROFILE } from '../test-utils';
 import {
   ArchiveError,
+  attachmentBody,
   batches,
   byCreated,
   collectionRow,
@@ -149,6 +150,18 @@ describe('readArchive', () => {
     expect([a.projects, a.collections, a.tags, a.places]).toEqual([[], [], [], []]);
     expect([a.site, a.exportedAt, a.shareLinks]).toEqual([null, null, 0]);
     expect(a.profile).toEqual({ id: null, handle: null, displayName: null });
+  });
+
+  it('reads the attachments of each entry, and none from an export made before entries had them', () => {
+    const clip = { id: 'at_1', kind: 'video', name: '湖边.mp4', file: 'media/2026/2026-05-02_at_1.mp4', posterFile: null, caption: '湖边' };
+    const a = readArchive(
+      JSON.stringify({ format: FORMAT, version: 2, entries: [{ id: 'en_1', attachments: [clip, { id: '../at' }, 'at_2', { file: 'x' }] }] })
+    );
+    expect(a.entries[0].attachments).toEqual([
+      { id: 'at_1', entryId: 'en_1', file: clip.file, posterFile: null, caption: '湖边', row: clip }
+    ]);
+    const v1 = readArchive(JSON.stringify({ format: FORMAT, version: 1, entries: [{ id: 'en_1', media: [] }] }));
+    expect(v1.entries[0].attachments).toEqual([]);
   });
 });
 
@@ -330,6 +343,34 @@ describe('photoMeta', () => {
   });
 });
 
+describe('attachmentBody', () => {
+  it('says what living.json says of the attachment, and the size of the file as it is here', () => {
+    const row = {
+      id: 'at_1',
+      kind: 'video',
+      name: '湖边.mp4',
+      mime: 'video/mp4',
+      size: 99,
+      duration: 2,
+      width: 'x',
+      createdAt: '2026-05-02T11:00:00Z'
+    };
+    const a = { id: 'at_1', entryId: 'en_1', file: 'media/x.mp4', posterFile: null, caption: null, row };
+    expect(attachmentBody(a, 10)).toEqual({
+      id: 'at_1',
+      kind: 'video',
+      name: '湖边.mp4',
+      mime: 'video/mp4',
+      size: 10,
+      duration: 2,
+      width: null,
+      height: null,
+      createdAt: '2026-05-02T11:00:00Z'
+    });
+    expect(attachmentBody({ ...a, row: { ...row, createdAt: 5 } }, 10)).not.toHaveProperty('createdAt');
+  });
+});
+
 describe('projectRow, entryRow, collectionRow', () => {
   const m = maps({
     photos: [['ph_1', 'ph_here1']],
@@ -376,6 +417,7 @@ describe('projectRow, entryRow, collectionRow', () => {
           { photoId: 'ph_1', caption: '湖边' },
           { photoId: 'ph_gone', caption: null }
         ],
+        attachments: [],
         tagIds: ['t_1', 't_gone'],
         projectIds: ['pj_gone', 'pj_1']
       },
@@ -395,12 +437,13 @@ describe('projectRow, entryRow, collectionRow', () => {
       createdAt: '2026-11-16T08:00:00Z',
       updatedAt: '2026-11-16T08:00:00Z',
       media: [{ photoId: 'ph_here1', caption: '湖边' }],
+      attachments: [],
       tagIds: ['t_here1'],
       projectIds: ['pj_here1']
     });
     expect('revision' in e).toBe(false);
     const gone = entryRow(
-      { id: 'en_2', row: { ...exportEntry('en_2', { poiId: 'poi_gone' }) }, media: [], tagIds: [], projectIds: [] },
+      { id: 'en_2', row: { ...exportEntry('en_2', { poiId: 'poi_gone' }) }, media: [], attachments: [], tagIds: [], projectIds: [] },
       m,
       keep,
       true

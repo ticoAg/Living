@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OWNER, OWNER_STATE } from './env.ts';
-import { apiOf, cutOff, expect, follow, rendered, test, watch } from './support.ts';
+import { apiOf, cutOff, expect, follow, rendered, test, watch, zipFiles } from './support.ts';
 
 const FIXTURES = ['1-west-lake-1.jpg', '2-west-lake-2.jpg', '3-west-lake-3.jpg'].map((f) =>
   fileURLToPath(new URL(`fixtures/${f}`, import.meta.url))
@@ -15,26 +15,6 @@ const FIXTURES = ['1-west-lake-1.jpg', '2-west-lake-2.jpg', '3-west-lake-3.jpg']
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 const sha256 = (b: Buffer) => createHash('sha256').update(b).digest('hex');
-
-/** The files of a ZIP of stored entries (what the export writes), by name, in the archive's order. */
-function zipFiles(zip: Buffer): Map<string, Buffer> {
-  const end = zip.length - 22;
-  expect(zip.readUInt32LE(end)).toBe(0x06054b50);
-  const out = new Map<string, Buffer>();
-  let at = zip.readUInt32LE(end + 16);
-  for (let i = 0; i < zip.readUInt16LE(end + 10); i++) {
-    expect(zip.readUInt32LE(at)).toBe(0x02014b50);
-    expect(zip.readUInt16LE(at + 10)).toBe(0);
-    const size = zip.readUInt32LE(at + 24);
-    const nameLen = zip.readUInt16LE(at + 28);
-    const offset = zip.readUInt32LE(at + 42);
-    const name = zip.subarray(at + 46, at + 46 + nameLen).toString('utf8');
-    const start = offset + 30 + zip.readUInt16LE(offset + 26) + zip.readUInt16LE(offset + 28);
-    out.set(name, zip.subarray(start, start + size));
-    at += 46 + nameLen;
-  }
-  return out;
-}
 
 interface ApiPhoto {
   id: string;
@@ -553,7 +533,7 @@ test('owner story: register, upload, publish and visit every page', async ({ pag
     // living.json comes last, with everything
     expect(names.at(-1)).toBe(`${root}living.json`);
     const json = JSON.parse((files.get(`${root}living.json`) as Buffer).toString('utf8'));
-    expect(json).toMatchObject({ format: 'living-export', version: 1, profile: { handle: OWNER.handle } });
+    expect(json).toMatchObject({ format: 'living-export', version: 2, profile: { handle: OWNER.handle } });
     expect(json.photos).toHaveLength(3);
     // each original is the very file that was uploaded
     const uploaded = new Set(FIXTURES.map((f) => sha256(readFileSync(f))));

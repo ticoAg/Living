@@ -1,4 +1,5 @@
-// What every spec shares: the page cut off from the internet, and a record of console errors and uncaught exceptions.
+// What every spec shares: the page cut off from the internet, a record of console errors and uncaught exceptions, and
+// the files of an export's ZIP.
 import { test as base, expect, type APIRequestContext, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { BASE_URL } from './env.ts';
 
@@ -123,3 +124,23 @@ export const test = base.extend<{ allowErrors: boolean; errors: { take: () => st
     { auto: true }
   ]
 });
+
+/** The files of a ZIP of stored entries (what the export writes), by name, in the archive's order. */
+export function zipFiles(zip: Buffer): Map<string, Buffer> {
+  const end = zip.length - 22;
+  expect(zip.readUInt32LE(end)).toBe(0x06054b50);
+  const out = new Map<string, Buffer>();
+  let at = zip.readUInt32LE(end + 16);
+  for (let i = 0; i < zip.readUInt16LE(end + 10); i++) {
+    expect(zip.readUInt32LE(at)).toBe(0x02014b50);
+    expect(zip.readUInt16LE(at + 10)).toBe(0);
+    const size = zip.readUInt32LE(at + 24);
+    const nameLen = zip.readUInt16LE(at + 28);
+    const offset = zip.readUInt32LE(at + 42);
+    const name = zip.subarray(at + 46, at + 46 + nameLen).toString('utf8');
+    const start = offset + 30 + zip.readUInt16LE(offset + 26) + zip.readUInt16LE(offset + 28);
+    out.set(name, zip.subarray(start, start + size));
+    at += 46 + nameLen;
+  }
+  return out;
+}

@@ -1,13 +1,15 @@
 // Attachments on the story's session: a video, a file and a recording going up with an entry and playing on its page,
-// the video's position gone from what went up, the files kept from a visitor; and a recording kept from the quick
-// note. Runs after the regressions, since it adds entries of its own.
+// the video's position gone from what went up, the files kept from a visitor; a recording kept from the quick note;
+// and all of them taken along by an export, into the account the story imported into. Runs after the regressions,
+// since it adds entries of its own, and in order, each test on the one before.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { EntryDetail } from '../shared/types.ts';
-import { OWNER_STATE } from './env.ts';
-import { apiOf, expect, follow, noOverflow, test } from './support.ts';
+import type { EntryDetail, EntrySummary } from '../shared/types.ts';
+import { BASE_URL, OWNER, OWNER_STATE } from './env.ts';
+import { apiOf, cutOff, expect, follow, noOverflow, test, watch, zipFiles } from './support.ts';
 
 test.use({ storageState: fileURLToPath(new URL(`../${OWNER_STATE}`, import.meta.url)) });
+test.describe.configure({ mode: 'serial' });
 
 /** 2 s of VP9 and Opus in MP4, with where it was made in a 3GPP `loci` box of its user data. */
 const CLIP = fileURLToPath(new URL('fixtures/lake-clip.mp4', import.meta.url));
@@ -149,4 +151,72 @@ test('a recording kept from the quick note, there still after a reload', async (
   expect(entry.attachments).toHaveLength(1);
   expect(entry.attachments[0]).toMatchObject({ kind: 'audio', mime: 'audio/webm' });
   await expect(page.locator(`a.en-card[href="/e/${entry.id}"] .en-card-file`)).toHaveCount(1);
+});
+
+test('an export takes the attachments along, and an import brings them back', async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  const api = apiOf(page.request);
+  const listed = (await api.get<{ entries: EntrySummary[] }>('/api/entries?mine=1')).entries.find((e) => e.title === '湖边的声音');
+  const entry = await api.get<EntryDetail>(`/api/entries/${listed?.id}`);
+  const clip = entry.attachments.find((a) => a.kind === 'video') as EntryDetail['attachments'][number];
+  const served = await (await page.request.get(`/media/a/${clip.id}`)).body();
+
+  await page.goto('/settings#export');
+  const section = page.getByRole('region', { name: '导出' });
+  await expect(section).toContainText(/\d+ 个附件/);
+  await expect(section.getByRole('switch', { name: '包含照片原文件和附件' })).toBeChecked();
+  const [download] = await Promise.all([page.waitForEvent('download'), section.getByRole('button', { name: '下载 zip' }).click()]);
+  await expect(section.getByRole('status')).toContainText('导出完成', { timeout: 60_000 });
+  const zip = test.info().outputPath('export.zip');
+  await download.saveAs(zip);
+  const files = zipFiles(readFileSync(zip));
+  const root = `living-${OWNER.handle}/`;
+  const json = JSON.parse((files.get(`${root}living.json`) as Buffer).toString('utf8'));
+  expect(json.version).toBe(2);
+  const out = (json.entries as { id: string; file: string; attachments: { id: string; file: string; posterFile: string | null }[] }[]).find(
+    (e) => e.id === entry.id
+  );
+  const a = out?.attachments.find((x) => x.id === clip.id);
+  expect(a).toMatchObject({
+    name: 'lake-clip.mp4',
+    caption: '湖边，傍晚',
+    file: expect.stringMatching(/^media\/\d{4}\/\d{4}-\d{2}-\d{2}_at_[\w-]+\.mp4$/),
+    posterFile: expect.stringMatching(/\.poster\.webp$/)
+  });
+  // the file as it went up, its frame beside it, the Markdown linking to it
+  expect(Buffer.compare(files.get(`${root}${a?.file}`) as Buffer, served)).toBe(0);
+  expect((files.get(`${root}${a?.posterFile}`) as Buffer).subarray(8, 12).toString()).toBe('WEBP');
+  expect((files.get(`${root}${out?.file}`) as Buffer).toString('utf8')).toContain('[lake-clip.mp4](<../../media/');
+
+  // into the account the story imported into: what is new comes, the attachments with it
+  const context = await browser.newContext({ storageState: undefined });
+  await cutOff(context);
+  const signedIn = await context.request.post('/api/auth/login', {
+    data: { handle: 'mori', password: 'smoke-test-pass-2' },
+    headers: { origin: BASE_URL }
+  });
+  expect(signedIn.ok()).toBe(true);
+  const other = await context.newPage();
+  const otherErrors = watch(other);
+  await other.goto('/settings#import');
+  const imports = other.getByRole('region', { name: '导入' });
+  await imports.locator('input[accept*=".zip"]').setInputFiles(zip);
+  await expect(imports).toContainText(/\d+ 个附件/);
+  await imports.getByRole('switch', { name: '全部设为私密' }).check();
+  await imports.getByRole('button', { name: '开始导入' }).click();
+  await expect(imports.getByRole('status')).toContainText('导入完成', { timeout: 90_000 });
+  await expect(imports).toContainText(/新加了 [^。]*\d+ 个附件/);
+
+  const mine = apiOf(other.request);
+  const theirs = (await mine.get<{ entries: EntrySummary[] }>('/api/entries?mine=1')).entries.find((e) => e.title === '湖边的声音');
+  const got = await mine.get<EntryDetail>(`/api/entries/${theirs?.id}`);
+  expect(got.attachments.map((x) => [x.kind, x.name, x.caption])).toEqual(entry.attachments.map((x) => [x.kind, x.name, x.caption]));
+  const video = got.attachments.find((x) => x.kind === 'video') as EntryDetail['attachments'][number];
+  expect(video.id).not.toBe(clip.id);
+  expect(video).toMatchObject({ poster: true, width: 256, height: 144 });
+  expect(Buffer.compare(await (await other.request.get(`/media/a/${video.id}`)).body(), served)).toBe(0);
+  await other.goto(`/e/${got.id}`);
+  await expect(other.locator('.att-video video')).toHaveAttribute('poster', new RegExp(`/media/a/${video.id}/poster$`));
+  expect(otherErrors.take(), 'console errors of the importer').toEqual([]);
+  await context.close();
 });

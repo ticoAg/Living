@@ -4,6 +4,7 @@ import type {
   Attachment,
   EntryDetail,
   EntrySummary,
+  ExportAttachment,
   ExportEntry,
   ExportPhoto,
   ExportPlace,
@@ -240,6 +241,25 @@ export function exportEntry(id: string, over: Partial<ExportEntry> = {}): Export
     poiId: null,
     createdAt: '2026-11-16T08:00:00Z',
     updatedAt: '2026-11-16T08:00:00Z',
+    ...over
+  };
+}
+
+export function exportAttachment(id: string, over: Partial<ExportAttachment> = {}): ExportAttachment {
+  return {
+    id,
+    entryId: 'en_1',
+    position: 0,
+    caption: null,
+    kind: 'video',
+    name: '湖边.mp4',
+    mime: 'video/mp4',
+    size: 5,
+    duration: 12.5,
+    width: 1920,
+    height: 1080,
+    poster: true,
+    createdAt: '2026-11-16T08:00:00Z',
     ...over
   };
 }

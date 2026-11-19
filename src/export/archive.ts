@@ -26,7 +26,8 @@ import type {
 } from '../../shared/types';
 
 export const FORMAT = 'living-export';
-export const FORMAT_VERSION = 1;
+/** 2: entries carry their attachments, whose files are in `media/` with the photos'. */
+export const FORMAT_VERSION = 2;
 
 /** Everything read from the API, by part. */
 export interface ExportData {
@@ -117,6 +118,31 @@ export function mediaPath(p: Pick<ExportPhoto, 'id' | 'takenAt'>, key: string): 
   return day ? `media/${day.slice(0, 4)}/${day}_${p.id}.${extOf(key)}` : `media/undated/${p.id}.${extOf(key)}`;
 }
 
+/** Extensions by type, for an attachment whose name has none. */
+const EXT_BY_MIME: Record<string, string> = {
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'video/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'application/pdf': 'pdf'
+};
+
+/** An attachment's extension: its name's, else its type's, else `bin`. */
+const attachmentExt = (a: Pick<ExportAttachment, 'name' | 'mime'>) =>
+  /\.([A-Za-z0-9]{1,8})$/.exec(a.name)?.[1].toLowerCase() ?? EXT_BY_MIME[a.mime] ?? 'bin';
+
+/** Where an attachment's file goes: with the photos, by the year of its entry, named by the entry's day and its id. */
+export function attachmentPath(day: string, a: Pick<ExportAttachment, 'id' | 'name' | 'mime'>): string {
+  return `media/${day.slice(0, 4)}/${day}_${a.id}.${attachmentExt(a)}`;
+}
+
+/** Where a video's frame goes: beside its file. */
+export const posterPath = (day: string, id: string, ext: 'webp' | 'jpg'): string => `media/${day.slice(0, 4)}/${day}_${id}.poster.${ext}`;
+
 /** The relative link from a file to another, both under the root. */
 export function relative(from: string, to: string): string {
   const a = from.split('/').slice(0, -1);
@@ -148,9 +174,16 @@ function image(from: string, id: string, file: string | undefined, caption: stri
   return caption ? `${md}\n\n${caption}` : md;
 }
 
+function attachmentLink(from: string, a: ExportAttachment, file: string | undefined): string {
+  // without its file (an export without originals), it is named, and living.json tells which it was
+  const md = file ? `[${escapeText(a.name)}](${dest(relative(from, file))})` : `（附件 ${escapeText(a.name)}）`;
+  return a.caption ? `${md}\n\n${a.caption}` : md;
+}
+
 /** Context for the Markdown of one export: the rows by id and the path each item got. */
 export interface Index {
   photoFile: Map<string, string>;
+  attachmentFile: Map<string, string>;
   entryFile: Map<string, string>;
   tagName: Map<string, string>;
   place: Map<string, ExportPlace>;
@@ -167,7 +200,8 @@ export function entryMarkdown(
   tagIds: string[],
   projectIds: string[],
   collections: string[],
-  ix: Index
+  ix: Index,
+  attachments: ExportAttachment[] = []
 ): string {
   const parts = [
     frontmatter([
@@ -188,6 +222,7 @@ export function entryMarkdown(
   if (e.title) parts.push(`# ${e.title}`);
   if (e.body) parts.push(e.body);
   for (const m of media) parts.push(image(path, m.photoId, ix.photoFile.get(m.photoId), m.caption));
+  for (const a of attachments) parts.push(attachmentLink(path, a, ix.attachmentFile.get(a.id)));
   return `${parts.join('\n\n')}\n`;
 }
 
@@ -278,6 +313,22 @@ export interface PhotoFile {
   large?: boolean;
 }
 
+/** An attachment's files as they ended up: its own and a video's frame, each when the export has it. */
+export interface AttachmentFile {
+  path?: string;
+  poster?: string;
+}
+
+/** The day an attachment's files are filed under: its entry's, or the day it was uploaded. */
+export const attachmentDay = (a: Pick<ExportAttachment, 'createdAt'>, entry: Pick<ExportEntry, 'occurredAt'> | undefined): string =>
+  (entry?.occurredAt ?? localIsoDay(a.createdAt)).slice(0, 10);
+
+/** `YYYY-MM-DD` of a UTC stamp, in local time. */
+function localIsoDay(t: string): string {
+  const d = localDate(t);
+  return d ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : t.slice(0, 10);
+}
+
 /** The files a photo list will get, before any is downloaded: the original's path for each. */
 export function plannedMedia(photos: ExportPhoto[]): Map<string, string> {
   return new Map(photos.map((p) => [p.id, mediaPath(p, p.fileKey)]));
@@ -285,20 +336,22 @@ export function plannedMedia(photos: ExportPhoto[]): Map<string, string> {
 
 /**
  * Every text file of the export: README.md, living.json and the Markdown, given where each photo's file went
- * (`files`; a photo missing from it is not in the export). `site` and `now` are for the README and the JSON;
- * `originals`: the photos were asked for.
+ * (`files`; a photo missing from it is not in the export) and each attachment's (`attached`). `site` and `now` are for
+ * the README and the JSON; `originals`: the files were asked for.
  */
 export function textFiles(
   data: ExportData,
   files: Map<string, PhotoFile>,
   site: Pick<SiteInfo, 'name' | 'url'>,
   now: Date,
-  originals = true
+  originals = true,
+  attached: Map<string, AttachmentFile> = new Map()
 ): TextFile[] {
   const paths = new PathSet();
   const entries = [...data.entries].sort(byOccurred);
   const ix: Index = {
     photoFile: new Map([...files].map(([id, f]) => [id, f.path])),
+    attachmentFile: new Map([...attached].flatMap(([id, f]) => (f.path ? [[id, f.path] as const] : []))),
     entryFile: new Map(),
     tagName: new Map(data.tags.map((t) => [t.id, t.name])),
     place: new Map(data.places.map((p) => [p.id, p])),
@@ -312,6 +365,7 @@ export function textFiles(
   }
 
   const media = groupBy(data.entryMedia, (m) => m.entryId);
+  const attachmentsOf = groupBy(data.attachments, (a) => a.entryId);
   const tagsOf = groupBy(data.entryTags, (t) => t.entryId);
   const projectsOf = groupBy(data.entryProjects, (p) => p.entryId);
   const entriesOf = groupBy(data.entryProjects, (p) => p.projectId);
@@ -335,12 +389,24 @@ export function textFiles(
     const m = (media.get(e.id) ?? []).sort(byPosition);
     const tagIds = (tagsOf.get(e.id) ?? []).map((t) => t.tagId);
     const projectIds = (projectsOf.get(e.id) ?? []).map((p) => p.projectId);
+    const atts = (attachmentsOf.get(e.id) ?? []).sort(byPosition);
     out.push({
       path,
-      text: entryMarkdown(e, path, m, tagIds, projectIds, collectionsOf.get(e.id) ?? [], ix),
+      text: entryMarkdown(e, path, m, tagIds, projectIds, collectionsOf.get(e.id) ?? [], ix, atts),
       mtime: localDate(e.occurredAt) ?? now
     });
-    return { ...e, media: m.map(({ photoId, caption }) => ({ photoId, caption })), tagIds, projectIds, file: path };
+    return {
+      ...e,
+      media: m.map(({ photoId, caption }) => ({ photoId, caption })),
+      attachments: atts.map(({ entryId: _e, position: _p, ...a }) => ({
+        ...a,
+        file: attached.get(a.id)?.path ?? null,
+        posterFile: attached.get(a.id)?.poster ?? null
+      })),
+      tagIds,
+      projectIds,
+      file: path
+    };
   });
 
   const projectRecords = [...data.projects]
@@ -375,8 +441,9 @@ export function textFiles(
     };
   });
 
-  const readme: TextFile = { path: 'README.md', text: readmeText(data, files, site, now, originals), mtime: now };
-  const fileList = [readme.path, ...out.map((f) => f.path), ...[...files.values()].map((f) => f.path)].sort();
+  const readme: TextFile = { path: 'README.md', text: readmeText(data, files, attached, site, now, originals), mtime: now };
+  const attachmentPaths = [...attached.values()].flatMap((f) => [f.path, f.poster]).filter((p): p is string => !!p);
+  const fileList = [readme.path, ...out.map((f) => f.path), ...[...files.values()].map((f) => f.path), ...attachmentPaths].sort();
   const json = {
     format: FORMAT,
     version: FORMAT_VERSION,
@@ -420,9 +487,23 @@ function mediaLine(photos: number, files: Map<string, PhotoFile>, originals: boo
   ].join('');
 }
 
+/** The README's line on the attachments' files; `withPhotos`: the photos' line comes first. */
+function attachmentLine(count: number, attached: Map<string, AttachmentFile>, originals: boolean, withPhotos: boolean): string | null {
+  if (!count) return null;
+  const have = [...attached.values()].filter((f) => f.path).length;
+  if (!have) return `- 这次导出没有下载附件：${count} 个附件只有信息在 living.json 里，Markdown 里写着附件的文件名。`;
+  const posters = [...attached.values()].some((f) => f.poster);
+  return [
+    `- \`media/\`${withPhotos ? ' 里还有 ' : '：'}${have} 个附件（视频、录音和其他文件），上传时的原文件，按记录的年份分文件夹，文件名是记录的日期和附件的编号`,
+    posters ? '；视频的封面是旁边同名的 .poster 图片。' : '。',
+    have < count ? `另有 ${count - have} 个${originals ? '找不到文件' : '这次没有下载'}，只有信息在 living.json 里。` : ''
+  ].join('');
+}
+
 function readmeText(
   data: ExportData,
   files: Map<string, PhotoFile>,
+  attached: Map<string, AttachmentFile>,
   site: Pick<SiteInfo, 'name' | 'url'>,
   now: Date,
   originals: boolean
@@ -434,6 +515,7 @@ function readmeText(
     `- \`projects/\`：${data.projects.length} 个项目，每个一个文件：说明、里程碑和其中的记录。`,
     `- \`collections/\`：${data.themes.length} 个合集，每个一个文件，按原来的顺序排着文字、照片和记录。`,
     mediaLine(data.photos.length, files, originals),
+    attachmentLine(data.attachments.length, attached, originals, data.photos.length > 0),
     '- `living.json`：全部信息，包括照片的拍摄参数、位置、地点、标签和公开范围。字段说明：https://github.com/ticoAg/Living/blob/main/docs/api/export.md'
   ].filter((l): l is string => !!l);
   return `# ${site.name} 导出
@@ -442,7 +524,7 @@ function readmeText(
 
 ${lines.join('\n')}
 
-Markdown 里的图片和链接都是相对路径：用 Obsidian、Typora 等编辑器打开这个文件夹，就能看到照片。
+Markdown 里的图片和链接都是相对路径：用 Obsidian、Typora 等编辑器打开这个文件夹，就能看到照片、打开附件。
 
 导出分成几个 zip 时，把它们解压到同一个位置，合起来就是这个文件夹；living.json 和 Markdown 在最后一个里。
 `;

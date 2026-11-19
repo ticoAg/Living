@@ -10,7 +10,7 @@ import { Toggle } from '../ui';
 import { errMsg } from '../util';
 
 // The whole archive to take away: entries, projects and collections as Markdown, everything in living.json, and the
-// photos' originals. As ZIP parts, or into a folder (Chrome, Edge), where the next export downloads only what is new.
+// photos' originals with the attachments' files. As ZIP parts, or into a folder (Chrome, Edge), where the next export downloads only what is new.
 // Docs: /docs/product/features/export.md
 
 interface Part {
@@ -34,6 +34,8 @@ function progressText(p: ExportProgress | null): string {
       return `读取档案 ${n(p.rows)} / ${n(p.totalRows)}`;
     case 'media':
       return `照片 ${n(p.photos)} / ${n(p.totalPhotos)} · ${fmtBytes(p.bytes)} / ${fmtBytes(p.totalBytes)}`;
+    case 'attachments':
+      return `附件 ${n(p.attachments)} / ${n(p.totalAttachments)} · ${fmtBytes(p.bytes)} / ${fmtBytes(p.totalBytes)}`;
     case 'writing':
       return '写入记录、项目、合集和 living.json';
     case 'tidying':
@@ -41,11 +43,14 @@ function progressText(p: ExportProgress | null): string {
   }
 }
 
-/** 0–1: the rows while they are read, then the photos by their bytes. */
+/** 0–1: the rows while they are read, then the photos and attachments by their bytes. */
 function fraction(p: ExportProgress | null): number {
   if (!p) return 0;
   if (p.phase === 'reading') return p.totalRows ? (p.rows / p.totalRows) * 0.05 : 0.05;
-  if (p.phase === 'media') return 0.05 + (p.totalBytes ? p.bytes / p.totalBytes : p.totalPhotos ? p.photos / p.totalPhotos : 1) * 0.9;
+  if (p.phase === 'media' || p.phase === 'attachments') {
+    const items = p.totalPhotos + p.totalAttachments;
+    return 0.05 + (p.totalBytes ? p.bytes / p.totalBytes : items ? (p.photos + p.attachments) / items : 1) * 0.9;
+  }
   return 0.97;
 }
 
@@ -55,6 +60,11 @@ function outcomeLines(o: ExportOutcome, originals: boolean): string[] {
   if (o.large.length) lines.push(`${n(o.large.length)} 张照片缺少原文件，用 2560 像素的大图代替了。`);
   if (o.missing.length) lines.push(`${n(o.missing.length)} 张照片找不到文件，只有信息在 living.json 里。`);
   if (!originals && o.photos > o.files) lines.push(`${n(o.photos - o.files)} 张照片没有下载，只有信息在 living.json 里。`);
+  if (o.attachmentsKept) lines.push(`${n(o.attachmentsKept)} 个附件上次已经导出，这次没有再下载。`);
+  if (o.attachmentsMissing.length) lines.push(`${n(o.attachmentsMissing.length)} 个附件找不到文件，只有信息在 living.json 里。`);
+  if (!originals && o.attachments > o.attachmentFiles) {
+    lines.push(`${n(o.attachments - o.attachmentFiles)} 个附件没有下载，只有信息在 living.json 里。`);
+  }
   if (o.removed) lines.push(`清理了 ${n(o.removed)} 个上次导出后删去的文件。`);
   return lines;
 }
@@ -153,7 +163,8 @@ export default function ExportSection({ user }: { user: SessionUser }) {
   }
 
   const counts = summary?.counts;
-  const zipParts = summary && originals ? Math.max(1, Math.ceil(summary.originalBytes / PART_BYTES)) : 1;
+  const fileBytes = summary ? summary.originalBytes + summary.attachmentBytes : 0;
+  const zipParts = summary && originals ? Math.max(1, Math.ceil(fileBytes / PART_BYTES)) : 1;
 
   return (
     <section className="se-section sf-panel" id="export" aria-labelledby="se-export-h">
@@ -168,7 +179,8 @@ export default function ExportSection({ user }: { user: SessionUser }) {
             `${n(counts.photos)} 张照片`,
             counts.projects > 0 && `${n(counts.projects)} 个项目`,
             counts.themes > 0 && `${n(counts.themes)} 个合集`,
-            summary.originalBytes > 0 && `原文件 ${fmtBytes(summary.originalBytes)}`
+            counts.attachments > 0 && `${n(counts.attachments)} 个附件`,
+            fileBytes > 0 && `原文件 ${fmtBytes(fileBytes)}`
           ]
             .filter((c) => c !== false)
             .map((c, i) => (
@@ -184,7 +196,12 @@ export default function ExportSection({ user }: { user: SessionUser }) {
         )}
       </p>
 
-      <Toggle label="包含照片原文件" checked={originals} onChange={setOriginals} disabled={running} />
+      <Toggle
+        label={counts?.attachments ? '包含照片原文件和附件' : '包含照片原文件'}
+        checked={originals}
+        onChange={setOriginals}
+        disabled={running}
+      />
 
       <div className="stack" style={{ ['--gap' as string]: '8px' }}>
         <div className="row">
@@ -198,7 +215,9 @@ export default function ExportSection({ user }: { user: SessionUser }) {
           )}
         </div>
         {!running && zipParts > 1 && <p className="small muted">zip 会分成 {zipParts} 个，每个约 1 GB。</p>}
-        {!running && canPickFolder() && <p className="small muted">再次导出到同一个文件夹，只下载新加的照片。</p>}
+        {!running && canPickFolder() && (
+          <p className="small muted">再次导出到同一个文件夹，只下载新加的照片{counts?.attachments ? '和附件' : ''}。</p>
+        )}
       </div>
 
       {state.kind === 'running' && (

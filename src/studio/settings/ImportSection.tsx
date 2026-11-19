@@ -36,6 +36,7 @@ const PHASE_TEXT: Record<ImportProgress['phase'], string> = {
   places: '导入地点',
   zones: '导入隐私区域',
   photos: '',
+  attachments: '',
   projects: '导入项目',
   entries: '导入记录',
   collections: '导入合集'
@@ -43,18 +44,21 @@ const PHASE_TEXT: Record<ImportProgress['phase'], string> = {
 
 function progressText(p: ImportProgress | null): string {
   if (!p) return '准备导入';
-  if (p.phase !== 'photos') return PHASE_TEXT[p.phase];
-  return `照片 ${n(p.photos)} / ${n(p.totalPhotos)}${p.totalBytes ? ` · ${fmtBytes(p.bytes)} / ${fmtBytes(p.totalBytes)}` : ''}`;
+  const bytes = p.totalBytes ? ` · ${fmtBytes(p.bytes)} / ${fmtBytes(p.totalBytes)}` : '';
+  if (p.phase === 'photos') return `照片 ${n(p.photos)} / ${n(p.totalPhotos)}${bytes}`;
+  if (p.phase === 'attachments') return `附件 ${n(p.attachments)} / ${n(p.totalAttachments)}${bytes}`;
+  return PHASE_TEXT[p.phase];
 }
 
-/** 0–1: the photos by their bytes, the rows before and after them a sliver each. */
+/** 0–1: the photos and attachments by their bytes, the rows before and after them a sliver each. */
 function fraction(p: ImportProgress | null): number {
   if (!p) return 0;
   const before = { tags: 0, places: 0.01, zones: 0.02 } as Record<string, number>;
   const after = { projects: 0.95, entries: 0.96, collections: 0.98 } as Record<string, number>;
   if (p.phase in before) return before[p.phase];
   if (p.phase in after) return after[p.phase];
-  const done = p.totalBytes ? p.bytes / p.totalBytes : p.totalPhotos ? p.photos / p.totalPhotos : 1;
+  const items = p.totalPhotos + p.totalAttachments;
+  const done = p.totalBytes ? p.bytes / p.totalBytes : items ? (p.photos + p.attachments) / items : 1;
   return 0.03 + Math.min(1, done) * 0.92;
 }
 
@@ -63,6 +67,7 @@ function planLines(plan: ImportPlan): string[] {
   const lines: string[] = [];
   const here = list([
     [plan.photosHere.size, '张照片'],
+    [plan.attachmentsHere.size, '个附件'],
     [[...plan.entries.values()].filter((t) => t.exists).length, '条记录'],
     [[...plan.projects.values()].filter((t) => t.exists).length, '个项目'],
     [[...plan.collections.values()].filter((t) => t.exists).length, '个合集']
@@ -70,6 +75,10 @@ function planLines(plan: ImportPlan): string[] {
   if (here) lines.push(`其中 ${here}已经在这里，会跳过。`);
   if (plan.noFile) lines.push(`${n(plan.noFile)} 张照片在导出里只有信息、没有文件，不会导入。`);
   if (plan.notPicked) lines.push(`${n(plan.notPicked)} 张照片的文件不在选中的文件里。导出分成了几个 zip 的话，要一起选上。`);
+  if (plan.attachmentsNoFile) lines.push(`${n(plan.attachmentsNoFile)} 个附件在导出里只有信息、没有文件，不会导入。`);
+  if (plan.attachmentsNotPicked) {
+    lines.push(`${n(plan.attachmentsNotPicked)} 个附件的文件不在选中的文件里。导出分成了几个 zip 的话，要一起选上。`);
+  }
   if (a.skipped) lines.push(`${n(a.skipped)} 行数据不完整，会跳过。`);
   return lines;
 }
@@ -78,6 +87,7 @@ function outcomeLines(o: ImportOutcome): string[] {
   const lines: string[] = [];
   const made = list([
     [o.created.photos, '张照片'],
+    [o.created.attachments, '个附件'],
     [o.created.entries, '条记录'],
     [o.created.projects, '个项目'],
     [o.created.collections, '个合集'],
@@ -88,6 +98,7 @@ function outcomeLines(o: ImportOutcome): string[] {
   lines.push(made ? `新加了 ${made}。` : '没有新加任何内容。');
   const kept = list([
     [o.existing.photos, '张照片'],
+    [o.existing.attachments, '个附件'],
     [o.existing.entries, '条记录'],
     [o.existing.projects, '个项目'],
     [o.existing.collections, '个合集'],
@@ -96,12 +107,14 @@ function outcomeLines(o: ImportOutcome): string[] {
   if (kept) lines.push(`${kept}已经在这里，跳过了。`);
   if (o.noFile) lines.push(`${n(o.noFile)} 张照片在导出里没有文件，没有导入。`);
   if (o.notPicked) lines.push(`${n(o.notPicked)} 张照片的文件不在选中的文件里，没有导入。`);
+  if (o.attachmentsNoFile) lines.push(`${n(o.attachmentsNoFile)} 个附件在导出里没有文件，没有导入。`);
+  if (o.attachmentsNotPicked) lines.push(`${n(o.attachmentsNotPicked)} 个附件的文件不在选中的文件里，没有导入。`);
   if (o.zonesFull) lines.push(`${n(o.zonesFull)} 个隐私区域超出了 50 个的上限，没有导入。`);
   if (o.shareLinks) lines.push('分享链接没有导入：导出里不含它们的地址，需要的话重新分享。');
   return lines;
 }
 
-const KIND_TEXT = { photo: '照片', entry: '记录', project: '项目', collection: '合集' } as const;
+const KIND_TEXT = { photo: '照片', attachment: '附件', entry: '记录', project: '项目', collection: '合集' } as const;
 
 function Outcome({ outcome }: { outcome: ImportOutcome }) {
   return (
@@ -209,13 +222,15 @@ export default function ImportSection() {
 
   const planned = state.kind === 'planned' ? state : null;
   const plan = planned?.plan;
+  const attachmentCount = plan ? plan.archive.entries.reduce((sum, e) => sum + e.attachments.length, 0) : 0;
   const counts = plan
     ? [
         `${n(plan.archive.entries.length)} 条记录`,
         `${n(plan.archive.photos.length)} 张照片`,
         plan.archive.projects.length > 0 && `${n(plan.archive.projects.length)} 个项目`,
         plan.archive.collections.length > 0 && `${n(plan.archive.collections.length)} 个合集`,
-        plan.bytes > 0 && `要上传 ${fmtBytes(plan.bytes)}`
+        attachmentCount > 0 && `${n(attachmentCount)} 个附件`,
+        plan.bytes + plan.attachmentBytes > 0 && `要上传 ${fmtBytes(plan.bytes + plan.attachmentBytes)}`
       ].filter((c) => c !== false)
     : [];
 

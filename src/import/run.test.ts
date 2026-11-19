@@ -1,10 +1,31 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { IMPORT_LIMITS } from '../../shared/limits';
 import type { ExportPhoto, PhotoDetail } from '../../shared/types';
-import { FORMAT, FORMAT_VERSION, mediaPath, textFiles, type ExportData, type PhotoFile } from '../export/archive';
+import {
+  attachmentDay,
+  attachmentPath,
+  FORMAT,
+  FORMAT_VERSION,
+  mediaPath,
+  posterPath,
+  textFiles,
+  type AttachmentFile,
+  type ExportData,
+  type PhotoFile
+} from '../export/archive';
 import { ApiError } from '../lib/api';
 import type { PublishResult } from '../studio/publish';
-import { exportData, exportEntry, exportPhoto, exportPlace, exportProject, exportTheme, EXPORT_PROFILE } from '../test-utils';
+import type { PutBytes } from '../attachments/upload';
+import {
+  exportAttachment,
+  exportData,
+  exportEntry,
+  exportPhoto,
+  exportPlace,
+  exportProject,
+  exportTheme,
+  EXPORT_PROFILE
+} from '../test-utils';
 import { ImportStopped, planImport, RETRY_WAIT, runImport, typeOf, type ImportOptions, type ImportProgress } from './run';
 import type { ImportSource, SourceFile } from './source';
 
@@ -39,6 +60,10 @@ function server() {
     failed: new Map<string, string>(),
     /** rows answered with another id than `resolve` gave them */
     renamed: new Map<string, string>(),
+    /** attachments uploaded in full here already */
+    attached: new Set<string>(),
+    /** the types of the frames sent, by attachment */
+    posters: new Map<string, string>(),
     next: new Map<string, Queued[]>()
   };
   const target = (x: string) => ({ id: s.existing.has(x) ? x : hereId(x), exists: s.existing.has(x) });
@@ -48,6 +73,7 @@ function server() {
     init?.signal?.throwIfAborted();
     const body = JSON.parse(typeof init?.body === 'string' ? init.body : 'null') as Record<string, unknown[]>;
     s.calls.push({ path, body });
+    if (init?.body instanceof Blob) s.posters.set(path.split('/')[3], init.body.type);
     const queued = s.next.get(path)?.shift();
     if (queued instanceof Error) throw queued;
     if (typeof queued === 'function') return queued(init?.signal);
@@ -58,6 +84,7 @@ function server() {
         return json({
           photos: each(body.photos, (h) => (s.photos.has(h) ? [h, s.photos.get(h)] : null)),
           entries: each(body.entries, (x) => [x, target(x)]),
+          attachments: each(body.attachments, (x) => [x, { id: hereId(x), exists: s.attached.has(x) }]),
           projects: each(body.projects, (x) => [x, target(x)]),
           collections: each(body.collections, (x) => [x, target(x)])
         });
@@ -68,6 +95,12 @@ function server() {
       }
       case '/api/import/zones':
         return json({ created: body.zones.length, existing: 0, full: 0 });
+      case '/api/import/attachments': {
+        const a = body as unknown as { id: string; size: number };
+        const attachment = { id: hereId(a.id), state: s.attached.has(a.id) ? 'loose' : 'uploading' };
+        if (s.attached.has(a.id)) return json({ here: true, attachment });
+        return json({ here: false, attachment, partBytes: 4, parts: Math.ceil(a.size / 4) }, 201);
+      }
       case '/api/import/projects':
       case '/api/import/entries':
       case '/api/import/collections': {
@@ -81,9 +114,23 @@ function server() {
         });
       }
     }
+    const done = /^\/api\/attachments\/([\w-]+)\/(complete|poster)$/.exec(path);
+    if (done) return json({ attachment: { id: done[1], state: 'loose' } });
     return refuse(404, 'not_found', '不存在');
   });
   return s;
+}
+
+/** Parts that go up: by attachment, the sizes sent. */
+function parts() {
+  const sent = new Map<string, number[]>();
+  const put: PutBytes = async (url, body, onProgress) => {
+    const [, idHere, n] = /\/api\/attachments\/([\w-]+)\/parts\/(\d+)$/.exec(url) as RegExpExecArray;
+    sent.set(idHere, [...(sent.get(idHere) ?? []), body.size]);
+    onProgress(body.size);
+    return { status: 200, body: { partNumber: Number(n), etag: `e${n}` } };
+  };
+  return { sent, put };
 }
 
 /** A request that waits until it is cancelled. */
@@ -100,13 +147,30 @@ function source(text: string, files: Record<string, number> = {}): ImportSource 
 const living = (over: Record<string, unknown> = {}) =>
   JSON.stringify({ format: FORMAT, version: FORMAT_VERSION, site: SITE, profile: { id: EXPORT_PROFILE.id }, ...over });
 
-/** living.json as an export writes it, and the photos' files: the originals, but for those in `without`. */
+/**
+ * living.json as an export writes it, and the photos' and attachments' files (an attachment's as long as it says, a
+ * frame 12 bytes): all of them, but for those in `without`.
+ */
 function exported(data: ExportData, without: string[] = [], picked = (_path: string) => true) {
   const files = new Map<string, PhotoFile>(
     data.photos.filter((p) => !without.includes(p.id)).map((p) => [p.id, { path: mediaPath(p, p.fileKey) }])
   );
-  const text = textFiles(data, files, SITE, NOW).find((f) => f.path === 'living.json')?.text as string;
+  const entryOf = new Map(data.entries.map((e) => [e.id, e]));
+  const attached = new Map<string, AttachmentFile>(
+    data.attachments
+      .filter((a) => !without.includes(a.id))
+      .map((a) => {
+        const day = attachmentDay(a, entryOf.get(a.entryId));
+        return [a.id, { path: attachmentPath(day, a), ...(a.poster ? { poster: posterPath(day, a.id, 'webp') } : {}) }];
+      })
+  );
+  const text = textFiles(data, files, SITE, NOW, true, attached).find((f) => f.path === 'living.json')?.text as string;
   const sizes = Object.fromEntries([...files.values()].filter((f) => picked(f.path)).map((f, i) => [f.path, 1000 * (i + 1)]));
+  for (const a of data.attachments) {
+    const f = attached.get(a.id);
+    if (f?.path && picked(f.path)) sizes[f.path] = a.size;
+    if (f?.poster && picked(f.path as string)) sizes[f.poster] = 12;
+  }
   return source(text, sizes);
 }
 
@@ -254,7 +318,7 @@ describe('planImport', () => {
     const plan = await planImport(src, new AbortController().signal);
 
     expect(bodies(s, '/api/import/resolve')).toEqual([
-      { photos: [sha(1), sha(2), sha(5)], entries: [EN.one, EN.two], projects: [PJ], collections: [TH] }
+      { photos: [sha(1), sha(2), sha(5)], entries: [EN.one, EN.two], attachments: [], projects: [PJ], collections: [TH] }
     ]);
     expect(plan.archive.photos).toHaveLength(5);
     expect([...plan.photosHere]).toEqual([[PH.b, PH_HERE]]);
@@ -333,6 +397,148 @@ describe('planImport', () => {
   });
 });
 
+describe('attachments', () => {
+  const AT = { clip: id('at', 1), rec: id('at', 2), gone: id('at', 3), left: id('at', 4), here: id('at', 5) };
+  const sound = { kind: 'audio' as const, mime: 'audio/webm', poster: false, width: null, height: null };
+  const data = () =>
+    exportData({
+      entries: [
+        exportEntry(EN.one, { title: '西湖', occurredAt: '2026-05-02T18:00:00', createdAt: '2026-05-02T10:00:00Z' }),
+        exportEntry(EN.two, { title: '第二天', occurredAt: '2026-05-03T09:00:00', createdAt: '2026-05-03T10:00:00Z' })
+      ],
+      attachments: [
+        exportAttachment(AT.clip, { entryId: EN.one, position: 0, caption: '湖边', size: 10, createdAt: '2026-05-02T11:00:00Z' }),
+        exportAttachment(AT.rec, { entryId: EN.one, position: 1, name: '录音.webm', size: 3, duration: 2, ...sound }),
+        // without its file in the export
+        exportAttachment(AT.gone, { entryId: EN.one, position: 2, kind: 'file', name: '路线.pdf', mime: 'application/pdf', poster: false }),
+        // its file in a part not picked
+        exportAttachment(AT.left, { entryId: EN.two, position: 0, name: '另一段.webm', ...sound }),
+        // uploaded by an earlier import that stopped before the entries
+        exportAttachment(AT.here, { entryId: EN.two, position: 1, name: '还有.webm', ...sound })
+      ]
+    });
+  const notLeft = (path: string) => !path.includes(AT.left);
+
+  it('of entries to bring are uploaded before the entries, in parts, each video with its frame', async () => {
+    const s = server();
+    s.attached.add(AT.here);
+    const p = parts();
+    const { plan, outcome, stopped, progress } = await go(exported(data(), [AT.gone], notLeft), { putPart: p.put });
+    expect(stopped).toBeNull();
+    expect(bodies(s, '/api/import/resolve')[0].attachments).toEqual([AT.clip, AT.rec, AT.gone, AT.left, AT.here]);
+    expect(plan.attachments.map((a) => a.id)).toEqual([AT.clip, AT.rec]);
+    expect([...plan.attachmentsHere]).toEqual([[AT.here, hereId(AT.here)]]);
+    expect([plan.attachmentBytes, plan.attachmentsNoFile, plan.attachmentsNotPicked]).toEqual([13, 1, 1]);
+
+    // nothing else in this export: no batches of tags, places, zones, projects or collections
+    expect(s.calls.map((c) => c.path)).toEqual([
+      '/api/import/resolve',
+      '/api/import/attachments',
+      `/api/attachments/${hereId(AT.clip)}/complete`,
+      `/api/attachments/${hereId(AT.clip)}/poster`,
+      '/api/import/attachments',
+      `/api/attachments/${hereId(AT.rec)}/complete`,
+      '/api/import/entries'
+    ]);
+    // what living.json says of each, the size its file has
+    expect(bodies(s, '/api/import/attachments')).toEqual([
+      {
+        id: AT.clip,
+        kind: 'video',
+        name: '湖边.mp4',
+        mime: 'video/mp4',
+        size: 10,
+        duration: 12.5,
+        width: 1920,
+        height: 1080,
+        createdAt: '2026-05-02T11:00:00Z'
+      },
+      {
+        id: AT.rec,
+        kind: 'audio',
+        name: '录音.webm',
+        mime: 'audio/webm',
+        size: 3,
+        duration: 2,
+        width: null,
+        height: null,
+        createdAt: '2026-11-16T08:00:00Z'
+      }
+    ]);
+    expect([...p.sent]).toEqual([
+      [hereId(AT.clip), [4, 4, 2]],
+      [hereId(AT.rec), [3]]
+    ]);
+    expect(bodies(s, `/api/attachments/${hereId(AT.clip)}/complete`)).toEqual([
+      {
+        parts: [
+          { partNumber: 1, etag: 'e1' },
+          { partNumber: 2, etag: 'e2' },
+          { partNumber: 3, etag: 'e3' }
+        ]
+      }
+    ]);
+    expect([...s.posters]).toEqual([[hereId(AT.clip), 'image/webp']]);
+
+    // the entries hold them, in order, as ids here; the ones that did not come are left out
+    const [entries] = bodies(s, '/api/import/entries');
+    expect((entries.entries as { attachments: unknown }[]).map((e) => e.attachments)).toEqual([
+      [
+        { attachmentId: hereId(AT.clip), caption: '湖边' },
+        { attachmentId: hereId(AT.rec), caption: null }
+      ],
+      [{ attachmentId: hereId(AT.here), caption: null }]
+    ]);
+    expect(outcome).toMatchObject({
+      created: { attachments: 2, entries: 2 },
+      existing: { attachments: 1 },
+      attachmentsNoFile: 1,
+      attachmentsNotPicked: 1,
+      failed: []
+    });
+    const last = progress.at(-1) as ImportProgress;
+    expect([last.attachments, last.totalAttachments, last.bytes, last.totalBytes]).toEqual([2, 2, 13, 13]);
+  });
+
+  it('of an entry here already are not brought: the entry stays as it is', async () => {
+    const s = server();
+    s.existing.add(EN.one);
+    const p = parts();
+    const { plan, outcome } = await go(exported(data()), { putPart: p.put });
+    expect(plan.attachments.map((a) => a.id)).toEqual([AT.left, AT.here]);
+    expect(p.sent.size).toBe(2);
+    expect(outcome).toMatchObject({ created: { attachments: 2 }, existing: { attachments: 0, entries: 1 } });
+  });
+
+  it('one the Worker turns down fails alone, its entry still comes; one here by now is counted so', async () => {
+    const s = server();
+    s.attached.add(AT.rec);
+    s.next.set('/api/import/attachments', [refuse(400, 'invalid_input', '视频的类型需要是 video/…')]);
+    const p = parts();
+    const { plan, outcome, stopped } = await go(exported(data()), { putPart: p.put });
+    expect(stopped).toBeNull();
+    // resolved before it was here: the Worker says so when asked to begin it
+    s.attached.delete(AT.rec);
+    expect(plan.attachments.map((a) => a.id)).toContain(AT.clip);
+    expect(outcome.failed).toEqual([{ kind: 'attachment', label: '湖边.mp4', message: '视频的类型需要是 video/…' }]);
+    const [entries] = bodies(s, '/api/import/entries');
+    expect((entries.entries as { attachments: { attachmentId: string }[] }[])[0].attachments.map((a) => a.attachmentId)).toEqual([
+      hereId(AT.rec),
+      hereId(AT.gone)
+    ]);
+    expect(p.sent.has(hereId(AT.clip))).toBe(false);
+  });
+
+  it('a session that ended stops the import', async () => {
+    const s = server();
+    s.next.set('/api/import/attachments', [refuse(401, 'unauthenticated', '请先登录')]);
+    const { stopped, outcome } = await go(exported(data()), { putPart: parts().put });
+    expect(stopped).toContain('登录已经失效');
+    expect(outcome.created.entries).toBe(0);
+    expect(bodies(s, '/api/import/entries')).toEqual([]);
+  });
+});
+
 describe('runImport', () => {
   it('brings everything over in order, each step with the ids the steps before it got', async () => {
     const s = server();
@@ -354,6 +560,7 @@ describe('runImport', () => {
       'places',
       'zones',
       'photos',
+      'attachments',
       'projects',
       'entries',
       'collections'
@@ -424,11 +631,13 @@ describe('runImport', () => {
     });
 
     expect(outcome).toEqual({
-      created: { photos: 2, entries: 2, projects: 1, collections: 1, tags: 2, places: 1, zones: 1 },
-      existing: { photos: 1, entries: 0, projects: 0, collections: 0, zones: 0 },
+      created: { photos: 2, attachments: 0, entries: 2, projects: 1, collections: 1, tags: 2, places: 1, zones: 1 },
+      existing: { photos: 1, attachments: 0, entries: 0, projects: 0, collections: 0, zones: 0 },
       failed: [],
       noFile: 1,
       notPicked: 1,
+      attachmentsNoFile: 0,
+      attachmentsNotPicked: 0,
       zonesFull: 0,
       shareLinks: 1
     });

@@ -1,9 +1,10 @@
-// Runs an export: reads the archive part by part from /api/export, downloads the photos' files, and writes it all to
-// a sink (ZIP parts, or a folder that a later export updates). The browser does the work, so that the Worker never
+// Runs an export: reads the archive part by part from /api/export, downloads the photos' and attachments' files, and
+// writes it all to a sink (ZIP parts, or a folder that a later export updates). The browser does the work, so that the Worker never
 // holds an archive in memory. Docs: /docs/product/features/export.md
 
 import {
   EXPORT_PARTS,
+  type ExportAttachment,
   type ExportPage,
   type ExportPart,
   type ExportPhoto,
@@ -12,10 +13,20 @@ import {
   type SiteInfo
 } from '../../shared/types';
 import { api, ApiError, mediaUrl, reportUnauthenticated } from '../lib/api';
-import { localDate, mediaPath, textFiles, type ExportData, type PhotoFile } from './archive';
+import {
+  attachmentDay,
+  attachmentPath,
+  localDate,
+  mediaPath,
+  posterPath,
+  textFiles,
+  type AttachmentFile,
+  type ExportData,
+  type PhotoFile
+} from './archive';
 import type { ExportSink } from './sinks';
 
-export type ExportPhase = 'reading' | 'media' | 'writing' | 'tidying';
+export type ExportPhase = 'reading' | 'media' | 'attachments' | 'writing' | 'tidying';
 
 export interface ExportProgress {
   phase: ExportPhase;
@@ -25,7 +36,10 @@ export interface ExportProgress {
   /** photos done: written, kept from an earlier export, or without a file */
   photos: number;
   totalPhotos: number;
-  /** bytes of the photos' originals done, of all of them */
+  /** attachments done, the same way */
+  attachments: number;
+  totalAttachments: number;
+  /** bytes of the photos' originals and the attachments' files done, of all of them */
   bytes: number;
   totalBytes: number;
 }
@@ -42,13 +56,20 @@ export interface ExportOutcome {
   missing: string[];
   /** files of an earlier export to the folder that this one no longer has */
   removed: number;
+  attachments: number;
+  /** attachments whose file is in the export */
+  attachmentFiles: number;
+  /** of them, kept from an earlier export to the folder */
+  attachmentsKept: number;
+  /** attachments with no file */
+  attachmentsMissing: string[];
   /** bytes downloaded */
   downloaded: number;
 }
 
 export interface ExportOptions {
   sink: ExportSink;
-  /** download the photos' files (a folder keeps those an earlier export left either way) */
+  /** download the photos' and attachments' files (a folder keeps those an earlier export left either way) */
   originals: boolean;
   site: Pick<SiteInfo, 'name' | 'url'>;
   signal: AbortSignal;
@@ -78,9 +99,12 @@ const wait = (ms: number, signal: AbortSignal) =>
     );
   });
 
-/** A response other than 200 or 404 for a photo's file. */
+/** A response other than 200 or 404 for a photo's or an attachment's file. */
 class HttpStatus extends Error {
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    readonly what: '照片' | '附件'
+  ) {
     super(`http ${status}`);
   }
 }
@@ -118,8 +142,10 @@ export async function runExport(o: ExportOptions): Promise<ExportOutcome> {
     totalRows: Object.values(summary.counts).reduce((a, b) => a + b, 0),
     photos: 0,
     totalPhotos: summary.counts.photos,
+    attachments: 0,
+    totalAttachments: summary.counts.attachments,
     bytes: 0,
-    totalBytes: summary.originalBytes
+    totalBytes: summary.originalBytes + summary.attachmentBytes
   };
   const report = () => o.onProgress?.({ ...progress });
   report();
@@ -146,18 +172,31 @@ export async function runExport(o: ExportOptions): Promise<ExportOutcome> {
   progress.phase = 'media';
   progress.totalPhotos = data.photos.length;
   report();
-  const outcome: ExportOutcome = { photos: data.photos.length, files: 0, kept: 0, large: [], missing: [], removed: 0, downloaded: 0 };
+  const outcome: ExportOutcome = {
+    photos: data.photos.length,
+    files: 0,
+    kept: 0,
+    large: [],
+    missing: [],
+    attachments: data.attachments.length,
+    attachmentFiles: 0,
+    attachmentsKept: 0,
+    attachmentsMissing: [],
+    removed: 0,
+    downloaded: 0
+  };
   const files = new Map<string, PhotoFile>();
 
-  /** A photo's file: a Blob, or null when there is none (404). */
-  async function getMedia(key: string, stop: AbortSignal): Promise<Blob | null> {
+  /** A file the Worker serves: a Blob, or null when there is none (404). */
+  async function getFile(url: string, what: HttpStatus['what'], stop: AbortSignal): Promise<Blob | null> {
     return retrying(async () => {
-      const res = await fetch(mediaUrl(key), { credentials: 'same-origin', signal: stop });
+      const res = await fetch(url, { credentials: 'same-origin', signal: stop });
       if (res.status === 404) return null;
-      if (!res.ok) throw new HttpStatus(res.status);
+      if (!res.ok) throw new HttpStatus(res.status, what);
       return res.blob();
     });
   }
+  const getMedia = (key: string, stop: AbortSignal) => getFile(mediaUrl(key), '照片', stop);
 
   // A signed-out browser is refused originals with 404 too: before taking one for missing, make sure it is not that.
   let checkedAt = -Infinity;
@@ -234,14 +273,71 @@ export async function runExport(o: ExportOptions): Promise<ExportOutcome> {
   } finally {
     signal.removeEventListener('abort', onAbort);
   }
-  // the photos given up were not lost to a session that ended on the way
-  if (outcome.large.length || outcome.missing.length) await stillSignedIn(true);
+  // ---- the attachments' files, one after another: they can be large ----
+  progress.phase = 'attachments';
+  progress.totalAttachments = data.attachments.length;
+  report();
+  const attached = new Map<string, AttachmentFile>();
+  const entryOf = new Map(data.entries.map((e) => [e.id, e]));
+  const placed = data.attachments
+    .map((a) => ({ a, day: attachmentDay(a, entryOf.get(a.entryId)) }))
+    .sort((x, y) => attachmentPath(x.day, x.a).localeCompare(attachmentPath(y.day, y.a)));
+  const fileUrl = (a: ExportAttachment) => `/media/a/${encodeURIComponent(a.id)}`;
+
+  /** A video's frame: one an earlier export left, or downloaded; in either format the Worker may keep it in. */
+  async function poster(a: ExportAttachment, day: string, mtime: Date): Promise<string | undefined> {
+    if (!a.poster) return undefined;
+    for (const ext of ['webp', 'jpg'] as const) {
+      const path = posterPath(day, a.id, ext);
+      if ((await o.sink.existing(path)) !== null) return path;
+    }
+    if (!o.originals) return undefined;
+    const blob = await getFile(`${fileUrl(a)}/poster`, '附件', signal);
+    if (!blob) return undefined;
+    const path = posterPath(day, a.id, blob.type === 'image/jpeg' ? 'jpg' : 'webp');
+    await o.sink.write(path, blob, mtime);
+    outcome.downloaded += blob.size;
+    return path;
+  }
+
+  try {
+    for (const { a, day } of placed) {
+      signal.throwIfAborted();
+      const path = attachmentPath(day, a);
+      const mtime = localDate(entryOf.get(a.entryId)?.occurredAt) ?? localDate(a.createdAt) ?? now;
+      const got: AttachmentFile = {};
+      if ((await o.sink.existing(path)) === a.size) {
+        got.path = path;
+        outcome.attachmentsKept++;
+      } else if (o.originals) {
+        const blob = await getFile(fileUrl(a), '附件', signal);
+        if (blob) {
+          await o.sink.write(path, blob, mtime);
+          got.path = path;
+          outcome.downloaded += blob.size;
+        } else {
+          await stillSignedIn();
+          outcome.attachmentsMissing.push(a.id);
+        }
+      }
+      if (got.path) got.poster = await poster(a, day, mtime);
+      attached.set(a.id, got);
+      progress.attachments++;
+      progress.bytes += a.size;
+      report();
+    }
+  } catch (e) {
+    throw failure(e);
+  }
+  // the files given up were not lost to a session that ended on the way
+  if (outcome.large.length || outcome.missing.length || outcome.attachmentsMissing.length) await stillSignedIn(true);
   outcome.files = files.size;
+  outcome.attachmentFiles = [...attached.values()].filter((f) => f.path).length;
 
   // ---- the text, then the tidying, then living.json, which lists what this export holds ----
   progress.phase = 'writing';
   report();
-  const all = textFiles(data, files, o.site, now, o.originals);
+  const all = textFiles(data, files, o.site, now, o.originals, attached);
   const texts = all.filter((f) => f.path !== 'living.json');
   const json = all.find((f) => f.path === 'living.json') as (typeof all)[number];
   for (const f of texts) {
@@ -252,7 +348,13 @@ export async function runExport(o: ExportOptions): Promise<ExportOutcome> {
     progress.phase = 'tidying';
     report();
     // file systems may ignore case: a path that differs only in case is the same file
-    const current = new Set([...texts.map((f) => f.path), ...[...files.values()].map((f) => f.path)].map((p) => p.toLowerCase()));
+    const current = new Set(
+      [
+        ...texts.map((f) => f.path),
+        ...[...files.values()].map((f) => f.path),
+        ...[...attached.values()].flatMap((f) => [f.path, f.poster]).filter((p): p is string => !!p)
+      ].map((p) => p.toLowerCase())
+    );
     for (const path of previous.files) {
       if (current.has(path.toLowerCase())) continue;
       signal.throwIfAborted();
@@ -269,6 +371,6 @@ export async function runExport(o: ExportOptions): Promise<ExportOutcome> {
 /** What the user reads when it stops. */
 function failure(e: unknown): unknown {
   if (aborted(e) || e instanceof ApiError || !(e instanceof TypeError || e instanceof HttpStatus)) return e;
-  if (e instanceof HttpStatus) return new Error(`下载照片没有成功（${e.status}），稍后再试`);
+  if (e instanceof HttpStatus) return new Error(`下载${e.what}没有成功（${e.status}），稍后再试`);
   return new Error('网络断了，导出没能完成');
 }

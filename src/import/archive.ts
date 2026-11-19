@@ -5,6 +5,7 @@
 
 import type {
   CreatePhotoMeta,
+  ImportAttachmentBody,
   ImportCollection,
   ImportCollectionItem,
   ImportEntry,
@@ -29,9 +30,22 @@ export interface ArchivePhoto {
   row: Json;
 }
 
+export interface ArchiveAttachment {
+  id: string;
+  entryId: string;
+  /** its file in the export, a path under the export's folder; null when none came with it */
+  file: string | null;
+  /** a video's frame beside it */
+  posterFile: string | null;
+  caption: string | null;
+  row: Json;
+}
+
 export interface ArchiveEntry {
   id: string;
   media: { photoId: string; caption: string | null }[];
+  /** in order; none in an export from before entries had them (version 1) */
+  attachments: ArchiveAttachment[];
   tagIds: string[];
   projectIds: string[];
   row: Json;
@@ -125,6 +139,13 @@ export function readArchive(text: string): Archive {
       media: Array.isArray(r.media)
         ? r.media.flatMap((m) => (isObj(m) && typeof m.photoId === 'string' ? [{ photoId: m.photoId, caption: str(m.caption) }] : []))
         : [],
+      attachments: Array.isArray(r.attachments)
+        ? r.attachments.flatMap((a) =>
+            isObj(a) && typeof a.id === 'string' && ID_RE.test(a.id)
+              ? [{ id: a.id, entryId: r.id as string, file: str(a.file), posterFile: str(a.posterFile), caption: str(a.caption), row: a }]
+              : []
+          )
+        : [],
       tagIds: ids(r.tagIds),
       projectIds: ids(r.projectIds),
       row: r
@@ -152,6 +173,7 @@ export function readArchive(text: string): Archive {
 /** Each kind's ids in the export → its ids here, filled in as the import goes. */
 export interface IdMaps {
   photos: Map<string, string>;
+  attachments: Map<string, string>;
   tags: Map<string, string>;
   places: Map<string, string>;
   entries: Map<string, string>;
@@ -161,6 +183,7 @@ export interface IdMaps {
 
 export const emptyMaps = (): IdMaps => ({
   photos: new Map(),
+  attachments: new Map(),
   tags: new Map(),
   places: new Map(),
   entries: new Map(),
@@ -171,8 +194,16 @@ export const emptyMaps = (): IdMaps => ({
 export type Relink = (text: string | null) => string | null;
 
 /** An id as this site makes them, of an item a page can be about: a prefix and a ULID (or an import's id, alike). */
-const ID_TOKEN = /\b(?:en|ph|pj|th|poi|t)_[0-9A-HJKMNP-TV-Z]{26}\b/g;
-const KIND: Record<string, keyof IdMaps> = { en: 'entries', ph: 'photos', pj: 'projects', th: 'collections', poi: 'places', t: 'tags' };
+const ID_TOKEN = /\b(?:en|ph|at|pj|th|poi|t)_[0-9A-HJKMNP-TV-Z]{26}\b/g;
+const KIND: Record<string, keyof IdMaps> = {
+  en: 'entries',
+  ph: 'photos',
+  at: 'attachments',
+  pj: 'projects',
+  th: 'collections',
+  poi: 'places',
+  t: 'tags'
+};
 /** An absolute link in a text, as far as it runs: up to a space, a bracket or a quote (Markdown, HTML, prose). */
 const LINK = /\bhttps?:\/\/[^\s<>()[\]"'`]+/gi;
 
@@ -326,9 +357,29 @@ export function entryRow(e: ArchiveEntry, maps: IdMaps, relink: Relink, privateA
       const id = maps.photos.get(m.photoId);
       return id ? [{ photoId: id, caption: relink(m.caption) }] : [];
     }),
+    attachments: e.attachments.flatMap((a) => {
+      const id = maps.attachments.get(a.id);
+      return id ? [{ attachmentId: id, caption: relink(a.caption) }] : [];
+    }),
     tagIds: mapped(e.tagIds, maps.tags),
     projectIds: mapped(e.projectIds, maps.projects)
   } as ImportEntry;
+}
+
+/** What `POST /api/import/attachments` is told of an attachment whose file is `size` bytes. */
+export function attachmentBody(a: ArchiveAttachment, size: number): ImportAttachmentBody {
+  const r = a.row;
+  return {
+    id: a.id,
+    kind: r.kind,
+    name: r.name,
+    mime: r.mime,
+    size,
+    duration: num(r.duration),
+    width: num(r.width),
+    height: num(r.height),
+    ...(typeof r.createdAt === 'string' ? { createdAt: r.createdAt } : {})
+  } as ImportAttachmentBody;
 }
 
 export function collectionRow(t: ArchiveCollection, maps: IdMaps, relink: Relink, privateAll: boolean): ImportCollection {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { EXPORT_PARTS } from '../../shared/types';
-import { exportData, exportEntry, exportPhoto, EXPORT_PROFILE, FakeDir } from '../test-utils';
+import { exportAttachment, exportData, exportEntry, exportPhoto, EXPORT_PROFILE, FakeDir } from '../test-utils';
 import type { ExportData } from './archive';
 import { runExport, RETRY_WAIT, type ExportOptions, type ExportProgress } from './run';
 import { FolderSink, type ExportSink, type Previous } from './sinks';
@@ -144,7 +144,19 @@ describe('runExport', () => {
     expect(await text(sink.files.get('media/2026/2026-11-16_ph_B.jpg'))).toBe('bbbb');
     expect(await text(sink.files.get('entries/2026/2026-11-16 西湖.md'))).toContain('![](<../../media/2025/2025-05-01_ph_A.jpg>)');
     expect(sink.closed).toBe(true);
-    expect(outcome).toEqual({ photos: 3, files: 3, kept: 0, large: [], missing: [], removed: 0, downloaded: 9 });
+    expect(outcome).toEqual({
+      photos: 3,
+      files: 3,
+      kept: 0,
+      large: [],
+      missing: [],
+      attachments: 0,
+      attachmentFiles: 0,
+      attachmentsKept: 0,
+      attachmentsMissing: [],
+      removed: 0,
+      downloaded: 9
+    });
     expect((await living(sink.files)).photos.map((p: { file: string }) => p.file)).toEqual([
       'media/2026/2026-11-16_ph_B.jpg',
       'media/2025/2025-05-01_ph_A.jpg',
@@ -225,9 +237,118 @@ describe('runExport', () => {
     );
     const outcome = await run(sink, { originals: false }).done;
     expect(s.calls.filter((c) => c.startsWith('/media/'))).toEqual([]);
-    expect(outcome).toEqual({ photos: 3, files: 1, kept: 1, large: [], missing: [], removed: 1, downloaded: 0 });
+    expect(outcome).toEqual({
+      photos: 3,
+      files: 1,
+      kept: 1,
+      large: [],
+      missing: [],
+      attachments: 0,
+      attachmentFiles: 0,
+      attachmentsKept: 0,
+      attachmentsMissing: [],
+      removed: 1,
+      downloaded: 0
+    });
     expect(sink.removed).toEqual(['media/2026/2026-11-16_ph_B.jpg']);
     expect(await text(sink.files.get('entries/2026/2026-11-16 西湖.md'))).toContain('![](<../../media/2025/2025-05-01_ph_A.jpg>)');
+  });
+
+  describe('attachments', () => {
+    const withFiles = exportData({
+      photos: [exportPhoto('ph_A', { takenAt: '2025-05-01T09:00:00', fileSize: 3 })],
+      entries: [exportEntry('en_1', { title: '西湖', occurredAt: '2026-05-02T18:00:00' })],
+      attachments: [
+        exportAttachment('at_v', { name: 'clip.MOV', mime: 'video/quicktime', size: 5, caption: '湖边' }),
+        exportAttachment('at_f', { kind: 'file', name: '路线[1].pdf', mime: 'application/pdf', size: 3, position: 1, poster: false })
+      ]
+    });
+    const jpeg = () => new Response('jpg', { headers: { 'content-type': 'image/jpeg' } });
+
+    it('come after the photos, by their entry’s day, a video’s frame beside it', async () => {
+      const s = server(withFiles);
+      s.media.set(original('ph_A'), 'aaa');
+      s.media.set('a/at_v', 'vvvvv');
+      s.media.set('a/at_v/poster', jpeg);
+      s.media.set('a/at_f', 'fff');
+      const sink = new MemorySink();
+      const { done, progress } = run(sink);
+      const outcome = await done;
+      expect(sink.written).toEqual([
+        'media/2025/2025-05-01_ph_A.jpg',
+        'media/2026/2026-05-02_at_f.pdf',
+        'media/2026/2026-05-02_at_v.mov',
+        'media/2026/2026-05-02_at_v.poster.jpg',
+        'README.md',
+        'entries/2026/2026-05-02 西湖.md',
+        'living.json'
+      ]);
+      expect(await text(sink.files.get('media/2026/2026-05-02_at_v.mov'))).toBe('vvvvv');
+      expect(outcome).toMatchObject({ attachments: 2, attachmentFiles: 2, attachmentsKept: 0, attachmentsMissing: [], downloaded: 14 });
+
+      const md = await text(sink.files.get('entries/2026/2026-05-02 西湖.md'));
+      expect(md).toContain(
+        '[clip.MOV](<../../media/2026/2026-05-02_at_v.mov>)\n\n湖边\n\n[路线\\[1\\].pdf](<../../media/2026/2026-05-02_at_f.pdf>)'
+      );
+      const j = await living(sink.files);
+      expect(j.version).toBe(2);
+      expect(j.entries[0].attachments).toEqual([
+        {
+          ...exportAttachment('at_v', { name: 'clip.MOV', mime: 'video/quicktime', size: 5, caption: '湖边' }),
+          entryId: undefined,
+          position: undefined,
+          file: 'media/2026/2026-05-02_at_v.mov',
+          posterFile: 'media/2026/2026-05-02_at_v.poster.jpg'
+        },
+        expect.objectContaining({ id: 'at_f', file: 'media/2026/2026-05-02_at_f.pdf', posterFile: null })
+      ]);
+      expect(j.files).toContain('media/2026/2026-05-02_at_v.poster.jpg');
+      const readme = await text(sink.files.get('README.md'));
+      expect(readme).toContain('`media/` 里还有 2 个附件（视频、录音和其他文件），上传时的原文件');
+      expect(readme).toContain('视频的封面是旁边同名的 .poster 图片。');
+
+      expect(progress[0]).toMatchObject({ totalAttachments: 2, totalBytes: 11 });
+      expect(progress.filter((p) => p.phase === 'attachments').at(-1)).toMatchObject({ attachments: 2, bytes: 11 });
+    });
+
+    it('in a folder: ones an earlier export left are kept, ones the Worker no longer has are missing', async () => {
+      const s = server(withFiles);
+      s.media.set(original('ph_A'), 'aaa');
+      const sink = new MemorySink(
+        { ownerId: EXPORT_PROFILE.id, files: [] },
+        new Map([
+          ['media/2026/2026-05-02_at_v.mov', 5],
+          ['media/2026/2026-05-02_at_v.poster.webp', 9]
+        ])
+      );
+      const outcome = await run(sink).done;
+      expect(s.calls.filter((c) => c.startsWith('/media/a/'))).toEqual(['/media/a/at_f']);
+      expect(outcome).toMatchObject({ attachmentFiles: 1, attachmentsKept: 1, attachmentsMissing: ['at_f'] });
+      const j = await living(sink.files);
+      expect(j.entries[0].attachments.map((a: { file: string | null; posterFile: string | null }) => [a.file, a.posterFile])).toEqual([
+        ['media/2026/2026-05-02_at_v.mov', 'media/2026/2026-05-02_at_v.poster.webp'],
+        [null, null]
+      ]);
+      expect(await text(sink.files.get('README.md'))).toContain('另有 1 个找不到文件，只有信息在 living.json 里。');
+      expect(await text(sink.files.get('entries/2026/2026-05-02 西湖.md'))).toContain('（附件 路线\\[1\\].pdf）');
+    });
+
+    it('without the originals are named, not downloaded', async () => {
+      const s = server(withFiles);
+      const sink = new MemorySink();
+      const outcome = await run(sink, { originals: false }).done;
+      expect(s.calls.filter((c) => c.startsWith('/media/'))).toEqual([]);
+      expect(outcome).toMatchObject({ attachments: 2, attachmentFiles: 0, attachmentsMissing: [] });
+      expect(await text(sink.files.get('README.md'))).toContain('- 这次导出没有下载附件：2 个附件只有信息在 living.json 里');
+      expect(await text(sink.files.get('entries/2026/2026-05-02 西湖.md'))).toContain('（附件 clip.MOV）\n\n湖边');
+    });
+
+    it('stop on a refused download, and say it was an attachment', async () => {
+      const s = server(withFiles);
+      s.media.set(original('ph_A'), 'aaa');
+      s.media.set('a/at_f', 403);
+      await expect(run(new MemorySink()).done).rejects.toThrow('下载附件没有成功（403），稍后再试');
+    });
   });
 
   it('refuses a folder that holds another account’s export before writing anything', async () => {
