@@ -24,7 +24,7 @@ sources:
 |---|---|---|
 | 一：记录 | [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md) | 已建（`0005_entries.sql`） |
 | 二：项目 | [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md) | 已建（`0006_projects.sql`），见 [项目](#项目) |
-| 三：合集与媒体 | 合集（[themes](/data/themes.md) 原地演进，[theme_items](/data/theme-items.md) 加入记录条目）、[users](/data/users.md) 的新照片默认公开范围、[share_links](/data/share-links.md)、[entries](/data/entries.md) 的地点 | 已建（`0007_collections.sql`、`0008_shares_places.sql`），见 [合集](#合集)、[照片的默认可见性](#照片的默认可见性)、[分享链接](#分享链接)、[记录的地点](#记录的地点)；新媒体按需要再加，见 [媒体](#媒体) |
+| 三：合集与媒体 | 合集（[themes](/data/themes.md) 原地演进，[theme_items](/data/theme-items.md) 加入记录条目）、[users](/data/users.md) 的新照片默认公开范围、[share_links](/data/share-links.md)、[entries](/data/entries.md) 的地点、[attachments](/data/attachments.md) | 已建（`0007_collections.sql`、`0008_shares_places.sql`、`0010_attachments.sql`），见 [合集](#合集)、[照片的默认可见性](#照片的默认可见性)、[分享链接](#分享链接)、[记录的地点](#记录的地点)、[媒体](#媒体) |
 | 四：完整档案 | 搜索用的部分索引 `photos_owner_text`（[photos](/data/photos.md#索引)）；导出、日历、回顾、作品与文章不加表 | 搜索与导出已做（`0009_search.sql`），见 [搜索](#搜索)、[导出与备份](#导出与备份)；日历、年度回顾和项目的节奏已做，见 [日历与回顾](#日历与回顾)；作品与文章已做，见 [作品与文章](#作品与文章) |
 
 产品上的边界见 [内容模型](/product/content-model.md)，分阶段的范围见 [路线图](/product/roadmap.md)。
@@ -94,7 +94,15 @@ sources:
 
 # 媒体
 
-[photos](/data/photos.md) 继续作为媒体层，图片处理不重写。[entry_media](/data/entry-media.md) 的名字已经为视频、录音、文件留了位置：增加新媒体时，或给 `photos` 加 `kind`，或另建表并让关联表带上媒体类型，到时再按实际需要定。原图仍只对本人开放，私密附件的文件、缩略图和计数都按同一套权限过滤。
+[photos](/data/photos.md) 继续作为媒体层，图片处理不重写。视频、录音和其他文件是 [附件](/data/attachments.md)，另建一张表（`0010_attachments.sql`），没有并进 `photos`，也不经 [entry_media](/data/entry-media.md)：
+
+- **用法不同**：照片先于记录存在，被记录、合集、地图、图库、Living 引用，有位置、尺寸图和标签；附件是为一条记录传的，只在这一条记录里，没有别处会引用它。并进 `photos`，每一处照片的查询都要排除它们；放进 `entry_media`，一个文件就能出现在几条记录里，删除和权限都要多一层。
+- **没有自己的公开范围**：照片各有公开范围，记录不改变它；附件跟着记录，能打开记录就能读到。一个文件只有一种权限来源，不会出现「公开的记录里有一段别人听不到的录音」。
+- **按原样存**：不生成尺寸，不转码。视频由浏览器截一帧作封面；手机视频和语音备忘录里的拍摄地点，上传前在浏览器里抹掉（只改那几个字节）。
+- **分片上传**：视频动辄几百 MB，超过 Worker 的请求体上限，所以用 R2 的分片上传，每片 16 MiB；先传文件、再保存记录，传到一半的、没放进记录的由每小时的清理删掉。
+- **不进缓存**：记录的公开范围随时会改，附件的文件一律 `private, no-store`，不像公开照片的尺寸图那样存进边缘缓存。
+
+导出的格式因此升到第 2 版：记录带上 `attachments`，文件和照片一起放在 `media/` 下，见 [导出接口](/api/export.md#livingjson)。
 
 # 搜索
 
@@ -124,7 +132,7 @@ sources:
 
 # 导出与备份
 
-- **导出**（[导出接口](/api/export.md)）：不加表。Worker 按页读出登录者自己的行，浏览器拼成 Markdown、living.json 和原文件。导出的格式有版本号（`living-export` 第 1 版），字段改动时升版本，旧版本的字段说明留在文档里。
+- **导出**（[导出接口](/api/export.md)）：不加表。Worker 按页读出登录者自己的行，浏览器拼成 Markdown、living.json 和原文件。导出的格式有版本号（`living-export`，加入附件后是第 2 版），字段改动时升版本，旧版本的字段说明留在文档里。
 - **备份**：站长用 `wrangler d1 export` 导出整个 D1，用 rclone 复制 R2 的桶；恢复先导入新库、核对后再换上，见 [备份与恢复](/runbooks/backup.md)。
 - Cloudflare 托管的存储不等于本地自托管：数据在站长的 Cloudflare 账号里，个人的导出和站长的备份才是在自己手里的副本，产品说明（[愿景](/product/vision.md)、[导出](/product/features/export.md#隐私)）里写明了。
-- **导入**（[导入接口](/api/import.md)）：不加表，也不加列。认出「以前导入过」靠 id 本身：新的记录、项目、合集和自建地点的 id 是账号 id 和导出里的 id 的 SHA-256（`importedId`，[worker/lib/ids.ts](https://github.com/ticoAg/Living/blob/main/worker/lib/ids.ts)），同一个账号再导入得到同一个 id，别的账号和普通的新建到不了它。照片照旧按 `photos_owner_sha` 认重复，标签按上级标签下的名字，地图服务的地点按 `source`、`source_id`。导出的格式升版本时，导入要能读旧版本。
+- **导入**（[导入接口](/api/import.md)）：不加表，也不加列。认出「以前导入过」靠 id 本身：新的记录、附件、项目、合集和自建地点的 id 是账号 id 和导出里的 id 的 SHA-256（`importedId`，[worker/lib/ids.ts](https://github.com/ticoAg/Living/blob/main/worker/lib/ids.ts)），同一个账号再导入得到同一个 id，别的账号和普通的新建到不了它。照片照旧按 `photos_owner_sha` 认重复，标签按上级标签下的名字，地图服务的地点按 `source`、`source_id`。导出的格式升版本时，导入要能读旧版本：第 1 版和第 2 版都能导入。

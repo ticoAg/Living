@@ -25,7 +25,7 @@ sources:
 # 关系
 
 - [entries](/data/entries.md) 与 [photos](/data/photos.md) 之间的多对多：一条记录可以有很多照片，一张照片可以出现在很多记录里，也可以同时在 [合集](/data/theme-items.md) 里。
-- 名字叫 media 而不叫 photos：照片是第一种媒体，以后的视频、录音和文件也经这里关联，见 [演进](/data/evolution.md)。
+- 名字叫 media：照片是记录的第一种媒体。视频、录音和其他文件不经这里，而是 [attachments](/data/attachments.md)：它们只属于一条记录，不被别处引用，见 [演进](/data/evolution.md#媒体)。
 
 # 可见性
 

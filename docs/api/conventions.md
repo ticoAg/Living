@@ -14,7 +14,7 @@ sources:
 - JSON，键名 camelCase；数据库列为 snake_case，由 Worker 转换。
 - 读取单个资源（`GET /api/photos/:id`、`/api/themes/:id`、`/api/entries/:id`、`/api/users/:handle`、`/api/site`）直接返回对象本身；列表包在复数键里（`{ "photos": [...] }`）；写操作返回包装后的对象（`{ "photo": ... }`、`{ "theme": ... }`、`{ "entry": ... }`、`{ "tag": ... }`）。
 - 时间：拍摄时间 `takenAt` 为本地时间 `YYYY-MM-DDTHH:mm:ss`（不带时区，时区另存 `tz`，如 `+08:00`）；记录的发生时间 `occurredAt` 也是本地时间，可以只有日期 `YYYY-MM-DD`；其他时间为 UTC ISO 8601。
-- ID：带前缀的 ULID：`u_` 用户、`ph_` 照片、`poi_` 地点、`th_` 合集、`it_` 合集条目、`en_` 记录、`pj_` 项目、`ms_` 里程碑、`t_` 用户标签、`pz_` 隐私区域、`sl_` 分享链接；预置标签用可读的英文 id（如 `lake`）。
+- ID：带前缀的 ULID：`u_` 用户、`ph_` 照片、`poi_` 地点、`th_` 合集、`it_` 合集条目、`en_` 记录、`pj_` 项目、`ms_` 里程碑、`t_` 用户标签、`pz_` 隐私区域、`sl_` 分享链接、`at_` 附件；预置标签用可读的英文 id（如 `lake`）。
 
 # 认证
 
@@ -35,9 +35,9 @@ sources:
 | 403 | `forbidden` | 无权限、跨站写请求 |
 | 404 | `not_found` | 不存在或无权查看 |
 | 409 | `conflict` / `duplicate` | 重名、重复上传（附 `photoId`）、记录在别处改过（附当前 `revision`） |
-| 413 | `too_large` | 原图超过 50 MB；JSON 请求体超过接口的上限（按 UTF-8 的字节算，请求带不带 `Content-Length` 都一样） |
-| 429 | `rate_limited` | 登录尝试过多 |
-| 502 | `upstream_failed` | 高德 / OSM 不可用（地点匹配仍返回站内候选） |
+| 413 | `too_large` | 原图超过 50 MB；附件超过 2 GiB、一片超过 16 MiB；JSON 请求体超过接口的上限（按 UTF-8 的字节算，请求带不带 `Content-Length` 都一样） |
+| 429 | `rate_limited` | 登录尝试过多；同时在传的附件太多 |
+| 502 | `upstream_failed` | 高德 / OSM 不可用（地点匹配仍返回站内候选）；存储附件的分片失败 |
 | 503 | `quota_exceeded` | 免费版 D1 当天能读写的行数用完了，协调世界时 0 点（北京时间 8 点）以后恢复，见 [费用](/architecture/cloudflare.md#费用) |
 
 `message` 用中文，直接说明原因和解决办法。
@@ -55,6 +55,8 @@ sources:
 记录另有状态：草稿和已归档的记录对他人一律按 404 处理，公开范围只对已完成的记录生效。
 
 容器（合集、记录、项目）里的内容按"凭 id 能否打开"决定：仅链接的照片和记录在能打开的容器里照常显示，也计入这个容器自己的数目（合集的 `photoCount` 和 `entryCount`、项目的 `entryCount` 等），因为打开容器的人本来就能看到它们。容器不传染：公开的容器里，他人打不开的内容直接略去，页面上不留空位（合集的这类条目在接口里留在原位，内容为 `null`，见 [合集接口](/api/themes.md#get-apithemesid)）。反过来从内容找容器时（照片所属的合集和记录、记录所属的项目和合集）按列表规则，仅链接的容器不会被找到。SQL 条件集中在 `worker/lib/visibility.ts`。
+
+附件不是容器里的内容，而是记录的一部分，没有自己的公开范围：能打开记录的人就能读到它的附件，见 [附件接口](/api/attachments.md#文件)。
 
 [分享链接](/api/shares.md) 是唯一的例外，而且由作者主动给出：持有链接的浏览器能打开那一项，以及里面显示的作者的照片和已完成的记录，不管它们的公开范围；草稿、已归档的记录和位置规则不变。
 

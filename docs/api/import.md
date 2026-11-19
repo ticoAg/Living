@@ -1,7 +1,7 @@
 ---
 type: API
 title: 导入接口
-description: 把一份导出带进登录者自己的账号：先问哪些已经在这里，再一批批送来标签、地点、隐私区域、项目、记录和合集，照片照常上传。已经在的不动，同一份导出再导入一次不会多出东西。
+description: 把一份导出带进登录者自己的账号：先问哪些已经在这里，再一批批送来标签、地点、隐私区域、项目、记录和合集，照片照常上传，附件分片上传。已经在的不动，同一份导出再导入一次不会多出东西。
 tags: [api, import, export, privacy]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/worker/routes/import.ts
@@ -11,16 +11,17 @@ sources:
   - resource: https://github.com/ticoAg/Living/blob/main/shared/types.ts
     title: 接口类型
 ---
-功能说明见 [导入](/product/features/import.md)，导出文件的格式见 [导出接口](/api/export.md#导出的文件)。导入在浏览器里进行：浏览器读出 living.json 和照片文件，按下面的顺序一批批送来，Worker 每次只处理一批，所以档案再大，每次请求也在免费版的 CPU 时间之内。
+功能说明见 [导入](/product/features/import.md)，导出文件的格式见 [导出接口](/api/export.md#导出的文件)。导入在浏览器里进行：浏览器读出 living.json、照片和附件的文件，按下面的顺序一批批送来，Worker 每次只处理一批，所以档案再大，每次请求也在免费版的 CPU 时间之内。
 
 # 顺序
 
-1. `POST /api/import/resolve`：哪些照片、记录、项目、合集已经在这个账号里，其余的会是什么 id。
+1. `POST /api/import/resolve`：哪些照片、记录、附件、项目、合集已经在这个账号里，其余的会是什么 id。
 2. `POST /api/import/tags`、`/places`、`/zones`：标签、地点、隐私区域。
 3. 照片：每张照常 `POST /api/photos`（[照片接口](/api/photos.md#post-apiphotos登录)），尺寸图在浏览器里从原文件重新生成，其余信息取自 living.json。
-4. `POST /api/import/projects`、`/entries`、`/collections`：项目（带里程碑）、记录、合集（带条目）。
+4. 附件：每个 `POST /api/import/attachments`，再照常一片片上传、完成、送上视频的封面（[附件接口](/api/attachments.md#上传)）。已经在这里的记录不动，它的附件也不传。
+5. `POST /api/import/projects`、`/entries`、`/collections`：项目（带里程碑）、记录（带附件）、合集（带条目）。
 
-行照 living.json 里的样子送来（字段见 [living.json](/api/export.md#livingjson)），只有它指向的东西（照片、标签、项目、地点、记录、封面）要换成这个站点的 id：浏览器从前面几步的响应里得到对照表，换好再送。
+行照 living.json 里的样子送来（字段见 [living.json](/api/export.md#livingjson)），只有它指向的东西（照片、附件、标签、项目、地点、记录、封面）要换成这个站点的 id：浏览器从前面几步的响应里得到对照表，换好再送。
 
 # 规则
 
@@ -29,9 +30,10 @@ sources:
 - **已经在这里**：
   - 记录、项目、合集：导出里的 id 就是这个账号的（导出自这个账号，之后没有删），或者是这个账号以前导入它时给的 id。
   - 照片：这个账号有文件的 SHA-256 相同的照片（上传本来就这样判断重复，返回 409 和那张照片的 id）。
+  - 附件：同记录的认法，而且文件已经传完；上一次导入没传完的，用同一个 id 重新传。
   - 标签、地点、隐私区域：见各自的接口。
-- **导入给的 id**：新的记录、项目、合集和自建的地点，id 是前缀（`en_`、`pj_`、`th_`、`poi_`）加上「`living-import`、账号 id、导出里的 id」三行文字的 SHA-256，按 Crockford base32 取 26 个字符。同一个账号导入同一项，得到的总是同一个 id，所以再导入一次能认出它；别的账号的导入、以及普通的新建，都到不了这个 id，所以没有人能占用别人的 id，也不能让自己的东西出现在别人删掉的东西原来的地址上。里程碑和合集的条目跟着项目、合集一起新建，id 照常随机。
-- **指向的东西**：记录里的照片、合集的照片条目和封面必须是自己的照片；记录、合集的记录条目必须是自己的记录；项目必须是自己的；标签必须是预置的或自己的；地点必须存在。不满足的不跟过来：从记录里去掉那张照片、标签、项目或地点，从合集里去掉那个条目，封面为空。导出里有、却没能导入的照片就这样从记录和合集里去掉。
+- **导入给的 id**：新的记录、附件、项目、合集和自建的地点，id 是前缀（`en_`、`at_`、`pj_`、`th_`、`poi_`）加上「`living-import`、账号 id、导出里的 id」三行文字的 SHA-256，按 Crockford base32 取 26 个字符。同一个账号导入同一项，得到的总是同一个 id，所以再导入一次能认出它；别的账号的导入、以及普通的新建，都到不了这个 id，所以没有人能占用别人的 id，也不能让自己的东西出现在别人删掉的东西原来的地址上。里程碑和合集的条目跟着项目、合集一起新建，id 照常随机。
+- **指向的东西**：记录里的照片、合集的照片条目和封面必须是自己的照片；记录里的附件必须是自己传完、还不在记录里的附件；记录、合集的记录条目必须是自己的记录；项目必须是自己的；标签必须是预置的或自己的；地点必须存在。不满足的不跟过来：从记录里去掉那张照片、附件、标签、项目或地点，从合集里去掉那个条目，封面为空。导出里有、却没能导入的照片就这样从记录和合集里去掉。
 - **检查**：每一行按普通的新建接口检查（字段、长度、日期、里程碑和条目的上限，记录不能是空的）。不过的那一行不导入，写进 `failed`（`id` 是导出里的 id，`message` 是原因），同一批的其他行照常。一批里同一个 id 出现两次，只算第一次。项目、记录、合集的行没有 `id` 或格式不对时，整个请求返回 400（这样的行在 `failed` 里说不清是哪一行）；标签和地点跳过这样的行。
 - **时间**：`createdAt`、`updatedAt` 取导出里的，里程碑的也一样：必须是接口写出的那种 UTC 时间，晚于现在的按现在，修改时间早于创建时间的按创建时间；没有或格式不对时用现在。合集的 `publishedAt` 同样取导出里的；没有或格式不对时，公开的合集用创建时间，其余为空。记录的版本号从 1 开始。
 - **公开范围**：照行里写的，没写时是仅自己可见。要全部改为仅自己可见，浏览器在送来之前改好。
@@ -45,7 +47,7 @@ sources:
 ## `POST /api/import/resolve`
 
 ```json
-{ "photos": ["<sha256>", "…"], "entries": ["en_…"], "projects": ["pj_…"], "collections": ["th_…"] }
+{ "photos": ["<sha256>", "…"], "entries": ["en_…"], "attachments": ["at_…"], "projects": ["pj_…"], "collections": ["th_…"] }
 ```
 
 每一项可选，各最多 1000 个；照片是文件的 SHA-256（64 位十六进制，不分大小写），其余是导出里的 id（`[A-Za-z0-9_-]`，最长 64）。格式不对返回 400。
@@ -54,6 +56,7 @@ sources:
 {
   "photos": { "<sha256>": "ph_…" },
   "entries": { "en_…": { "id": "en_…", "exists": true } },
+  "attachments": { "at_…": { "id": "at_…", "exists": false } },
   "projects": { "pj_…": { "id": "pj_…", "exists": false } },
   "collections": {}
 }
@@ -120,13 +123,28 @@ sources:
 
 最多 50 个一批。项目和它的里程碑一起新建；已经在这里的项目不动，也不补它的里程碑。
 
+## `POST /api/import/attachments`
+
+```json
+{ "id": "at_…", "kind": "video", "name": "湖边.mp4", "mime": "video/mp4", "size": 52428800, "duration": 12.5, "width": 1920, "height": 1080, "createdAt": "…" }
+```
+
+一个附件，在记录之前：字段同 `POST /api/attachments`（[附件接口](/api/attachments.md#post-apiattachments)），加上导出里的 `id` 和 `createdAt`，`size` 是选中的文件的大小。
+
+- 已经在这里（以前导入时传完了）：`{ "here": true, "attachment": OwnAttachment }`，不用再传。
+- 否则 201：`{ "here": false, "attachment": OwnAttachment, "partBytes": 16777216, "parts": 4 }`，用导入给的 id 开始上传，接着照常 `PUT /api/attachments/:id/parts/:n`、`POST /api/attachments/:id/complete`，视频再 `PUT /api/attachments/:id/poster`（导出里的封面）。上一次导入没传完的，丢掉重来。
+- 加入时间取导出里的 `createdAt`，规则同上文的 [时间](#规则)。
+- 和普通上传一样受「同时在传最多 10 个」的限制（429）；格式不对、太大返回 400、413。
+
+传完的附件不在任何记录里，等 `POST /api/import/entries` 把它放进记录；没放进记录的七天后删去。
+
 ## `POST /api/import/entries`
 
 ```json
-{ "entries": [{ "id": "en_…", "type": "note", "title": "西湖边", "body": "…", "occurredAt": "2026-11-16T15:30:00", "visibility": "private", "status": "published", "poiId": "poi_…", "createdAt": "…", "updatedAt": "…", "media": [{ "photoId": "ph_…", "caption": null }], "tagIds": ["lake"], "projectIds": ["pj_…"] }] }
+{ "entries": [{ "id": "en_…", "type": "note", "title": "西湖边", "body": "…", "occurredAt": "2026-11-16T15:30:00", "visibility": "private", "status": "published", "poiId": "poi_…", "createdAt": "…", "updatedAt": "…", "media": [{ "photoId": "ph_…", "caption": null }], "attachments": [{ "attachmentId": "at_…", "caption": null }], "tagIds": ["lake"], "projectIds": ["pj_…"] }] }
 ```
 
-最多 100 个一批，`media`、`tagIds`、`projectIds`、`poiId` 是这里的 id。草稿和已归档的照样导入。照片都没能跟过来、又没有标题和正文的记录是空的，不导入。
+最多 100 个一批，`media`、`attachments`、`tagIds`、`projectIds`、`poiId` 是这里的 id。草稿和已归档的照样导入。照片和附件都没能跟过来、又没有标题和正文的记录是空的，不导入。同一个附件只放进这一批里第一条列出它的记录。
 
 ## `POST /api/import/collections`
 
@@ -146,7 +164,7 @@ sources:
 
 # 用量
 
-- Workers：每批一次请求，每张照片一次上传。2 万张照片、几千条记录的档案，约是两万多次请求，免费版每天 10 万次。
+- Workers：每批一次请求，每张照片一次上传，每个附件每 16 MiB 一次（再加开始、完成和封面）。2 万张照片、几千条记录的档案，约是两万多次请求，免费版每天 10 万次。
 - D1：写入的行数约是导入的行数的几倍（每个索引另算一行），照片最多：每张约 10 行。免费版每天 10 万行写入，2 万张照片要两三天导完，额度用完时见 [规则](#规则)。
-- R2：每张照片四个文件（原文件和三种尺寸图），R2 免费的 10 GB 存储也要算上。
+- R2：每张照片四个文件（原文件和三种尺寸图），附件每一片一次 A 类操作；R2 免费的 10 GB 存储也要算上。
 - 详见 [费用](/architecture/cloudflare.md#费用)。

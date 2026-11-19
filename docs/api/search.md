@@ -49,7 +49,7 @@ sources:
 
 | 组 | 在哪些字段里找 | 排序 |
 |---|---|---|
-| `entries` | 标题、正文、照片说明（[entry_media](/data/entry-media.md) 的 `caption`） | 标题含有任一个词的在前，然后按发生时间从近到远 |
+| `entries` | 标题、正文、照片说明（[entry_media](/data/entry-media.md) 的 `caption`）、附件的说明和文件名（[attachments](/data/attachments.md) 的 `caption`、`name`） | 标题含有任一个词的在前，然后按发生时间从近到远 |
 | `photos` | 标题、笔记；只看有标题或笔记的照片 | 标题含有任一个词的在前，然后按拍摄时间从近到远 |
 | `projects` | 名称、说明、里程碑的标题和内容 | 名称含有任一个词的在前，然后按最近修改 |
 | `themes` | 标题、副标题、前言、条目的文字（[theme_items](/data/theme-items.md) 的 `text`） | 标题含有任一个词的在前，然后按最近修改 |
@@ -58,7 +58,7 @@ sources:
 
 # 每组的结果
 
-- `entries`：`SearchEntryHit`。`label` 是标题，没有标题时是正文的第一行（纯文本），再没有就是类型名；`photo` 是第一张照片；`snippet` 取正文里第一个找到的词附近，正文里没有就取第一个含有词的照片说明，都没有就是正文开头。
+- `entries`：`SearchEntryHit`。`label` 是标题，没有标题时是正文的第一行（纯文本），再没有就是类型名；`photo` 是第一张照片；`snippet` 取正文里第一个找到的词附近，正文里没有就依次取第一个含有词的照片说明、附件说明、附件的文件名，都没有就是正文开头。
 - `photos`：照片列表的字段（`PhotoSummary`），加上取自笔记的 `snippet`。
 - `projects`：`SearchProjectHit`，`snippet` 取说明里第一个找到的词附近，说明里没有就取第一个含有词的里程碑（按日期，标题和内容），都没有就是说明开头。
 - `themes`：`SearchThemeHit`，带封面 `cover`，与合集列表相同：选定的封面，没有时是第一张照片（记录里的也算）；`snippet` 取前言里第一个找到的词附近，前言里没有就取第一个含有词的条目文字（按条目顺序），都没有就是前言开头。

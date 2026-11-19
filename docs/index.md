@@ -3,7 +3,7 @@ okf_version: "0.2"
 ---
 # Living 知识包
 
-Living 是一个以记录为中心的私人数字档案：随时记下发生的事、想法、练习和创作，按需带上照片，在今天和档案里按时间回看，把长期的学习和创作建成项目；照片自动匹配地点，用多层级标签整理，把照片和记录编成合集和游记，在地图上回看，用 Living 模式全屏轮播。这里按 [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.2 组织：每个文件只讲一个概念，frontmatter 里的 `type` 说明它是什么，概念之间用 Markdown 链接相连。
+Living 是一个以记录为中心的私人数字档案：随时记下发生的事、想法、练习和创作，按需带上照片、视频、录音和文件，在今天和档案里按时间回看，把长期的学习和创作建成项目；照片自动匹配地点，用多层级标签整理，把照片和记录编成合集和游记，在地图上回看，用 Living 模式全屏轮播。这里按 [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf) v0.2 组织：每个文件只讲一个概念，frontmatter 里的 `type` 说明它是什么，概念之间用 Markdown 链接相连。
 
 # 产品
 

@@ -1,7 +1,7 @@
 ---
 type: API
 title: 媒体接口
-description: /media 路径下读取 R2 中的尺寸图与原图，按照片可见性控制访问和缓存。
+description: /media 路径下读取 R2 中的尺寸图、原图和附件：照片按自己的可见性，附件按所在记录的权限控制访问和缓存。
 tags: [api, media]
 ---
 # GET /media/v/:photoId/:file
@@ -15,6 +15,10 @@ tags: [api, media]
 # GET /media/o/:ownerId/:file
 
 原图，只有所有者可读，`Cache-Control: private, no-store`，`Content-Disposition: inline`。
+
+# GET /media/a/:id、/media/a/:id/poster
+
+附件的文件和视频的画面：按所在记录的权限读取，文件支持 `Range`，不进任何缓存；能播放的视频和声音、PDF 在页面里打开，其余只能下载。见 [附件接口](/api/attachments.md#文件)。
 
 # 说明
 

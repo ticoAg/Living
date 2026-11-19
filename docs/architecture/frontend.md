@@ -76,7 +76,8 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `shared/geo.ts` | 距离、方位角、坐标转换、扇形与圆、度分秒格式 |
 | `shared/entries.ts` | 记录类型与状态的名字、列表摘要的截取、记录的纯文本名字（照片页的所属记录、浏览器标签页的标题用） |
 | `shared/projects.ts` | 项目类型与状态的名字、从项目新写的记录的类型（`entryTypeFor`）、两个本地日期之间的天数 |
-| `shared/limits.ts` | 输入上限：照片、合集、合集条目、记录、标签、账号（含用户名格式 `HANDLE_RE`）、隐私区域、邀请码、地点搜索与地区名；地点编辑的 `POI_LIMITS` 留在 `shared/types.ts`，在这里再导出。Worker 的校验和表单的 `maxLength`、提示文案、发送前检查都引用它，不另写数字 |
+| `shared/attachments.ts` | 附件的文件按什么提供：浏览器能放的视频和声音（`PLAYABLE`）、`servedAs`。Worker 照此设响应头，阅读页照此决定放还是下载 |
+| `shared/limits.ts` | 输入上限：照片、合集、合集条目、记录、附件（含分片的大小）、标签、账号（含用户名格式 `HANDLE_RE`）、隐私区域、邀请码、地点搜索与地区名；地点编辑的 `POI_LIMITS` 留在 `shared/types.ts`，在这里再导出。Worker 的校验和表单的 `maxLength`、提示文案、发送前检查都引用它，不另写数字 |
 | `src/lib/api.ts` | `api<T>()` 请求封装、`mediaUrl()`；`/api/auth/*` 以外的 401 经 `onSessionLost` 通知会话层；`anonymous` 以访客身份请求（不带 Cookie、不读浏览器缓存） |
 | `src/lib/visitor.ts` | [访客视角](#访客视角)：`VisitorContext`、`withVisitor` / `withoutVisitor`（哪些页面保持访客视角）、`isVisitorSearch`、`keepVisitor`（自己改写地址的页面留住访客视角） |
 | `src/lib/useApi.ts` | 共享 GET 缓存 `useApi(path)`、`invalidate(prefix)`、`prefetch(path)`、`setCached(path, data)`、`forget(path)`（删除后丢掉，不再显示也不重取）。结果 5 分钟内算新鲜；过期后在组件挂载或标签页重新可见时后台重取，期间继续显示旧数据；失败的结果在下次挂载时重试。不定时轮询：列表接口每次全量读，D1 免费版按读取行数计额。组件用 `useSyncExternalStore` 订阅，渲染和订阅之间到达的结果（预取的数据在懒加载页面提交前返回）不会丢。访客视角里用 `visitorKey(path)` 另存一份，任何改动都丢掉全部访客副本。`useApiEach(paths)` 一次读几个地址（一份分成几次请求的列表，如按 id 分批要的照片） |
@@ -93,6 +94,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `src/components/PhotoPicker.tsx` | 从自己的照片里挑选（按日期范围、标签，可多选），合集编辑器和记录编辑器共用 |
 | `src/components/PickerDialog.tsx` | 挑选器的对话框：照片挑选器和合集编辑器的记录挑选器（`src/themes/EntryPicker.tsx`）共用，Esc 或点背景关闭 |
 | `src/components/AutoTextarea.tsx` | 随内容长高的文本框 |
+| `src/attachments/` | [附件](/product/features/attachments.md)：分片上传、重试与续传（`upload.ts`、`useUploads.ts`），读出时长、尺寸和封面（`probe.ts`），抹掉 MP4 / QuickTime 里的拍摄地点（`mp4.ts`），录音（`recorder.ts`、`useRecorder.ts`），编辑器的「附件」（`AttachmentsField.tsx`）和阅读页的播放（`AttachmentView.tsx`）。记录编辑器、随手记和导入共用 |
 | `src/components/SectionTabs.tsx` | 一个分区内几页之间的标签（图库的照片 / 地图 / 索引、档案的时间线 / 项目），只对登录的人显示 |
 | `src/components/Header.tsx` | 站点页眉与导航（见 [导航](#导航)）：字标在左，四个分区居中（当前分区是一枚衬底色的胶囊），登录后的搜索按钮、上传按钮和账户菜单在右；手机上（≤640px）页眉一行（字标、上传、账户），四个分区移到底部固定栏，每项是图标加名字，登录后栏的正中是拍照按钮 |
 | `src/components/CaptureButton.tsx` | 手机底栏的拍照按钮：打开页面内相机（`src/studio/CameraSheet.tsx`，按需加载），拍下的照片连同手机定位交给上传队列；系统相机作为备选，见 [拍照](/product/features/upload.md#拍照) |

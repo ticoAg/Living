@@ -1,7 +1,7 @@
 ---
 type: R2 Bucket
 title: R2 媒体文件
-description: 存储桶 living-photos：o/ 前缀放原图（仅本人可读），v/ 前缀放三种尺寸图（按照片可见性读取），全部经 Worker 访问。
+description: 存储桶 living-photos：o/ 前缀放原图（仅本人可读），v/ 前缀放三种尺寸图（按照片可见性读取），a/ 前缀放附件（按所在记录读取），全部经 Worker 访问。
 tags: [data, r2, media]
 sources:
   - resource: https://github.com/ticoAg/Living/blob/main/wrangler.jsonc
@@ -23,8 +23,10 @@ R2 存储桶默认私有。启用公开访问会绕过 Worker 里的权限判断
 |---|---|---|
 | `o/<ownerId>/<photoId>.<ext>` | 原图，原样保存（含 EXIF）。`<ext>` 由浏览器报告的 MIME 类型决定，没有类型时看文件扩展名：`jpg`、`png`、`webp`、`avif`、`heic`、`heif` 等 | 只有所有者，经 `/media/o/<ownerId>/<photoId>.<ext>` |
 | `v/<photoId>/<s\|m\|l>.<webp\|jpg>` | 尺寸图 | 按照片可见性，经 `/media/v/<photoId>/<file>` |
+| `a/<ownerId>/<attachmentId>.<ext>` | 附件的文件，按上传时的样子（视频和录音抹掉了拍摄地点）。`<ext>` 取自文件名，没有时为 `bin` | 按所在记录，经 `/media/a/<attachmentId>` |
+| `a/<ownerId>/<attachmentId>.poster.<webp\|jpg>` | 视频的画面，浏览器截的一帧 | 同上，经 `/media/a/<attachmentId>/poster` |
 
-[photos](/data/photos.md) 的 `file_key` 存原图的键，`variants` 存三个尺寸图的键和像素尺寸。D1 里的键就是 R2 的键，访问路径是 `/media/` 加上键。
+[photos](/data/photos.md) 的 `file_key` 存原图的键，`variants` 存三个尺寸图的键和像素尺寸。D1 里的键就是 R2 的键，访问路径是 `/media/` 加上键。附件不同：[attachments](/data/attachments.md) 的 `file_key`、`poster_key` 只给 Worker 用，访问路径按附件的 id，见 [附件接口](/api/attachments.md#文件)。
 
 # 尺寸图
 
@@ -57,10 +59,11 @@ R2 存储桶默认私有。启用公开访问会绕过 Worker 里的权限判断
 - 删除：`DELETE /api/photos/:id` 先在一个 D1 batch 里删除数据库行（并置空封面和头像引用），再删除四个对象。第二步失败只会留下无法访问的孤儿文件；可以按 `v/<photoId>/` 前缀对照 `photos.id` 清理。
 - 修改标题、标签、可见性等只改 D1，不动 R2。
 - 对象内容不可变：键里含 `photoId`，不会被覆盖，所以尺寸图可以缓存一年。
+- 附件：分片上传（每片 16 MiB），传完之前 R2 里没有这个对象。删除记录或附件时先删 D1 的行，再删对象；不在记录里的附件由每小时的清理删掉，见 [attachments](/data/attachments.md#清理)。附件的文件不进缓存。
 
 # 容量
 
-R2 免费额度是 10 GB 存储，无出站流量费，见 [Cloudflare 资源](/architecture/cloudflare.md)。按一张手机照片原图 3–8 MB、三种尺寸共 1–2 MB 估算，10 GB 大约容纳一两千张。照片多了以后，R2 存储是主要成本。
+R2 免费额度是 10 GB 存储，无出站流量费，见 [Cloudflare 资源](/architecture/cloudflare.md)。按一张手机照片原图 3–8 MB、三种尺寸共 1–2 MB 估算，10 GB 大约容纳一两千张。附件按原样存，最占地方的是视频：手机拍的一分钟就有几十到几百 MB（看分辨率和编码），录音一分钟不到 1 MB。照片和视频多了以后，R2 存储是主要成本。
 
 # 本地开发
 

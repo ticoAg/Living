@@ -32,17 +32,17 @@ sources:
 - 不分页：最多返回 `ENTRY_LIST_LIMIT`（5000）条，超出时略去最早的，`truncated` 为 true。[日历](/product/features/calendar.md) 用 `from`、`to` 一次只读一个月，所以多早的月份都完整。
 - `from`、`to` 不是真实存在的日期时返回 400「from 的格式应为 YYYY-MM-DD」（`to` 同理），`to` 早于 `from` 时返回 400「to 不能早于 from」。`type` 里有别的词（包括大小写不同、多余的逗号和空格）时返回 400「type 只能是 note / article / reading / practice / creation / trip，可以用逗号隔开几个」。
 - `excerpt` 是正文开头的 Markdown 原文，最多 300 个码点，能在换行处截断就在换行处截断；`hasMore` 表示正文还有后续。`chars` 是正文一共多少个码点（Markdown 原文，没有正文为 0），[文章](/product/features/showcase.md#文章) 列表用它显示字数。
-- `photoIds` 只含请求者能打开的照片，按记录里的顺序；`tagIds` 为直接标签；`projectIds` 只含请求者能在列表里看到的项目（本人：全部），按项目创建的先后。
+- `photoIds` 只含请求者能打开的照片，按记录里的顺序；`attachments` 是附件的摘要（`id`、`kind`、`duration`、`poster`），按顺序，能看到记录的人都能看到；`tagIds` 为直接标签；`projectIds` 只含请求者能在列表里看到的项目（本人：全部），按项目创建的先后。
 - `poi`：作者选的地点（`id`、`name`、`category`、`city`、`district`，和地图用的 `lat`、`lng`），没有为 null。能看到记录的人都能看到它的地点；地点落在作者的隐私区域里时，编辑器会提醒，不会自动隐藏。
 - 缓存同 [接口约定](/api/conventions.md#缓存)。
 
 # GET /api/entries/:id
 
-`EntryDetail`：摘要的全部字段，加完整的 `body`、`media`（照片及其在这条记录里的说明）、`revision` 和 `themes`。
+`EntryDetail`：摘要的全部字段，加完整的 `body`、`media`（照片及其在这条记录里的说明）、`attachments`（附件及其说明，见 [附件接口](/api/attachments.md#在记录里)）、`revision` 和 `themes`。
 
 - 他人只能打开 `published` 且 `public` 或 `unlisted` 的记录；其余（包括草稿、已归档）返回 404，与不存在无法区分。
 - 持有能到达这条记录的 [分享链接](/api/shares.md)（这条记录的，或收录它的合集、项目的）时，已完成的私密记录也能打开，`media` 含全部照片。
-- `media` 略去请求者不能打开的照片，不留空位；照片对象不带笔记 `note`。
+- `media` 略去请求者不能打开的照片，不留空位；照片对象不带笔记 `note`。`attachments` 没有自己的公开范围，能打开记录就全部列出。
 - `themes`：收录这条记录、请求者能在列表里看到的 [合集](/api/themes.md)（公开的，本人：全部），每个带 `id`、`title`，按合集的 `updatedAt` 倒序。仅链接可见的合集不从记录页透露，与照片页一样。
 
 # POST /api/entries（登录）
@@ -58,17 +58,18 @@ sources:
 | `visibility` | `private` | |
 | `status` | `published` | 编辑器第一次保存时传 `draft` |
 | `media` | `[]` | `{ photoId, caption? }[]`，最多 200 张，说明最多 2000 字；必须都是自己的照片，否则 400；重复的照片只保留第一次 |
+| `attachments` | `[]` | `{ attachmentId, caption? }[]`，最多 20 个，说明最多 2000 字；必须是自己传完的、不在别的记录里的附件，否则 400，见 [附件接口](/api/attachments.md#在记录里) |
 | `tagIds` | `[]` | 最多 200 个；只保留预置标签和自己的标签，其他忽略 |
 | `projectIds` | `[]` | 最多 50 个；只保留自己的项目，其他忽略 |
 | `poiId` | null | 已有的 [地点](/api/pois.md) id，不存在时 400；搜索结果先用 `POST /api/pois` 建成地点 |
 
-标题、正文、照片至少有一样，否则 400。请求体最大 1 MB。上限定义在 `shared/limits.ts` 的 `ENTRY_LIMITS`。
+标题、正文、照片、附件至少有一样，否则 400。请求体最大 1 MB。上限定义在 `shared/limits.ts` 的 `ENTRY_LIMITS`。
 
 # PATCH /api/entries/:id（本人）
 
 `UpdateEntryBody` → `{ "entry": EntryDetail }`。
 
-- 只改给出的字段；`title`、`body`、`poiId` 给 null 即清空；`media`、`tagIds`、`projectIds` 给出时整体替换。
+- 只改给出的字段；`title`、`body`、`poiId` 给 null 即清空；`media`、`attachments`、`tagIds`、`projectIds` 给出时整体替换；不再列出的附件离开记录，七天后删去。
 - 任何改动都让 `revision` 加一并更新 `updatedAt`；什么都没给时原样返回。
 - 带上 `revision`（编辑开始时的版本）：与当前版本不同时返回 409，什么都不改：
 
@@ -81,7 +82,7 @@ sources:
 
 # DELETE /api/entries/:id（本人）
 
-→ `{ "ok": true }`。记录与它的照片关联、标签关联、项目关联、合集里的条目、分享链接一起删除，照片、标签、项目、合集和地点本身不受影响；收录过它的合集更新 `updatedAt`。
+→ `{ "ok": true }`。记录与它的附件（连同 R2 里的文件）、照片关联、标签关联、项目关联、合集里的条目、分享链接一起删除，照片、标签、项目、合集和地点本身不受影响；收录过它的合集更新 `updatedAt`。
 
 # 别处的变化
 
@@ -91,4 +92,4 @@ sources:
 - 项目的统计、封面和照片来自其中的记录，见 [项目接口](/api/projects.md)。
 - 合集可以收录记录，统计、封面和地点也算上记录里的照片，见 [合集接口](/api/themes.md)。
 
-数据见 [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md)、[entry_projects](/data/entry-projects.md)。
+数据见 [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[attachments](/data/attachments.md)、[entry_tags](/data/entry-tags.md)、[entry_projects](/data/entry-projects.md)。

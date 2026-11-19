@@ -1,5 +1,12 @@
 # Directory Update Log
 
+## 2026-11-19
+* **Creation**: 第三阶段的最后一项：[附件](/product/features/attachments.md)。记录里可以放视频、录音和其他文件：编辑器的「附件」里添加或直接录音，随手记的麦克风录好就和文字一起记下；选好就分片上传，显示进度，断了从断的那一片接着传。阅读页里视频带封面直接放，声音是播放条，其他文件下载（PDF 在浏览器里打开）；卡片显示附件，作品没有照片时用视频的封面。迁移 `0010_attachments.sql` 新增 [attachments](/data/attachments.md)，接口见 [附件接口](/api/attachments.md)：R2 分片上传，每片 16 MiB，一个最多 2 GiB，一条记录最多 20 个。另建一张表、不并进照片，理由见 [数据演进](/data/evolution.md#媒体)。
+* **Update**: 附件没有自己的公开范围，跟着所在的记录：能打开记录的人（包括凭分享链接打开的）就能播放、下载，不在记录里的只有作者能读，`/media/a/` 下的文件一律不进缓存。手机视频和语音备忘录（MP4、MOV、M4A）里的拍摄地点，上传前在浏览器里原地抹掉；浏览器能放的视频和声音、PDF 在页面里打开，其余（网页、SVG……）只能下载，并带 `sandbox` 的内容安全策略。没传完的一天后、不在记录里的七天后由每小时的定时任务删掉。见 [隐私](/product/features/privacy.md#附件)、[分享链接](/product/features/sharing.md#能看到什么)、[Cloudflare 资源](/architecture/cloudflare.md#定时任务)。
+* **Update**: 导出格式升到第 2 版：记录带上 `attachments`，附件的文件和视频的封面放在 `media/` 下，Markdown 里是指向它们的链接；「包含照片原文件和附件」一起下载，导出到同一个文件夹时只下载新的。导入读得了第 1 版和第 2 版，附件在照片之后、记录之前重新分片上传（`POST /api/import/attachments`），已经在的记录连同附件不动。[搜索](/api/search.md) 也找附件的说明和文件名。见 [导出接口](/api/export.md#livingjson)、[导入接口](/api/import.md)。
+* **Update**: 修正 [分享链接](/api/shares.md)：浏览器同时持有一条记录的链接和一个合集或项目的链接时，打开合集或项目里的记录返回 500（授权查询绑定了没用上的参数）。
+* **Update**: [路线图](/product/roadmap.md) 的第三阶段已完成；[内容模型](/product/content-model.md)、[记录](/product/features/entries.md)、[今天](/product/features/today.md)、[entry_media](/data/entry-media.md)、[数据模型总览](/data/overview.md)、[R2 媒体文件](/data/media.md)、[接口约定](/api/conventions.md)、[前端分区](/architecture/frontend.md)、[备份与恢复](/runbooks/backup.md) 随之更新。
+
 ## 2026-11-18
 * **Creation**: 第四阶段：[导入](/product/features/import.md)。设置里选导出的文件夹或全部 zip（浏览器自己读 zip，不用先解压），先列出导出里有多少、多少已经在这里，再按标签、地点、隐私区域、照片、项目、记录、合集的顺序一批批导入；照片从原文件重新生成尺寸，信息取自 living.json，不从 EXIF 重读位置。已经在的跳过、不覆盖，正文里指向原站点的链接换到这个站点，可以全部设为私密；中途停下再导入一次接着做。接口见 [导入接口](/api/import.md)，新的 id 由账号和导出里的 id 算出，再导入能认出它，不加表，见 [数据演进](/data/evolution.md#导出与备份)。
 * **Update**: 免费版 D1 当天的读写额度用完时，所有接口返回 503 `quota_exceeded` 和恢复的时间，不再是 500；JSON 请求体的上限按字节算，不带 `Content-Length` 的请求以前按字符数算，中文能多放进近三倍。见 [接口约定](/api/conventions.md#错误)。[导出](/product/features/export.md)、[隐私](/product/features/privacy.md#搜索与导出)、[账号](/product/features/accounts.md)、[费用](/architecture/cloudflare.md#费用)、[路线图](/product/roadmap.md)、[备份与恢复](/runbooks/backup.md)、[前端分区](/architecture/frontend.md#路由与归属) 随之更新。

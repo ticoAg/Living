@@ -14,6 +14,7 @@
 * [theme_items](theme-items.md) - 合集的有序条目：照片、记录、文字段落或日期分段
 * [entries](entries.md) - 记录：发生时间、Markdown 正文、类型、状态和公开范围，可以只有文字
 * [entry_media](entry-media.md) - 记录与照片的多对多关联，带顺序和记录内的说明
+* [attachments](attachments.md) - 附件：记录里的视频、录音和其他文件，跟着记录的公开范围；R2 里的文件和每小时的清理
 * [entry_tags](entry-tags.md) - 记录与标签的多对多关联，与照片共用标签树但分开挂
 * [projects](projects.md) - 项目：一个持续的过程，有类型、起止日期、状态和公开范围
 * [entry_projects](entry-projects.md) - 记录与项目的多对多关联，只能放进作者自己的项目
@@ -30,7 +31,7 @@
 # KV 与 R2
 
 * [KV 会话与限流](kv.md) - 登录会话和登录限流计数；KV 的写入额度只留给登录
-* [R2 媒体文件](media.md) - 原图与三种尺寸图的对象键、访问规则和生命周期
+* [R2 媒体文件](media.md) - 原图、三种尺寸图和附件的对象键、访问规则和生命周期
 
 # 参考数据
 
