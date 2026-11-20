@@ -593,6 +593,44 @@ export interface AttachmentResponse {
   attachment: OwnAttachment;
 }
 
+// ---- library (docs/api/library.md) ----------------------------------------------------------------------------------
+
+/** The most attachments `GET /api/library` lists, newest first; past it the response says `truncated`. */
+export const LIBRARY_ATTACHMENTS_LIMIT = 5000;
+
+/** The entry an attachment is in, as its author's library names it. */
+export interface LibraryEntryRef extends PhotoEntryRef {
+  visibility: Visibility;
+  status: EntryStatus;
+}
+
+/** One's attachment as the library lists it. */
+export interface LibraryAttachment extends OwnAttachment {
+  /** what its entry says under it */
+  caption: string | null;
+  /** when its file came in whole; null while uploading */
+  uploadedAt: string | null;
+  /** UTC: when the hourly cleanup deletes one in no entry (within the hour after); null while it is in one */
+  purgeAt: string | null;
+  entry: LibraryEntryRef | null;
+}
+
+/** How many, and their bytes. */
+export interface LibraryCount {
+  count: number;
+  bytes: number;
+}
+
+/** `GET /api/library`: one's attachments, what one keeps here, and which of one's photos are in one's entries. */
+export interface LibraryResponse {
+  attachments: LibraryAttachment[];
+  truncated: boolean;
+  /** photos: their original files (the sizes made from them not counted); attachments: those uploaded whole */
+  usage: Record<'photos' | AttachmentKind, LibraryCount>;
+  /** one's photos that are in at least one of one's entries */
+  entryPhotoIds: string[];
+}
+
 // ---- share links (docs/api/shares.md) -------------------------------------------------------------------------------
 
 /** What a share link can open: an entry, a collection (theme) or a project. */

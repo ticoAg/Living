@@ -369,10 +369,22 @@ export function parseRange(header: string | undefined, size: number): { offset: 
 
 // ---- loose ones ---------------------------------------------------------------------------------------------------
 
+/** Days an attachment in no entry is kept: one whose upload never completed, and one uploaded whole. */
+export const KEPT_DAYS = { uploading: 1, loose: 7 } as const;
+
 /**
- * The hourly job: attachments in no entry go, rows first and then their files, a day after an upload that never
- * completed and a week after one came loose (uploaded and never saved in an entry, or taken out of one). An entry
- * deleted some other way leaves its attachments in none, `loose_since` unset: they go a week after their upload.
+ * When the hourly job deletes an attachment in no entry: it goes at the first run after this. Null while it is in one.
+ * An entry deleted some other way leaves its attachments in none, `loose_since` unset: they go a week after their upload.
+ */
+export function purgeAt(r: Pick<AttachmentRow, 'entry_id' | 'loose_since' | 'uploaded_at' | 'created_at'>): string | null {
+  if (r.entry_id) return null;
+  const since = Date.parse(r.loose_since ?? r.uploaded_at ?? r.created_at);
+  return iso(since + (r.uploaded_at === null ? KEPT_DAYS.uploading : KEPT_DAYS.loose) * DAY);
+}
+
+/**
+ * The hourly job: attachments in no entry go, rows first and then their files, past `purgeAt`: a day after an upload
+ * that never completed and a week after one came loose (uploaded and never saved in an entry, or taken out of one).
  */
 export async function purgeLooseAttachments(db: D1Database, bucket: R2Bucket, now = Date.now()): Promise<{ purged: number }> {
   const res = await db
@@ -383,7 +395,7 @@ export async function purgeLooseAttachments(db: D1Database, bucket: R2Bucket, no
          ORDER BY loose_since LIMIT 200)
        RETURNING ${FILE_COLS}`
     )
-    .bind(iso(now - DAY), iso(now - 7 * DAY))
+    .bind(iso(now - KEPT_DAYS.uploading * DAY), iso(now - KEPT_DAYS.loose * DAY))
     .all<AttachmentFiles>();
   if (res.results.length) await deleteAttachmentFiles(bucket, res.results);
   return { purged: res.results.length };
