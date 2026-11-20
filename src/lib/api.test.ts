@@ -40,3 +40,29 @@ describe('a 401 from the API', () => {
     off();
   });
 });
+
+describe('a request as a visitor', () => {
+  it('goes without cookies and past the browser cache; a plain one sends cookies and may use the cache', async () => {
+    const seen: RequestInit[] = [];
+    vi.stubGlobal('fetch', async (_path: string, init: RequestInit) => {
+      seen.push(init);
+      return new Response('{}', { status: 200 });
+    });
+    await api('/api/entries?owner=song', { anonymous: true });
+    await api('/api/entries?owner=song');
+    expect(seen.map((i) => [i.credentials, i.cache])).toEqual([
+      ['omit', 'no-store'],
+      ['same-origin', undefined]
+    ]);
+  });
+
+  it('says nothing about the session when refused for want of one', async () => {
+    const lost = vi.fn();
+    const off = onSessionLost(lost);
+    answer(401, { error: 'unauthenticated', message: '请先登录' });
+    const err = await api('/api/entries?mine=1', { anonymous: true }).catch((e: unknown) => e);
+    expect((err as ApiError).status).toBe(401);
+    expect(lost).not.toHaveBeenCalled();
+    off();
+  });
+});

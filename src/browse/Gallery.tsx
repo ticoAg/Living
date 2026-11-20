@@ -4,6 +4,7 @@ import type { PhotoSummary } from '../../shared/types';
 import { Icon } from '../components/icons';
 import { useSession } from '../lib/session';
 import { buildTagTree, filterByTags, inclusiveCounts } from '../lib/tags';
+import { useVisitor } from '../lib/visitor';
 import { enc, usePhotoList, usePoiList, useTagTree } from './api';
 import { setBrowseList } from './context';
 import GalleryTile, { galleryTileSize } from './GalleryTile';
@@ -24,7 +25,7 @@ const photoId = (p: PhotoSummary) => p.id;
 
 const SKELETON_RATIOS = ['4 / 5', '3 / 2', '2 / 3', '1 / 1', '3 / 4', '3 / 2', '4 / 5', '2 / 3', '3 / 2', '1 / 1', '3 / 4', '4 / 3'];
 
-export default function Gallery({ owner }: { owner?: string }) {
+export default function Gallery({ owner, lead }: { owner?: string; lead?: ReactNode }) {
   const { user } = useSession();
   const q = useQuery();
   const rawTags = useMemo(() => splitIds(q.get('tags')), [q]);
@@ -50,9 +51,13 @@ export default function Gallery({ owner }: { owner?: string }) {
   const listed = useDeferredValue(shown);
 
   // the photo page steps through the whole filtered list, not just the tiles rendered so far
+  const visitor = useVisitor();
   useEffect(() => {
-    setBrowseList(shown.map((p) => p.id));
-  }, [shown]);
+    setBrowseList(
+      shown.map((p) => p.id),
+      visitor
+    );
+  }, [shown, visitor]);
 
   const poiOf = useCallback((p: PhotoSummary) => (p.poiId ? poiById.get(p.poiId) : undefined), [poiById]);
   const tileSize = useCallback((p: PhotoSummary) => galleryTileSize(p, poiOf(p)), [poiOf]);
@@ -111,6 +116,7 @@ export default function Gallery({ owner }: { owner?: string }) {
   return (
     <div className="gal">
       <div className="gal-head">
+        {lead}
         {hasFilter && (
           <FilterToggle open={filterOpen} onToggle={() => setFilterOpen((o) => !o)} count={selected.length} controls={filterId} />
         )}

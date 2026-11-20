@@ -1,21 +1,31 @@
 // Living — one Worker: JSON API (/api), media from R2 (/media), and the SPA via static assets; plus the hourly job
-// (provinces, place cache cleanup).
+// (provinces, place cache cleanup, loose attachments).
 // Contract: /docs/api/
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AppEnv, Env } from './env';
+import { purgeLooseAttachments } from './lib/attachments';
 import { forbidden, HttpError, REFERRER_POLICY } from './lib/http';
 import { fillRegions } from './lib/regions';
 import { purgePlaceCache } from './providers/cache';
 import { admin } from './routes/admin';
+import { attachments } from './routes/attachments';
 import { auth } from './routes/auth';
+import { entries } from './routes/entries';
+import { exporter } from './routes/export';
+import { imports } from './routes/import';
+import { library } from './routes/library';
 import { me } from './routes/me';
 import { media } from './routes/media';
 import { photos } from './routes/photos';
 import { pois } from './routes/pois';
 import { privacyZones } from './routes/privacyZones';
+import { shares } from './routes/shares';
+import { projects } from './routes/projects';
+import { search } from './routes/search';
+import { review } from './routes/review';
 import { site } from './routes/site';
 import { tags } from './routes/tags';
 import { themes } from './routes/themes';
@@ -78,7 +88,16 @@ app.route('/api/photos', photos);
 app.route('/api/tags', tags);
 app.route('/api/pois', pois);
 app.route('/api/themes', themes);
+app.route('/api/entries', entries);
+app.route('/api/attachments', attachments);
+app.route('/api/library', library);
+app.route('/api/projects', projects);
 app.route('/api/privacy-zones', privacyZones);
+app.route('/api/shares', shares);
+app.route('/api/search', search);
+app.route('/api/export', exporter);
+app.route('/api/import', imports);
+app.route('/api/review', review);
 app.route('/api/admin', admin);
 app.route('/media', media);
 
@@ -96,6 +115,16 @@ app.notFound((c) => {
   // Anything else belongs to the SPA (normally served before the Worker runs).
   return c.env.ASSETS.fetch(c.req.raw);
 });
+
+/**
+ * On the Workers Free plan, D1 refuses every query for the rest of the UTC day once the account has read or written its
+ * daily rows (docs/architecture/cloudflare.md#费用). Said as such, so that a long job (an import) can stop and say when
+ * to go on, instead of retrying a server error.
+ */
+const D1_QUOTA = /exceeded D1's free tier daily row (?:read|write) limit/i;
+const D1_QUOTA_MESSAGE = '今天的数据库额度已经用完，要到协调世界时 0 点（北京时间 8 点）以后才能继续';
+const isD1Quota = (err: unknown): boolean =>
+  err instanceof Error && (D1_QUOTA.test(err.message) || (err.cause instanceof Error && D1_QUOTA.test(err.cause.message)));
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {
@@ -119,18 +148,26 @@ app.onError((err, c) => {
                 : 'invalid_input';
     return c.json({ error, message: err.message || '请求有误' }, status, { 'Cache-Control': 'no-store' });
   }
+  if (isD1Quota(err)) {
+    console.error('d1 daily limit', c.req.method, new URL(c.req.url).pathname);
+    return c.json({ error: 'quota_exceeded', message: D1_QUOTA_MESSAGE }, 503, { 'Cache-Control': 'no-store' });
+  }
   console.error('unhandled error', c.req.method, new URL(c.req.url).pathname, err instanceof Error ? (err.stack ?? err.message) : err);
   return c.json({ error: 'internal', message: '服务器出错了，请稍后再试' }, 500, { 'Cache-Control': 'no-store' });
 });
 
 /**
- * The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts), and expired rows of the
- * place cache (providers/cache.ts). The two are independent: one failing does not stop the other.
+ * The cron trigger in wrangler.jsonc: provinces for photos stored without one (lib/regions.ts), expired rows of the
+ * place cache (providers/cache.ts), and attachments in no entry past their time (lib/attachments.ts). The jobs are
+ * independent: one failing does not stop the others.
  */
 async function scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
   const failed = (job: string) => (e: unknown) => console.error(`${job}: run failed`, e instanceof Error ? (e.stack ?? e.message) : e);
   ctx.waitUntil(fillRegions(env).then((run) => console.log('regions', JSON.stringify(run)), failed('regions')));
   ctx.waitUntil(purgePlaceCache(env.DB).then((purged) => console.log('place cache', JSON.stringify({ purged })), failed('place cache')));
+  ctx.waitUntil(
+    purgeLooseAttachments(env.DB, env.MEDIA).then((run) => console.log('attachments', JSON.stringify(run)), failed('attachments'))
+  );
 }
 
 export default { fetch: app.fetch, scheduled } satisfies ExportedHandler<Env>;

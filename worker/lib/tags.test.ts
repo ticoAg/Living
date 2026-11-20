@@ -14,21 +14,24 @@ const row = (over: Partial<TagRow> = {}): TagRow => ({
 
 describe('toTag', () => {
   it('maps a row to the API shape', () => {
-    expect(toTag(row({ count: 5 }))).toEqual({
+    expect(toTag(row({ count: 5, entry_count: 2 }))).toEqual({
       id: 't_01',
       name: '晨雾',
       parentId: 'light',
       ownerId: 'u_1',
       color: null,
       sort: 3,
-      count: 5
+      count: 5,
+      entryCount: 2
     });
   });
 
   it('counts zero when the row carries no count, and lets an explicit count win', () => {
     expect(toTag(row()).count).toBe(0);
+    expect(toTag(row()).entryCount).toBe(0);
     expect(toTag(row({ count: 5 }), 9).count).toBe(9);
     expect(toTag(row({ count: 5 }), 0).count).toBe(0);
+    expect(toTag(row({ entry_count: 4 }), 0, 7).entryCount).toBe(7);
   });
 
   it('keeps preset tags (no owner) and colour swatches as they are', () => {

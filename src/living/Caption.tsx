@@ -1,4 +1,4 @@
-import { CategoryIcon } from '../components/icons';
+import { CategoryIcon, Icon } from '../components/icons';
 import type { CaptionData } from './captionText';
 import type { Pos, Size } from './settings';
 
@@ -16,7 +16,7 @@ interface Props {
   animate: boolean;
 }
 
-/** Place in large spaced serif with its category symbol, then title, mono meta, coordinates, camera and tags. */
+/** Place in large spaced serif with its category symbol, then title, the entry, mono meta, coordinates, camera and tags. */
 export default function Caption({ data, photoId, visible, pos, size, barUp, animate }: Props) {
   return (
     <div className="lv-caption" data-pos={pos} data-size={size} data-bar={barUp ? 'up' : 'down'} data-visible={visible}>
@@ -28,6 +28,12 @@ export default function Caption({ data, photoId, visible, pos, size, barUp, anim
           </span>
         )}
         {data.sub && <span className="lv-cap-sub">{data.sub}</span>}
+        {data.entry && (
+          <span className="lv-cap-entry">
+            <Icon name="note" size={15} aria-hidden="true" />
+            <span>{data.entry}</span>
+          </span>
+        )}
         {data.meta.length > 0 && (
           <span className="lv-cap-meta">
             {data.meta.map((t, i) => (

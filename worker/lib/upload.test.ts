@@ -84,7 +84,14 @@ const refs = (over: Partial<UploadRefs> = {}): UploadRefs => ({
 
 async function makeUpload(meta: Record<string, unknown> = {}, r: Partial<UploadRefs> = {}): Promise<Upload> {
   const parsed = await parseUploadForm(form(metaJson(meta)));
-  return { photoId: 'ph_1', ownerId: 'u_1', form: parsed, refs: refs(r), files: uploadFiles('u_1', 'ph_1', parsed) };
+  return {
+    photoId: 'ph_1',
+    ownerId: 'u_1',
+    defaultVisibility: 'public',
+    form: parsed,
+    refs: refs(r),
+    files: uploadFiles('u_1', 'ph_1', parsed)
+  };
 }
 
 afterEach(() => {
@@ -358,6 +365,14 @@ describe('photoRecord', () => {
       sha256: SHA,
       uploaded_at: NOW
     });
+  });
+
+  it('gives a photo whose meta names no visibility the uploader’s setting', async () => {
+    const u = await makeUpload();
+    expect(photoRecord({ ...u, defaultVisibility: 'private' }, null, NOW)).toMatchObject({ visibility: 'private' });
+    expect(photoRecord(u, null, NOW)).toMatchObject({ visibility: 'public' });
+    const chosen = await makeUpload({ visibility: 'unlisted' });
+    expect(photoRecord({ ...chosen, defaultVisibility: 'private' }, null, NOW)).toMatchObject({ visibility: 'unlisted' });
   });
 
   it('computes the distance to the place itself when the photo has a point, and defaults the method to manual', async () => {

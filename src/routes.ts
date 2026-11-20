@@ -1,5 +1,7 @@
 import { lazy, type ComponentType } from 'react';
-import { prefetch } from './lib/useApi';
+import { dayOf, monthSpan, parseMonth } from '../shared/days';
+import { prefetch, visitorKey } from './lib/useApi';
+import { isVisitorSearch } from './lib/visitor';
 
 // Page modules are split per route. Without help each first visit waits for its chunk, then for its data,
 // with the Suspense fallback in between. Two things close that gap:
@@ -24,12 +26,24 @@ function page(load: Loader): Page {
   return Object.assign(lazy(get), { preload: () => void get().catch(() => {}) });
 }
 
+export const Today = page(() => import('./pages/Today'));
+export const Archive = page(() => import('./pages/Archive'));
+export const Calendar = page(() => import('./pages/Calendar'));
+export const YearReview = page(() => import('./pages/YearReview'));
+export const EntryReader = page(() => import('./pages/EntryReader'));
+export const EntryEditor = page(() => import('./pages/EntryEditor'));
+export const Projects = page(() => import('./pages/Projects'));
+export const ProjectPage = page(() => import('./pages/ProjectPage'));
+export const ProjectForm = page(() => import('./pages/ProjectForm'));
 export const Explore = page(() => import('./pages/Explore'));
 export const Profile = page(() => import('./pages/Profile'));
+export const Works = page(() => import('./pages/Works'));
+export const Articles = page(() => import('./pages/Articles'));
 export const Photo = page(() => import('./pages/Photo'));
 export const Place = page(() => import('./pages/Place'));
 export const MapPage = page(() => import('./pages/MapPage'));
 export const IndexPage = page(() => import('./pages/IndexPage'));
+export const Library = page(() => import('./pages/Library'));
 export const Living = page(() => import('./pages/Living'));
 export const Upload = page(() => import('./pages/Upload'));
 export const PhotoEdit = page(() => import('./pages/PhotoEdit'));
@@ -41,6 +55,8 @@ export const Settings = page(() => import('./pages/Settings'));
 export const Themes = page(() => import('./pages/Themes'));
 export const ThemeReader = page(() => import('./pages/ThemeReader'));
 export const ThemeEditor = page(() => import('./pages/ThemeEditor'));
+export const ShareOpen = page(() => import('./pages/ShareOpen'));
+export const Search = page(() => import('./pages/Search'));
 export const NotFound = page(() => import('./pages/NotFound'));
 
 const enc = encodeURIComponent;
@@ -54,15 +70,40 @@ const dec = (s: string) => {
 
 // The gallery, map and index all read the same three lists.
 const BROWSE = ['/api/photos', '/api/tags', '/api/pois'];
+// Today and the archive read the author's own entries and photos.
+const ARCHIVE = ['/api/entries?mine=1', '/api/photos?mine=1', '/api/tags'];
 
 /** The page for a path and the GET paths it requests on mount, spelled exactly as the page spells them. */
 const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   [/^\/$/, Explore, () => BROWSE],
+  [/^\/today$/, Today, () => ARCHIVE],
+  [/^\/archive$/, Archive, () => ARCHIVE],
+  [/^\/archive\/calendar$/, Calendar, () => []],
+  [/^\/archive\/(\d{4})$/, YearReview, (m) => [`/api/review/${m[1]}`, '/api/review']],
+  [/^\/entries\/new$/, EntryEditor, () => []],
+  [/^\/e\/([^/]+)\/edit$/, EntryEditor, (m) => [`/api/entries/${enc(dec(m[1]))}`]],
+  [/^\/e\/([^/]+)$/, EntryReader, (m) => [`/api/entries/${enc(dec(m[1]))}`]],
+  [/^\/projects$/, Projects, () => ['/api/projects?mine=1']],
+  [/^\/projects\/new$/, ProjectForm, () => []],
+  [/^\/projects\/([^/]+)\/edit$/, ProjectForm, (m) => [`/api/projects/${enc(dec(m[1]))}`]],
+  [/^\/projects\/([^/]+)$/, ProjectPage, (m) => [`/api/projects/${enc(dec(m[1]))}`, `/api/entries?project=${enc(dec(m[1]))}`]],
   [/^\/(?:@|%40)([^/]+)\/?$/i, Profile, (m) => [`/api/users/${enc(dec(m[1]))}`]],
+  // the lists are asked for by the canonical handle, which links write
+  [/^\/(?:@|%40)([^/]+)\/works\/?$/i, Works, (m) => [`/api/users/${enc(dec(m[1]))}`, `/api/entries?owner=${enc(dec(m[1]))}&type=creation`]],
+  [
+    /^\/(?:@|%40)([^/]+)\/articles\/?$/i,
+    Articles,
+    (m) => [`/api/users/${enc(dec(m[1]))}`, `/api/entries?owner=${enc(dec(m[1]))}&type=article`]
+  ],
   [/^\/p\/([^/]+)$/, Photo, (m) => [`/api/photos/${enc(dec(m[1]))}`, '/api/photos']],
-  [/^\/place\/([^/]+)$/, Place, (m) => [`/api/pois/${enc(dec(m[1]))}`, `/api/photos?poi=${enc(dec(m[1]))}`, '/api/tags']],
+  [
+    /^\/place\/([^/]+)$/,
+    Place,
+    (m) => [`/api/pois/${enc(dec(m[1]))}`, `/api/photos?poi=${enc(dec(m[1]))}`, '/api/tags', `/api/entries?poi=${enc(dec(m[1]))}`]
+  ],
   [/^\/map$/, MapPage, () => BROWSE],
   [/^\/index$/, IndexPage, () => BROWSE],
+  [/^\/library$/, Library, () => ['/api/photos?mine=1', '/api/library']],
   [/^\/living$/, Living, () => []],
   [/^\/upload$/, Upload, () => []],
   [/^\/studio\/photo\/[^/]+$/, PhotoEdit, () => []],
@@ -74,7 +115,9 @@ const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   [/^\/themes$/, Themes, () => []],
   [/^\/themes\/new$/, ThemeEditor, () => []],
   [/^\/t\/[^/]+\/edit$/, ThemeEditor, () => []],
-  [/^\/t\/([^/]+)$/, ThemeReader, (m) => [`/api/themes/${enc(dec(m[1]))}`]]
+  [/^\/t\/([^/]+)$/, ThemeReader, (m) => [`/api/themes/${enc(dec(m[1]))}`]],
+  [/^\/s\/[^/]+$/, ShareOpen, () => []],
+  [/^\/search$/, Search, () => []]
 ];
 
 /** Fetch the chunk for `url` and, with `data`, the GET requests its page will make. */
@@ -84,17 +127,45 @@ export function warm(url: URL, data: boolean): void {
     if (!m) continue;
     pg.preload();
     if (data) {
-      const list = paths(m);
+      // the gallery's entry layer reads the public entries instead of the photo lists
+      const list = pg === Explore && url.searchParams.get('layer') === 'entries' ? ['/api/entries'] : paths(m);
       // the theme list depends on ?mine=1 and the session, so only the public list is warmed
       if (pg === Themes && !url.search.includes('mine=1')) list.push('/api/themes');
-      list.forEach(prefetch);
+      // the calendar reads the month in its address, this one by default
+      if (pg === Calendar) {
+        const now = new Date();
+        const { from, to } = monthSpan(
+          parseMonth(url.searchParams.get('month')) ?? dayOf(now.getFullYear(), now.getMonth() + 1, 1).slice(0, 7)
+        );
+        list.push(`/api/entries?mine=1&from=${from}&to=${to}`, `/api/photos?mine=1&from=${from}&to=${to}`, '/api/tags');
+      }
+      // in the visitor view (lib/visitor.ts) the page asks as a visitor
+      const visitor = isVisitorSearch(url.search);
+      list.forEach((p) => prefetch(visitor ? visitorKey(p) : p));
     }
     return;
   }
 }
 
-/** Chunks worth having before anyone asks: the pages one click away from the gallery. */
-const IDLE = [Explore, Photo, Place, Profile, MapPage, IndexPage, Themes, ThemeReader, Living];
+/** Chunks worth having before anyone asks: the pages one click away from the gallery, and from Today and the archive. */
+const IDLE = [
+  Explore,
+  Photo,
+  Place,
+  Profile,
+  MapPage,
+  IndexPage,
+  Themes,
+  ThemeReader,
+  Living,
+  Today,
+  Archive,
+  Calendar,
+  YearReview,
+  EntryReader,
+  Projects,
+  ProjectPage
+];
 
 function slowNetwork(): boolean {
   const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;

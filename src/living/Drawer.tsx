@@ -15,9 +15,9 @@ import {
   type Src
 } from './settings';
 
-/** An optional part of the source that came with the link: a place, theme, city or user. */
+/** An optional part of the source that came with the link: a place, theme, entry, entry types, city or user. */
 export interface Scope {
-  key: 'place' | 'theme' | 'city' | 'user';
+  key: 'place' | 'theme' | 'entry' | 'types' | 'city' | 'user';
   label: string;
   on: boolean;
   onToggle: () => void;
@@ -50,7 +50,8 @@ interface Props {
 const SRC_OPTIONS: [Src, string][] = [
   ['all', '全部'],
   ['tags', '标签'],
-  ['today', '那年今日']
+  ['today', '那年今日'],
+  ['entries', '记录']
 ];
 const FX_OPTIONS: [Fx, string][] = [
   ['drift', '缓慢推近'],
@@ -74,6 +75,7 @@ const SIZE_OPTIONS: [Size, string][] = [
 const FIELD_LABELS: Record<FieldKey, string> = {
   place: '地点',
   title: '标题',
+  entry: '记录',
   city: '城市',
   date: '日期',
   time: '时间',
@@ -228,7 +230,7 @@ export default function Drawer({
 
   const orderOptions: (readonly [Order, string])[] = [
     ['shuffle', '随机'],
-    ['time', s.src === 'theme' ? '主题顺序' : '按时间']
+    ['time', s.src === 'theme' ? '合集顺序' : s.src === 'entry' ? '记录顺序' : '按时间']
   ];
 
   return (

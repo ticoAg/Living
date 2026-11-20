@@ -10,16 +10,28 @@
 * [pois](pois.md) - 地点：名称、类别、中心点和匹配半径，全站共享
 * [photos](photos.md) - 照片：位置、拍摄参数、文件键、尺寸图信息、可见性和位置精度
 * [photo_tags](photo-tags.md) - 照片与标签的多对多关联，记录标签来源
-* [themes](themes.md) - 主题：一次旅程或一个专题的标题、导语、封面、日期范围和公开范围
-* [theme_items](theme-items.md) - 主题的有序条目：照片、文字段落或日期分段
+* [themes](themes.md) - 合集：一次旅程或一个专题的标题、导语、封面、日期范围和公开范围
+* [theme_items](theme-items.md) - 合集的有序条目：照片、记录、文字段落或日期分段
+* [entries](entries.md) - 记录：发生时间、Markdown 正文、类型、状态和公开范围，可以只有文字
+* [entry_media](entry-media.md) - 记录与照片的多对多关联，带顺序和记录内的说明
+* [attachments](attachments.md) - 附件：记录里的视频、录音和其他文件，跟着记录的公开范围；R2 里的文件和每小时的清理
+* [entry_tags](entry-tags.md) - 记录与标签的多对多关联，与照片共用标签树但分开挂
+* [projects](projects.md) - 项目：一个持续的过程，有类型、起止日期、状态和公开范围
+* [entry_projects](entry-projects.md) - 记录与项目的多对多关联，只能放进作者自己的项目
+* [milestones](milestones.md) - 项目的里程碑：到达或计划的日子，带这一阶段的总结
 * [privacy_zones](privacy-zones.md) - 隐私区域：落在其中的照片上传时强制隐藏位置
+* [share_links](share-links.md) - 分享链接：一条记录、一个合集或一个项目的私密地址，可删除，可设有效期
 * [settings](settings.md) - 站点级键值设置，目前只有注册方式
 * [place_cache](place-cache.md) - 地点数据源的应答缓存：周边地点、名称搜索和逆地理，带过期时间，每小时清理
+
+# 演进
+
+* [数据演进](evolution.md) - 走向以记录为中心的数据计划：各阶段的表、主题如何成为合集、照片的默认可见性和迁移规则
 
 # KV 与 R2
 
 * [KV 会话与限流](kv.md) - 登录会话和登录限流计数；KV 的写入额度只留给登录
-* [R2 媒体文件](media.md) - 原图与三种尺寸图的对象键、访问规则和生命周期
+* [R2 媒体文件](media.md) - 原图、三种尺寸图和附件的对象键、访问规则和生命周期
 
 # 参考数据
 

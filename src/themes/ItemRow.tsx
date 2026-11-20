@@ -1,11 +1,13 @@
 import { memo, useId, type DragEvent } from 'react';
+import { entryLabel, entryTypeLabel, hasTime } from '../../shared/entries';
 import { THEME_ITEM_LIMITS } from '../../shared/limits';
-import type { Poi, Visibility } from '../../shared/types';
+import type { Poi, ThemeEntry, Visibility } from '../../shared/types';
 import Img from '../components/Img';
 import { CategoryIcon, Icon } from '../components/icons';
 import { fmtDay, fmtTime } from '../lib/format';
-import AutoTextarea from './AutoTextarea';
+import AutoTextarea from '../components/AutoTextarea';
 import type { DraftItem } from './draft';
+import { entryShown } from './items';
 import { fmtDayHeading } from './util';
 
 /** Callbacks shared by every row. The object is created once, so rows only re-render when their own data changes. */
@@ -14,7 +16,7 @@ export interface RowActions {
   move: (key: string, delta: -1 | 1) => void;
   remove: (key: string) => void;
   toggleMenu: (key: string) => void;
-  insert: (key: string, kind: 'text' | 'day' | 'photo') => void;
+  insert: (key: string, kind: 'text' | 'day' | 'photo' | 'entry') => void;
   dragStart: (key: string) => void;
   dragOver: (key: string, pos: 'before' | 'after') => void;
   drop: () => void;
@@ -34,12 +36,82 @@ interface Props {
 }
 
 const DRAG_TYPE = 'application/x-living-item';
-const KIND_NAME = { photo: '照片', text: '文字段落', day: '日期分段' } as const;
+const KIND_NAME = { photo: '照片', text: '文字段落', day: '日期分段', entry: '记录' } as const;
 
 const excerpt = (s: string, n = 56) => {
   const t = s.replace(/\s+/g, ' ').trim();
   return t.length > n ? `${t.slice(0, n)}…` : t;
 };
+
+/** Why readers of a shared theme will not see this entry, if they will not. */
+function unseenReason(e: ThemeEntry): string {
+  if (e.status === 'draft') return '草稿，读者看不到';
+  if (e.status === 'archived') return '已归档，读者看不到';
+  return entryShown(e) ? '' : '记录仅自己可见';
+}
+
+function EntryBody({
+  item,
+  uid,
+  themeVisibility,
+  actions
+}: {
+  item: Extract<DraftItem, { kind: 'entry' }>;
+  uid: string;
+  themeVisibility: Visibility;
+  actions: RowActions;
+}) {
+  const e = item.entry;
+  if (!e) return <p className="ed-meta">这条记录已不可用，保存时会从合集中移除。</p>;
+  const cover = e.photos[0];
+  const unseen = themeVisibility !== 'private' ? unseenReason(e) : '';
+  const hiddenPhotos = themeVisibility !== 'private' && !unseen ? e.photos.filter((p) => p.visibility === 'private').length : 0;
+  return (
+    <div className="ed-photo ed-entry">
+      <div className="ed-thumb">
+        {cover ? (
+          <Img photo={cover} ratio="4 / 3" sizes="120px" alt="" />
+        ) : (
+          <span className="ed-thumb-blank" aria-hidden="true">
+            <Icon name="note" size={20} />
+          </span>
+        )}
+      </div>
+      <div className="ed-photo-main">
+        <p className="ed-meta">
+          {e.type !== 'note' && <span>{entryTypeLabel(e.type)}</span>}
+          <span className="mono">
+            {fmtDay(e.occurredAt)}
+            {hasTime(e.occurredAt) && ` ${fmtTime(e.occurredAt)}`}
+          </span>
+          {e.photos.length > 0 && <span>{e.photos.length} 张照片</span>}
+          {unseen && <span className="ed-flag">{unseen}</span>}
+          {hiddenPhotos > 0 && <span className="ed-flag">{hiddenPhotos} 张照片仅自己可见</span>}
+        </p>
+        <p className="ed-entry-title">{entryLabel(e.title, e.excerpt, 60) || entryTypeLabel(e.type)}</p>
+        <div className="field">
+          <label className="label" htmlFor={`${uid}-t`}>
+            本合集说明
+          </label>
+          <AutoTextarea
+            id={`${uid}-t`}
+            className="textarea ed-ta"
+            rows={1}
+            maxLength={THEME_ITEM_LIMITS.captionMax}
+            value={item.text}
+            placeholder="写在这条记录前面，可不填"
+            onChange={(ev) => actions.patch(item.key, { text: ev.target.value })}
+          />
+        </div>
+        <p className="ed-note">
+          <a href={`/e/${e.id}`} target="_blank" rel="noopener">
+            打开记录
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, dragging, actions }: Props) {
   const uid = useId();
@@ -165,19 +237,19 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
                   </span>
                 )}
                 {photo.visibility === 'private' && themeVisibility !== 'private' && (
-                  <span className="ed-flag" title="照片本身是仅自己可见，读者在主题里看不到它">
+                  <span className="ed-flag" title="照片本身是仅自己可见，读者在合集里看不到它">
                     照片仅自己可见
                   </span>
                 )}
               </p>
             ) : (
-              <p className="ed-meta">这张照片已不可用，保存时会从主题中移除。</p>
+              <p className="ed-meta">这张照片已不可用，保存时会从合集中移除。</p>
             )}
             {photo && (
               <>
                 <div className="field">
                   <label className="label" htmlFor={`${uid}-t`}>
-                    本主题说明
+                    本合集说明
                   </label>
                   <AutoTextarea
                     id={`${uid}-t`}
@@ -200,6 +272,8 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
           </div>
         </div>
       )}
+
+      {item.kind === 'entry' && <EntryBody item={item} uid={uid} themeVisibility={themeVisibility} actions={actions} />}
 
       {item.kind === 'text' && (
         <div className="field">
@@ -257,6 +331,9 @@ function ItemRow({ item, index, total, poi, themeVisibility, menuOpen, dropPos, 
           <span className="small muted">在此项之后插入</span>
           <button type="button" className="btn btn-quiet" onClick={() => actions.insert(key, 'photo')}>
             照片
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={() => actions.insert(key, 'entry')}>
+            记录
           </button>
           <button type="button" className="btn btn-quiet" onClick={() => actions.insert(key, 'text')}>
             文字段落

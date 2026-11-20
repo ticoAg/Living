@@ -5,7 +5,7 @@ import { fmtDay } from '../lib/format';
 export const KIND_LABEL: Record<ThemeKind, string> = { trip: '旅程', topic: '专题' };
 export const VISIBILITY_LABEL: Record<Visibility, string> = { public: '公开', unlisted: '仅链接', private: '仅自己' };
 export const VISIBILITY_HINT: Record<Visibility, string> = {
-  public: '出现在主题列表，任何人都能阅读。',
+  public: '出现在合集列表，任何人都能阅读。',
   unlisted: '不进入列表，知道链接的人可以阅读。',
   private: '只有你能看到。'
 };

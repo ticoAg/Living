@@ -26,7 +26,7 @@ sources:
 
 # 定时任务
 
-`wrangler.jsonc` 的 `triggers.crons` 设为 `23 * * * *`：每小时第 23 分钟，Worker 的 `scheduled` 处理函数（`worker/index.ts`）做两件互不影响的事，一件失败不妨碍另一件。
+`wrangler.jsonc` 的 `triggers.crons` 设为 `23 * * * *`：每小时第 23 分钟，Worker 的 `scheduled` 处理函数（`worker/index.ts`）做三件互不影响的事，一件失败不妨碍其他。
 
 补全照片的省份（`worker/lib/regions.ts`）：
 
@@ -38,9 +38,13 @@ sources:
 
 - 删除 [place_cache](/data/place-cache.md) 里已过期的行，按 `expires_at` 的索引查找。读缓存时过期行本来就算未命中，清理只是不让表无限变大。
 
+清理附件（`worker/lib/attachments.ts`）：
+
+- 删掉不在记录里的 [附件](/data/attachments.md#清理)：没传完的一天以后，传完了没放进记录、或者从记录里去掉的七天以后；一次最多 200 个，先删行，再删 R2 里的文件、放弃没传完的分片上传。
+
 其他：
 
-- 结果写进 Workers Logs：`regions {"filled":…,"empty":…,"failed":…}` 和 `place cache {"purged":…}`。本地开发时用 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"` 触发一次。
+- 结果写进 Workers Logs：`regions {"filled":…,"empty":…,"failed":…}`、`place cache {"purged":…}` 和 `attachments {"purged":…}`。本地开发时用 `curl "http://localhost:5173/cdn-cgi/handler/scheduled"` 触发一次。
 - Cron 触发器在免费版里不另外计费，每次运行算一次请求。
 
 # 变量与密钥
@@ -61,7 +65,8 @@ sources:
 | `/assets/*`（文件名带内容哈希的 JS、CSS、Worker） | 同上 | `public/_headers` 设为一年、`immutable`，不再回源确认 |
 | `/media/` 下的公开尺寸图 | Worker 用 Cache API 存一份，命中时不读 D1 和 R2；照片改为私密或删除时清除当前机房的副本 | 一年、`immutable`：尺寸图只在上传时写入，之后不再改写 |
 | 原图、私密照片的尺寸图 | 不缓存 | `private, no-store` |
-| 列表接口（照片、标签、地点、主题） | 不缓存 | 未登录 `public, max-age=30`，登录后 `private, no-store`，都带 `Vary: Cookie` |
+| 附件的文件 | 不缓存：权限跟着记录，随时会变 | `private, no-store`；公开且已完成的记录里视频的画面 `private, max-age=3600` |
+| 列表接口（照片、标签、地点、合集） | 不缓存 | 未登录 `public, max-age=30`，登录后 `private, no-store`，都带 `Vary: Cookie` |
 | 其他接口 | 不缓存 | `no-store` |
 
 静态资源请求不调用 Worker，不占请求额度。构建缓存另见 [构建与发布](/architecture/ci-cd.md)。
@@ -76,6 +81,7 @@ sources:
 
 - 页面与静态文件的响应头写在 `public/_headers` 的 `/*` 规则里，和 `/assets/*` 的缓存规则叠加生效。
 - `/api` 由 `worker/index.ts` 的中间件统一加；`/media` 在 `worker/routes/media.ts` 里加，包括从 R2 读出的响应、Cache API 命中的副本和命中后的 304（缓存里的旧副本没有这些头，返回前补上）。
+- 附件的文件（PDF 以外）另带 `Content-Security-Policy: default-src 'none'; sandbox`，附件和画面都带 `Cross-Origin-Resource-Policy: same-origin`：上传的网页、SVG 不会在站点上运行，别的站点也嵌入不了，见 [附件接口](/api/attachments.md#文件)。
 - 不设完整的内容安全策略：地图的 Worker、内联样式和 `data:` 占位图都要放行，配错会让站点打不开。
 
 # 费用
@@ -86,7 +92,9 @@ sources:
 |---|---|---|
 | Workers | 每天 10 万次请求 | 每次 `/api`、`/media` 请求和每次定时任务 |
 | D1 | 5 GB（单库 500 MB）；每天 500 万行读取、10 万行写入 | 全部表，包括地点缓存 [place_cache](/data/place-cache.md)：每写一条缓存约记 3 行（连同索引） |
-| R2 | 10 GB 存储，无出站流量费 | 原图与尺寸图 |
+| R2 | 10 GB 存储，无出站流量费 | 原图、尺寸图和附件 |
 | KV | 每天 10 万次读、1000 次写、1000 次删除 | 只有会话和登录限流，见 [KV](/data/kv.md) |
+
+[导出](/product/features/export.md) 是请求最多的操作：每张照片的原文件一次 `/media` 请求，2 万张照片的档案约占一天 Worker 额度的五分之一（R2 每张一次 B 类操作，每月免费 1000 万次）。导出到同一个文件夹时只下载新的照片。[导入](/product/features/import.md) 最费 D1 的写入：每张照片一次上传、约写 10 行（连同索引），免费版一天大约能导入一万张，额度用完时所有接口返回 503 `quota_exceeded`，导入停下，第二天接着做；照片的四个文件各是一次 R2 的 A 类操作（每月免费 100 万次）。[搜索](/api/search.md#读取的行数) 每次要读一遍自己的记录、项目和合集，几千条记录读几千行。[附件](/api/attachments.md#用量) 按 16 MiB 一片上传，每片一次请求、一次 A 类操作，1 GB 的视频约 64 次；播放和拖动进度条各是一次请求和一次 B 类操作。视频最占 R2 的存储。
 
 KV 的写入额度最紧：会话写不进去时登录和注册返回 500，当天无法登录。所以 KV 只放会话和登录限流（每天约 500 次成功登录才会用完），地点与逆地理缓存放在 D1，批量上传再多照片也不占 KV 的写入。

@@ -3,11 +3,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { PHOTO_LIST_LIMIT, type PhotoDetail, type PhotoListResponse } from '../../shared/types';
 import {
+  addInvite,
   Client,
   expectStatus,
   JPEG,
   newSha,
   newUser,
+  PASSWORD,
   PNG,
   upload,
   uploadForm,
@@ -297,6 +299,48 @@ describe('POST /api/photos', () => {
     expect(await r2Keys()).toEqual(
       [first.variants.l.key, first.variants.m.key, first.variants.s.key, `o/${alice.me.id}/${first.id}.jpg`].sort()
     );
+  });
+});
+
+describe('who sees a new photo', () => {
+  it('is no one else for an account just registered, unless the upload names a visibility', async () => {
+    await addInvite(platform, 'NEWCOMER', 'member');
+    const carol = new Client(platform);
+    const signUp = { invite: 'NEWCOMER', handle: 'carol', displayName: 'Carol', password: PASSWORD };
+    expectStatus(await carol.post('/api/auth/register', signUp), 201);
+    const plain = await upload(carol);
+    expect(plain.visibility).toBe('private');
+    expect((await bob.get(`/api/photos/${plain.id}`)).status).toBe(404);
+    for (const visibility of ['public', 'unlisted', 'private'] as const) {
+      expect((await upload(carol, { visibility })).visibility, visibility).toBe(visibility);
+    }
+  });
+
+  it('is everyone for an account from before the setting, unless the upload names a visibility', async () => {
+    // newUser() writes such an account
+    const plain = await upload(alice);
+    expect(plain.visibility).toBe('public');
+    expect((await new Client(platform).get(`/api/photos/${plain.id}`)).status).toBe(200);
+    for (const visibility of ['unlisted', 'private'] as const) {
+      expect((await upload(alice, { visibility })).visibility, visibility).toBe(visibility);
+    }
+  });
+
+  it('follows a changed setting from the next upload on, and leaves the photos already uploaded as they were', async () => {
+    const earlier = await upload(alice);
+    expectStatus(await alice.patch('/api/me', { photoVisibility: 'unlisted' }), 200);
+    const later = await upload(alice);
+    const named = await upload(alice, { visibility: 'public' });
+    expectStatus(await alice.patch('/api/me', { photoVisibility: 'private' }), 200);
+    const last = await upload(alice);
+    expect([earlier, later, named, last].map((p) => p.visibility)).toEqual(['public', 'unlisted', 'public', 'private']);
+    // as stored once both changes are made
+    expect(await rows('SELECT id, visibility FROM photos WHERE owner_id = ?1 ORDER BY rowid', alice.me.id)).toEqual([
+      { id: earlier.id, visibility: 'public' },
+      { id: later.id, visibility: 'unlisted' },
+      { id: named.id, visibility: 'public' },
+      { id: last.id, visibility: 'private' }
+    ]);
   });
 });
 

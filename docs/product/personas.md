@@ -1,7 +1,7 @@
 ---
 type: Persona Set
 title: 用户与场景
-description: 旅行者、日常记录者、访客三类用户，以及每类用户最常做的事。
+description: 旅行者、日常记录者、学习与创作者、访客，以及每类用户最常做的事。
 tags: [product]
 ---
 # 旅行者
@@ -9,7 +9,7 @@ tags: [product]
 一年出门几次，每次回来手机里多出几百张照片。
 
 - 回来当晚批量上传，地点自动匹配好，只确认几张拿不准的。
-- 把这次旅行建成一个 [主题](/product/features/themes.md)，按天排好，给几张照片写笔记，生成 [游记](/product/features/travelogue.md) 发给朋友。
+- 把这次旅行建成一个 [合集](/product/features/themes.md)，按天排好，给几张照片写笔记，生成 [游记](/product/features/travelogue.md) 发给朋友。
 - 几年后在 [地图](/product/features/map.md) 上看自己去过哪里。
 
 # 日常记录者
@@ -20,11 +20,20 @@ tags: [product]
 - 在 [地点页](/product/features/places.md) 看同一个地方四季的样子。
 - 把旧平板放在客厅，开着 [Living 模式](/product/features/living-mode.md) 当相框。
 
+# 学习与创作者
+
+在学一样东西或做一件长期的事：练书法、读书、写作、画画。
+
+- 每天练完在 [今天](/product/features/today.md) 记一笔，有时带一张作品照片，大多数时候只有一两句话。
+- 读完一章写一篇 [记录](/product/features/entries.md)，类型选「阅读」，打上书名的标签。
+- 隔一段时间在 [档案](/product/features/archive.md) 里只看「练习」，看出这几个月的变化。
+- 这些记录默认只有自己能看到；偶尔把满意的一篇设为公开。
+
 # 访客
 
 朋友或陌生人，通过分享链接进来，不需要注册。
 
-- 浏览公开的图库、主题和游记。
+- 浏览公开的图库、合集、游记和作者公开的记录。
 - 在地图上找到某个地点的照片。
 - 看不到任何非公开内容和被隐藏的坐标。
 

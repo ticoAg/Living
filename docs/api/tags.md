@@ -14,7 +14,7 @@ tags: [api, tags]
 | （无，已登录） | 预置标签 + 请求者自己的标签 |
 | `owner=<handle>` | 预置标签 + 该用户的标签 |
 
-`count`：直接带该标签、且对请求者可见的照片数（有 `owner` 时只算该用户的照片）。
+`count`：直接带该标签、且对请求者可见的照片数（有 `owner` 时只算该用户的照片）。`entryCount`：直接带该标签、请求者能在列表里看到的 [记录](/api/entries.md) 数（他人：公开且已完成；本人：全部），`owner` 同样生效。
 
 # POST /api/tags（登录）
 
@@ -30,4 +30,4 @@ tags: [api, tags]
 
 # DELETE /api/tags/:id
 
-删除该标签及全部子孙（递归 CTE），并删除对应的 `photo_tags` → `{ "ok": true, "deleted": <数量> }`。权限同 PATCH。删除预置标签（只有 owner/admin 能删）时，其他用户挂在它下面的标签也会一并删除并计入数量。
+删除该标签及全部子孙（递归 CTE），并删除对应的 `photo_tags` 和 `entry_tags` → `{ "ok": true, "deleted": <数量> }`。权限同 PATCH。删除预置标签（只有 owner/admin 能删）时，其他用户挂在它下面的标签也会一并删除并计入数量。

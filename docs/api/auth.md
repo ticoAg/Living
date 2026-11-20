@@ -1,7 +1,7 @@
 ---
 type: API
 title: 认证与站点
-description: 站点信息、注册、登录、退出、当前用户与个人资料接口。
+description: 站点信息、注册、登录、退出、当前用户与个人资料接口，包括新照片的默认公开范围。
 tags: [api, account]
 ---
 # GET /api/site
@@ -14,9 +14,9 @@ tags: [api, account]
 
 # POST /api/auth/register
 
-请求 `{ "invite"?: string, "handle": string, "displayName": string, "password": string }` → 201 `{ "user": SessionUser }` 并设置会话 Cookie。
+请求 `{ "invite"?: string, "handle": string, "displayName": string, "password": string }` → 201 `{ "user": SessionUser }` 并设置会话 Cookie。新账号的 `photoVisibility` 为 `private`。
 
-- `handle`：`^[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}$`，不区分大小写唯一，且不在保留名单（admin api media living login register settings studio themes upload map index place t p www root owner）。
+- `handle`：`^[a-zA-Z0-9][a-zA-Z0-9_-]{2,23}$`，不区分大小写唯一，且不在保留名单（admin api media living login register settings studio themes upload map index place t p www root owner today archive entries e projects s search）。
 - `password`：至少 8 个字符。`displayName`：1–40 字符。
 - `needsSetup` 时必须提供角色为 `owner` 的有效邀请码。之后按 `registration`：`invite` 需要有效邀请码；`open` 不需要（提供则按邀请码角色）；`closed` 返回 403。
 - 邀请码有效 = 存在、未使用、未过期；使用后写入 `used_by`、`used_at`，用户角色取邀请码的 `role`。
@@ -33,7 +33,9 @@ tags: [api, account]
 
 # PATCH /api/me（登录）
 
-请求 `{ "displayName"?, "bio"?, "avatarPhotoId"? }`（头像必须是自己的照片）→ `{ "user": SessionUser }`。
+请求 `{ "displayName"?, "bio"?, "avatarPhotoId"?, "photoVisibility"? }`（头像必须是自己的照片）→ `{ "user": SessionUser }`。
+
+`photoVisibility`（`public` / `unlisted` / `private`）：新照片的默认公开范围，上传时没有指定公开范围的照片按它保存。只影响以后的上传，已有照片的公开范围不变。新注册的账号是 `private`；这项设置出现之前就有的账号是 `public`，与之前的上传行为一致，见 [users](/data/users.md#新照片的默认公开范围)。
 
 # POST /api/me/password（登录）
 

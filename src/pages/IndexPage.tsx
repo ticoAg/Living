@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'wouter';
 import { usePhotoList, usePoiList, useTagTree } from '../browse/api';
 import { useDocTitle, useScrollTop } from '../browse/hooks';
+import LibraryTabs from '../browse/LibraryTabs';
 import { galleryLink } from '../browse/links';
 import { LoadError, Loading, TruncatedNote } from '../browse/ui';
 import { CategoryIcon } from '../components/icons';
@@ -138,6 +139,7 @@ export default function IndexPage() {
 
   return (
     <main className="page bw idx">
+      <LibraryTabs />
       <div className="idx-head">
         <h1 className="display idx-h1">索引</h1>
         <p className="idx-totals mono">

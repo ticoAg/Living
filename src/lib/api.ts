@@ -18,6 +18,8 @@ interface ApiOptions {
   /** raw body, e.g. FormData */
   body?: BodyInit;
   signal?: AbortSignal;
+  /** As a visitor: without cookies, and past the browser's cache, which keeps a visitor's lists for 30 seconds. */
+  anonymous?: boolean;
 }
 
 // A 401 from anything but /api/auth/* means the session ended (expired after 30 days, or signed out elsewhere).
@@ -41,9 +43,10 @@ export function reportUnauthenticated(path: string): void {
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const init: RequestInit = {
     method: opts.method ?? (opts.json !== undefined || opts.body !== undefined ? 'POST' : 'GET'),
-    credentials: 'same-origin',
+    credentials: opts.anonymous ? 'omit' : 'same-origin',
     signal: opts.signal
   };
+  if (opts.anonymous) init.cache = 'no-store';
   if (opts.json !== undefined) {
     init.headers = { 'content-type': 'application/json' };
     init.body = JSON.stringify(opts.json);
@@ -61,7 +64,8 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     }
   }
   if (!res.ok) {
-    if (res.status === 401) reportUnauthenticated(path);
+    // a visitor's 401 says nothing about the session
+    if (res.status === 401 && !opts.anonymous) reportUnauthenticated(path);
     const e = (data ?? {}) as Partial<ApiErrorBody>;
     throw new ApiError(res.status, e.error ?? `http_${res.status}`, e.message ?? '请求失败，请稍后再试', e);
   }

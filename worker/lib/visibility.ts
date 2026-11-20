@@ -6,6 +6,16 @@
 //  - poi:   places offered in matching and search → provider places, the viewer's own custom places, and custom
 //           places used by a public photo whose location may be shown
 //
+// Entries add a status to the visibility: others only ever see finished (`published`) entries. Drafts and archived
+// entries are their author's alone, whatever their visibility says.
+//
+// A container shown to someone (a theme, an entry, a project) shows only what they could open by id: making it
+// public never makes a private photo or entry public.
+//
+// A share link (lib/shares.ts) opens one item and what is shown in it for whoever holds the link: the by-id helpers
+// take the owner of that item as `grant`, and pass that owner's content whatever its visibility. Entries must still be
+// finished; locations still follow `loc`, as for anyone else.
+//
 // Each helper registers its parameter on `q` and returns SQL text; `a` is the table alias.
 
 import type { Sql } from './sql';
@@ -14,8 +24,9 @@ export function photoList(q: Sql, viewer: string | null, a = 'p'): string {
   return viewer ? `(${a}.visibility = 'public' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility = 'public'`;
 }
 
-export function photoById(q: Sql, viewer: string | null, a = 'p'): string {
-  return viewer ? `(${a}.visibility != 'private' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility != 'private'`;
+export function photoById(q: Sql, viewer: string | null, a = 'p', grant: string | null = null): string {
+  const shown = viewer ? `(${a}.visibility != 'private' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility != 'private'`;
+  return grant ? `(${shown} OR ${a}.owner_id = ${q.p(grant)})` : shown;
 }
 
 export function photoLocation(q: Sql, viewer: string | null, a = 'p'): string {
@@ -24,6 +35,33 @@ export function photoLocation(q: Sql, viewer: string | null, a = 'p'): string {
 
 export function themeList(q: Sql, viewer: string | null, a = 'th'): string {
   return viewer ? `(${a}.visibility = 'public' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility = 'public'`;
+}
+
+/** Projects in lists and counts: public ones, plus every project of the viewer's own. Their status hides nothing. */
+export function projectList(q: Sql, viewer: string | null, a = 'pj'): string {
+  return viewer ? `(${a}.visibility = 'public' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility = 'public'`;
+}
+
+/** Projects that open by id or link: public and unlisted ones, plus every project of the viewer's own. */
+export function projectById(q: Sql, viewer: string | null, a = 'pj', grant: string | null = null): string {
+  const shown = viewer ? `(${a}.visibility != 'private' OR ${a}.owner_id = ${q.p(viewer)})` : `${a}.visibility != 'private'`;
+  return grant ? `(${shown} OR ${a}.owner_id = ${q.p(grant)})` : shown;
+}
+
+/** Entries in lists and counts: finished public ones, plus every entry of the viewer's own. */
+export function entryList(q: Sql, viewer: string | null, a = 'e'): string {
+  const shown = `(${a}.visibility = 'public' AND ${a}.status = 'published')`;
+  return viewer ? `(${shown} OR ${a}.owner_id = ${q.p(viewer)})` : shown;
+}
+
+/**
+ * Entries that open by id or link: finished public and unlisted ones, plus every entry of the viewer's own; with a
+ * share link's `grant`, also that owner's finished private ones.
+ */
+export function entryById(q: Sql, viewer: string | null, a = 'e', grant: string | null = null): string {
+  const shown = `(${a}.visibility != 'private' AND ${a}.status = 'published')`;
+  const granted = grant ? ` OR (${a}.owner_id = ${q.p(grant)} AND ${a}.status = 'published')` : '';
+  return viewer ? `(${shown} OR ${a}.owner_id = ${q.p(viewer)}${granted})` : granted ? `(${shown}${granted})` : shown;
 }
 
 /**

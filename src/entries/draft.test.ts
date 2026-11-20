@@ -1,0 +1,282 @@
+import { describe, expect, it } from 'vite-plus/test';
+import { ATTACHMENT_LIMITS, ENTRY_LIMITS } from '../../shared/limits';
+import { attachment, entryDetail, photo } from '../test-utils';
+import {
+  addAttachments,
+  addMedia,
+  changedFields,
+  draftFromEntry,
+  draftProblem,
+  emptyDraft,
+  isEmptyDraft,
+  moveMedia,
+  occurredAtOf,
+  parseBackup,
+  payloadOf,
+  type EntryDraft
+} from './draft';
+
+const at = new Date(2026, 10, 16, 8, 30, 15);
+const place = { id: 'poi_lake', name: '西湖', category: 'scenic', city: '杭州', district: null };
+/** the place as an entry carries it, with its position */
+const located = { ...place, lat: 30.25, lng: 120.15 };
+const held = (id: string, caption = '') => ({ attachmentId: id, caption, attachment: attachment(id) });
+
+describe('emptyDraft', () => {
+  it('is a private note of this moment', () => {
+    const d = emptyDraft(at, '一句话');
+    expect(d).toMatchObject({
+      type: 'note',
+      body: '一句话',
+      date: '2026-11-16',
+      time: '08:30',
+      visibility: 'private',
+      media: [],
+      poi: null
+    });
+    expect(payloadOf(d).poiId).toBeNull();
+    expect(occurredAtOf(d)).toBe('2026-11-16T08:30:15');
+  });
+
+  it('starts as a project asks: its kind of entry, in it', () => {
+    const d = emptyDraft(at, '', { type: 'practice', projectIds: ['pj_1'] });
+    expect(d).toMatchObject({ type: 'practice', projectIds: ['pj_1'], body: '' });
+    expect(payloadOf(d).projectIds).toEqual(['pj_1']);
+    expect(payloadOf({ ...d, projectIds: ['pj_2', 'pj_1'] }).projectIds).toEqual(['pj_1', 'pj_2']);
+  });
+
+  it('starts on another day for the whole day, and on today at this moment', () => {
+    const past = emptyDraft(at, '', { date: '2026-03-02' });
+    expect(past).toMatchObject({ date: '2026-03-02', time: '', heldTime: '' });
+    expect(payloadOf(past).occurredAt).toBe('2026-03-02');
+    expect(emptyDraft(at, '', { date: '2026-11-16' })).toMatchObject({ date: '2026-11-16', time: '08:30' });
+  });
+
+  it('starts with the recordings a quick note hands over, each once', () => {
+    const rec = attachment('at_r', { kind: 'audio', name: '录音.webm', mime: 'audio/webm', poster: false });
+    const d = emptyDraft(at, '路上想到的', { attachments: [rec, rec] });
+    expect(d.attachments).toEqual([{ attachmentId: 'at_r', caption: '', attachment: rec }]);
+    expect(payloadOf(d).attachments).toEqual([{ attachmentId: 'at_r', caption: null }]);
+    expect(isEmptyDraft(emptyDraft(at, '', { attachments: [rec] }))).toBe(false);
+  });
+});
+
+describe('draftFromEntry', () => {
+  it('reads a saved entry back into the form, and the same payload comes out', () => {
+    const e = entryDetail('en_1', {
+      type: 'reading',
+      title: '长安的荔枝',
+      body: '第一章',
+      occurredAt: '2026-11-16T21:05:42',
+      visibility: 'unlisted',
+      media: [{ photoId: 'ph_a', caption: null, photo: photo('ph_a') }],
+      attachments: [
+        { ...attachment('at_v'), caption: '湖边' },
+        { ...attachment('at_f', { kind: 'file', name: '票.pdf', mime: 'application/pdf' }), caption: null }
+      ],
+      tagIds: ['t_1'],
+      projectIds: ['pj_1'],
+      poi: located
+    });
+    const d = draftFromEntry(e);
+    expect(d).toMatchObject({ title: '长安的荔枝', date: '2026-11-16', time: '21:05', heldTime: '21:05:42' });
+    expect(d.attachments.map((a) => [a.caption, a.attachment])).toEqual([
+      ['湖边', attachment('at_v')],
+      ['', attachment('at_f', { kind: 'file', name: '票.pdf', mime: 'application/pdf' })]
+    ]);
+    expect(payloadOf(d)).toEqual({
+      type: 'reading',
+      title: '长安的荔枝',
+      body: '第一章',
+      occurredAt: '2026-11-16T21:05:42',
+      visibility: 'unlisted',
+      media: [{ photoId: 'ph_a', caption: null }],
+      attachments: [
+        { attachmentId: 'at_v', caption: '湖边' },
+        { attachmentId: 'at_f', caption: null }
+      ],
+      tagIds: ['t_1'],
+      projectIds: ['pj_1'],
+      poiId: 'poi_lake'
+    });
+  });
+
+  it('reads a day-only time as no time', () => {
+    const d = draftFromEntry(entryDetail('en_1', { occurredAt: '2026-11-16', title: null, body: null }));
+    expect(d).toMatchObject({ date: '2026-11-16', time: '', heldTime: '', title: '', body: '' });
+    expect(occurredAtOf(d)).toBe('2026-11-16');
+  });
+});
+
+describe('occurredAtOf', () => {
+  const base: EntryDraft = emptyDraft(at);
+
+  it('keeps the seconds while the minute stays, and drops them when it changes', () => {
+    expect(occurredAtOf({ ...base, time: '08:30' })).toBe('2026-11-16T08:30:15');
+    expect(occurredAtOf({ ...base, time: '08:31' })).toBe('2026-11-16T08:31:00');
+    expect(occurredAtOf({ ...base, date: '2026-11-15' })).toBe('2026-11-15T08:30:15');
+  });
+
+  it('is the day alone without a time', () => {
+    expect(occurredAtOf({ ...base, time: '' })).toBe('2026-11-16');
+  });
+});
+
+describe('payloadOf', () => {
+  it('sends blank fields as null and trims titles and captions, but not the text', () => {
+    const d: EntryDraft = {
+      ...emptyDraft(at),
+      title: '  ',
+      body: '\n  缩进的第一行\n',
+      media: [{ photoId: 'ph_a', caption: ' 说明 ', photo: null }],
+      attachments: [held('at_a', ' 录音 '), held('at_b', '  ')]
+    };
+    expect(payloadOf(d)).toMatchObject({
+      title: null,
+      body: '\n  缩进的第一行\n',
+      media: [{ photoId: 'ph_a', caption: '说明' }],
+      attachments: [
+        { attachmentId: 'at_a', caption: '录音' },
+        { attachmentId: 'at_b', caption: null }
+      ]
+    });
+    expect(payloadOf({ ...d, body: ' \n ' }).body).toBeNull();
+  });
+});
+
+describe('changedFields', () => {
+  it('names only what differs from what was sent', () => {
+    const before = payloadOf(emptyDraft(at, '一'));
+    const after = payloadOf({ ...emptyDraft(at, '一二'), tagIds: [] });
+    expect(changedFields(after, before)).toEqual({ body: '一二' });
+    expect(changedFields(before, before)).toEqual({});
+  });
+
+  it('sends everything when nothing was sent yet', () => {
+    const p = payloadOf(emptyDraft(at, '一'));
+    expect(changedFields(p, null)).toEqual(p);
+  });
+
+  it('notices a change of order among the photos', () => {
+    const one = { photoId: 'a', caption: null };
+    const two = { photoId: 'b', caption: null };
+    const p = payloadOf(emptyDraft(at, '一'));
+    expect(changedFields({ ...p, media: [two, one] }, { ...p, media: [one, two] })).toEqual({ media: [two, one] });
+  });
+});
+
+describe('isEmptyDraft and draftProblem', () => {
+  const d = emptyDraft(at);
+
+  it('call a draft with no words, no photo and no attachment empty', () => {
+    expect(isEmptyDraft(d)).toBe(true);
+    expect(isEmptyDraft({ ...d, body: '  \n' })).toBe(true);
+    expect(isEmptyDraft({ ...d, title: '题' })).toBe(false);
+    expect(isEmptyDraft({ ...d, media: [{ photoId: 'a', caption: '', photo: null }] })).toBe(false);
+    expect(isEmptyDraft({ ...d, attachments: [held('at_a')] })).toBe(false);
+  });
+
+  it('need a day, and a time if any in hours and minutes', () => {
+    expect(draftProblem(d)).toBeNull();
+    expect(draftProblem({ ...d, date: '' })).toBe('请填写日期');
+    expect(draftProblem({ ...d, time: '8' })).toBe('时间格式应为 时:分');
+  });
+
+  it('hold the server’s limits, counted in characters', () => {
+    expect(draftProblem({ ...d, title: '字'.repeat(ENTRY_LIMITS.titleMax) })).toBeNull();
+    expect(draftProblem({ ...d, title: '字'.repeat(ENTRY_LIMITS.titleMax + 1) })).toBe(`标题最多 ${ENTRY_LIMITS.titleMax} 个字符`);
+    expect(draftProblem({ ...d, body: '😀'.repeat(ENTRY_LIMITS.bodyMax + 1) })).toBe(`正文最多 ${ENTRY_LIMITS.bodyMax} 个字符`);
+    expect(draftProblem({ ...d, media: [{ photoId: 'a', caption: '字'.repeat(ENTRY_LIMITS.captionMax + 1), photo: null }] })).toBe(
+      `第 1 张照片的说明最多 ${ENTRY_LIMITS.captionMax} 个字符`
+    );
+    const many = Array.from({ length: ATTACHMENT_LIMITS.perEntry + 1 }, (_, i) => held(`at_${i}`));
+    expect(draftProblem({ ...d, attachments: many.slice(1) })).toBeNull();
+    expect(draftProblem({ ...d, attachments: many })).toBe(`一条记录最多 ${ATTACHMENT_LIMITS.perEntry} 个附件`);
+    const long = '字'.repeat(ATTACHMENT_LIMITS.captionMax);
+    expect(draftProblem({ ...d, attachments: [held('at_a'), held('at_b', ` ${long} `)] })).toBeNull();
+    expect(draftProblem({ ...d, attachments: [held('at_a'), held('at_b', `${long}字`)] })).toBe(
+      `第 2 个附件的说明最多 ${ATTACHMENT_LIMITS.captionMax} 个字符`
+    );
+  });
+});
+
+describe('addMedia and moveMedia', () => {
+  const m = (id: string) => ({ photoId: id, caption: '', photo: null });
+
+  it('adds new photos at the end, in the order picked', () => {
+    const out = addMedia([m('a')], [photo('b'), photo('a'), photo('c'), photo('b')]);
+    expect(out.map((x) => x.photoId)).toEqual(['a', 'b', 'c']);
+    expect(out[1].photo?.id).toBe('b');
+  });
+
+  it('moves a photo within the list', () => {
+    const list = [m('a'), m('b'), m('c')];
+    expect(moveMedia(list, 0, 1).map((x) => x.photoId)).toEqual(['b', 'a', 'c']);
+    expect(moveMedia(list, 2, -1).map((x) => x.photoId)).toEqual(['a', 'c', 'b']);
+    expect(moveMedia(list, 0, -1).map((x) => x.photoId)).toEqual(['a', 'b', 'c']);
+    expect(moveMedia(list, 2, 5).map((x) => x.photoId)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('add new attachments at the end, and move them as photos', () => {
+    const out = addAttachments([held('at_a', '说明')], [attachment('at_b'), attachment('at_a'), attachment('at_c', { kind: 'audio' })]);
+    expect(out.map((x) => [x.attachmentId, x.caption])).toEqual([
+      ['at_a', '说明'],
+      ['at_b', ''],
+      ['at_c', '']
+    ]);
+    expect(out[2].attachment.kind).toBe('audio');
+    expect(moveMedia(out, 2, -2).map((x) => x.attachmentId)).toEqual(['at_c', 'at_a', 'at_b']);
+  });
+});
+
+describe('parseBackup', () => {
+  const draft = {
+    ...emptyDraft(at, '未保存的一段'),
+    media: [{ photoId: 'ph_a', caption: '说明', photo: photo('ph_a') }],
+    attachments: [
+      held('at_v', '湖边'),
+      { ...held('at_r'), attachment: attachment('at_r', { kind: 'audio', mime: 'audio/webm', width: null, height: null, poster: false }) }
+    ]
+  };
+
+  it('reads back what was stored', () => {
+    const raw = JSON.stringify({ draft, at: '2026-11-16T00:30:00.000Z' });
+    expect(parseBackup(raw)).toEqual({ draft, at: '2026-11-16T00:30:00.000Z' });
+  });
+
+  it('refuses what is not a backup', () => {
+    for (const raw of [null, '', '{', '[]', '{"draft":{}}', JSON.stringify({ draft: { ...draft, type: 'diary' }, at: 'x' })]) {
+      expect(parseBackup(raw)).toBeNull();
+    }
+    expect(parseBackup(JSON.stringify({ draft: { ...draft, media: [{ photoId: 1 }] }, at: 'x' }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ draft: { ...draft, tagIds: [1] }, at: 'x' }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ draft: { ...draft, projectIds: 'pj_1' }, at: 'x' }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ draft: { ...draft, poi: 'poi_lake' }, at: 'x' }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ draft: { ...draft, poi: { id: 'poi_lake' } }, at: 'x' }))).toBeNull();
+    const [one] = draft.attachments;
+    for (const attachments of [
+      'at_v',
+      [null],
+      [{ ...one, attachmentId: 1 }],
+      [{ ...one, caption: null }],
+      [{ ...one, attachmentId: 'at_w' }],
+      [{ ...one, attachment: null }],
+      [{ ...one, attachment: { ...one.attachment, kind: 'image' } }],
+      [{ ...one, attachment: { ...one.attachment, size: '3 MB' } }],
+      [{ ...one, attachment: { ...one.attachment, duration: undefined } }],
+      [{ ...one, attachment: { ...one.attachment, poster: 1 } }]
+    ]) {
+      expect(parseBackup(JSON.stringify({ draft: { ...draft, attachments }, at: 'x' })), JSON.stringify(attachments)).toBeNull();
+    }
+  });
+
+  it('keeps the place it was given', () => {
+    const raw = JSON.stringify({ draft: { ...draft, poi: place }, at: 'x' });
+    expect(parseBackup(raw)?.draft.poi).toEqual(place);
+  });
+
+  it('reads a copy kept before entries had projects, places or attachments as in none', () => {
+    const { projectIds: _gone, poi: _none, attachments: _left, ...older } = draft;
+    expect(parseBackup(JSON.stringify({ draft: older, at: 'x' }))?.draft).toMatchObject({ projectIds: [], poi: null, attachments: [] });
+  });
+});

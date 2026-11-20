@@ -2,7 +2,7 @@
 // write the rows in one D1 batch. docs/api/photos.md#post-apiphotos登录
 
 import { distance } from '../../shared/geo';
-import type { GeoPrivacy, PoiMethod, Variants } from '../../shared/types';
+import type { GeoPrivacy, PoiMethod, Variants, Visibility } from '../../shared/types';
 import { duplicate, invalid, tooLarge, upstream } from './http';
 import {
   isFile,
@@ -61,6 +61,8 @@ export interface UploadFiles {
 export interface Upload {
   photoId: string;
   ownerId: string;
+  /** the uploader's setting, for a photo whose meta names no visibility */
+  defaultVisibility: Visibility;
   form: UploadForm;
   refs: UploadRefs;
   files: UploadFiles;
@@ -236,7 +238,7 @@ export function photoRecord(upload: Upload, poi: PoiRow | null, now: string): Re
     palette: meta.palette ? JSON.stringify(meta.palette) : null,
     focus_x: meta.focus?.[0] ?? null,
     focus_y: meta.focus?.[1] ?? null,
-    visibility: meta.visibility,
+    visibility: meta.visibility ?? upload.defaultVisibility,
     in_living: meta.inLiving,
     favorite: meta.favorite,
     sha256: meta.sha256,

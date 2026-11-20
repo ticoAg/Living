@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import type { PhotoDetail } from '../../shared/types';
 import { ApiError } from '../lib/api';
-import { fmtLongDay } from '../lib/format';
+import { fmtLongDay, localDay } from '../lib/format';
 import { inclusiveCounts } from '../lib/tags';
 import { useApi } from '../lib/useApi';
 import Caption from '../living/Caption';
@@ -26,8 +26,6 @@ import '../styles/living.css';
 // Parameters, storage, the playlist and the page's state live in src/living/ (data, playback, bar, drawer, keys);
 // this page wires them to the screen.
 
-const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
 export default function Living() {
   const [, navigate] = useLocation();
   const [init] = useState(() => readInitial());
@@ -39,7 +37,14 @@ export default function Living() {
   // One shuffle per visit: same order until the page is reloaded.
   const [seed] = useState(() => Math.floor(Math.random() * 4294967296));
   // What the link opened with, so the drawer can offer to switch those parts on and off again.
-  const [scope0] = useState(() => ({ place: init.source.place, theme: init.source.theme, city: init.source.city, user: init.source.user }));
+  const [scope0] = useState(() => ({
+    place: init.source.place,
+    theme: init.source.theme,
+    entry: init.source.src === 'entry' ? init.source.entry : '',
+    types: init.source.src === 'entries' ? init.source.types : [],
+    city: init.source.city,
+    user: init.source.user
+  }));
 
   const rootRef = useRef<HTMLElement>(null);
   const touched = useRef(false);
@@ -51,7 +56,7 @@ export default function Living() {
   useWakeLock(settings.awake);
   const drawer = useDrawer();
 
-  const today = localDate(now);
+  const today = localDay(now);
   const data = useLivingData({ source, settings, drawerEverOpened: drawer.everOpened, startId, seed, today });
   const { photos, status, activeRes, tagsRes, tree, poiById } = data;
   const play = usePlayback({ playlist: data.playlist, firstId: init.start, everySec: settings.every, hidden });
@@ -84,7 +89,7 @@ export default function Living() {
 
   const playAll = useCallback(() => {
     const plain = source.src === 'all' && !source.city && !source.user;
-    changeSource({ src: 'all', tags: [], place: '', theme: '', city: '', user: '', order: 'shuffle' });
+    changeSource({ src: 'all', tags: [], place: '', theme: '', entry: '', types: [], city: '', user: '', order: 'shuffle' });
     if (plain) activeRes.reload();
     rerender((v) => v + 1);
   }, [source, changeSource, activeRes]);
@@ -129,19 +134,32 @@ export default function Living() {
 
   const poi = cur?.poiId ? (poiById.get(cur.poiId) ?? null) : null;
   const tagName = useCallback((id: string) => tree?.byId.get(id)?.name ?? null, [tree]);
+  const entryName = cur ? (data.entryOf.get(cur.id) ?? null) : null;
   const caption = useMemo(
     () =>
       cur
-        ? buildCaption(cur, { fields: fieldSet, poi, tagName, detail: detail && detail.id === cur.id ? detail : null, today: now })
+        ? buildCaption(cur, {
+            fields: fieldSet,
+            poi,
+            tagName,
+            detail: detail && detail.id === cur.id ? detail : null,
+            today: now,
+            entry: entryName
+          })
         : null,
-    [cur, fieldSet, poi, tagName, detail, now]
+    [cur, fieldSet, poi, tagName, detail, now, entryName]
   );
   const showCaption = !!cur && hasCaption(caption);
 
   const effectiveFx = settings.fx === 'drift' && reduced ? 'fade' : settings.fx;
   const dimmed = settings.night && (now.getHours() >= 22 || now.getHours() < 7);
 
-  const names: SourceNames = { place: (id) => poiById.get(id)?.name, themeTitle: data.themeTitle, tag: (id) => tree?.byId.get(id)?.name };
+  const names: SourceNames = {
+    place: (id) => poiById.get(id)?.name,
+    themeTitle: data.themeTitle,
+    entryTitle: data.entryTitle,
+    tag: (id) => tree?.byId.get(id)?.name
+  };
   const summary = summaryLine(source, names, status, n);
 
   /* -------------------------------------------------------------- drawer */
@@ -205,7 +223,7 @@ export default function Living() {
       {(bar.shown || settings.clock) && <div className="lv-scrim lv-scrim-top" aria-hidden="true" />}
 
       <p className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
-        {cur ? announceText(cur, poi) : status === 'loading' ? '载入中' : ''}
+        {cur ? announceText(cur, poi, entryName) : status === 'loading' ? '载入中' : ''}
       </p>
 
       <div className="lv-brand" data-hidden={!bar.shown}>

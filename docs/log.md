@@ -1,5 +1,56 @@
 # Directory Update Log
 
+## 2026-11-20
+* **Creation**: [媒体库](/product/features/library.md)（`/library`，登录后图库的第四个标签页）：自己的照片、视频、音频和文件，各有多少、多大；照片和附件都能筛出不在任何记录里的；附件写着在哪条记录里，或者不在记录里、几天后删去，可以下载、删除；「选择」几张照片和不在记录里的附件，「写一条记录」打开编辑器，它们已经放好，日期是照片里最早的拍摄日。接口 [`GET /api/library`](/api/library.md) 一次给出附件和它们所在的记录、删去的时间、各类的数量和大小，以及自己的记录用到了哪些照片；不加表。
+* **Creation**: [图库的记录一层](/product/features/gallery.md#记录)：首页筛选栏最前面切换「照片 | 记录」（`?layer=entries`），所有人公开的已完成记录和作品一样排成格子，按类型筛选（`type=`），Living 放这些记录里的照片。
+* **Creation**: [Living 放记录](/product/features/living-mode.md#记录)：`src=entry&entry=<id>` 按一条记录里的顺序放它的照片，记录页有照片时最下面有 Living；`src=entries` 放已完成记录里的照片（`type=`、`user=` 可选），同一张只放一次，算在最新的那条里。字幕多一行「记录」，默认显示，写照片所在记录的名字；设置面板的来源多一个「记录」。
+* **Update**: 不在记录里的附件什么时候删去，清理任务和媒体库用同一处规则（`KEPT_DAYS`、`purgeAt`）。[记录](/product/features/entries.md)、[附件](/product/features/attachments.md)、[路线图](/product/roadmap.md)、[前端分区](/architecture/frontend.md)、[接口索引](/api/index.md) 随之更新。
+
+## 2026-11-19
+* **Creation**: 第三阶段的最后一项：[附件](/product/features/attachments.md)。记录里可以放视频、录音和其他文件：编辑器的「附件」里添加或直接录音，随手记的麦克风录好就和文字一起记下；选好就分片上传，显示进度，断了从断的那一片接着传。阅读页里视频带封面直接放，声音是播放条，其他文件下载（PDF 在浏览器里打开）；卡片显示附件，作品没有照片时用视频的封面。迁移 `0010_attachments.sql` 新增 [attachments](/data/attachments.md)，接口见 [附件接口](/api/attachments.md)：R2 分片上传，每片 16 MiB，一个最多 2 GiB，一条记录最多 20 个。另建一张表、不并进照片，理由见 [数据演进](/data/evolution.md#媒体)。
+* **Update**: 附件没有自己的公开范围，跟着所在的记录：能打开记录的人（包括凭分享链接打开的）就能播放、下载，不在记录里的只有作者能读，`/media/a/` 下的文件一律不进缓存。手机视频和语音备忘录（MP4、MOV、M4A）里的拍摄地点，上传前在浏览器里原地抹掉；浏览器能放的视频和声音、PDF 在页面里打开，其余（网页、SVG……）只能下载，并带 `sandbox` 的内容安全策略。没传完的一天后、不在记录里的七天后由每小时的定时任务删掉。见 [隐私](/product/features/privacy.md#附件)、[分享链接](/product/features/sharing.md#能看到什么)、[Cloudflare 资源](/architecture/cloudflare.md#定时任务)。
+* **Update**: 导出格式升到第 2 版：记录带上 `attachments`，附件的文件和视频的封面放在 `media/` 下，Markdown 里是指向它们的链接；「包含照片原文件和附件」一起下载，导出到同一个文件夹时只下载新的。导入读得了第 1 版和第 2 版，附件在照片之后、记录之前重新分片上传（`POST /api/import/attachments`），已经在的记录连同附件不动。[搜索](/api/search.md) 也找附件的说明和文件名。见 [导出接口](/api/export.md#livingjson)、[导入接口](/api/import.md)。
+* **Update**: 修正 [分享链接](/api/shares.md)：浏览器同时持有一条记录的链接和一个合集或项目的链接时，打开合集或项目里的记录返回 500（授权查询绑定了没用上的参数）。
+* **Update**: [路线图](/product/roadmap.md) 的第三阶段已完成；[内容模型](/product/content-model.md)、[记录](/product/features/entries.md)、[今天](/product/features/today.md)、[entry_media](/data/entry-media.md)、[数据模型总览](/data/overview.md)、[R2 媒体文件](/data/media.md)、[接口约定](/api/conventions.md)、[前端分区](/architecture/frontend.md)、[备份与恢复](/runbooks/backup.md) 随之更新。
+
+## 2026-11-18
+* **Creation**: 第四阶段：[导入](/product/features/import.md)。设置里选导出的文件夹或全部 zip（浏览器自己读 zip，不用先解压），先列出导出里有多少、多少已经在这里，再按标签、地点、隐私区域、照片、项目、记录、合集的顺序一批批导入；照片从原文件重新生成尺寸，信息取自 living.json，不从 EXIF 重读位置。已经在的跳过、不覆盖，正文里指向原站点的链接换到这个站点，可以全部设为私密；中途停下再导入一次接着做。接口见 [导入接口](/api/import.md)，新的 id 由账号和导出里的 id 算出，再导入能认出它，不加表，见 [数据演进](/data/evolution.md#导出与备份)。
+* **Update**: 免费版 D1 当天的读写额度用完时，所有接口返回 503 `quota_exceeded` 和恢复的时间，不再是 500；JSON 请求体的上限按字节算，不带 `Content-Length` 的请求以前按字符数算，中文能多放进近三倍。见 [接口约定](/api/conventions.md#错误)。[导出](/product/features/export.md)、[隐私](/product/features/privacy.md#搜索与导出)、[账号](/product/features/accounts.md)、[费用](/architecture/cloudflare.md#费用)、[路线图](/product/roadmap.md)、[备份与恢复](/runbooks/backup.md)、[前端分区](/architecture/frontend.md#路由与归属) 随之更新。
+* **Creation**: 第三阶段：[地图的记录图层](/product/features/map.md#记录图层)。地图标题旁切换「照片 | 记录」（`?layer=entries`），公开且已完成的记录放在它的地点，没有地点时放在它第一张有位置的照片那里，和照片一样按省、市、区县、地点合成图集；没有照片的记录圆片上是记录图标；按类型筛选，侧栏列出记录卡片。[记录接口](/api/entries.md#get-apientries) 加上 `located=1`，摘要的 `poi` 带上 `lat`、`lng`；照片只算看的人能打开的，位置照旧按位置精度，见 [隐私](/product/features/privacy.md#记录)。[路线图](/product/roadmap.md)、[前端分区](/architecture/frontend.md) 随之更新。
+* **Update**: 登录限流偶尔漏记一次尝试：计数写进 KV 时用的是绝对过期时刻「现在 + 60 秒」，读写之间跨过一秒，KV 就按它自己的时钟拒绝这次写入。改用相对的 TTL，见 [KV](/data/kv.md)。
+* **Creation**: 第四阶段：[作品与文章](/product/features/showcase.md)。个人主页最先展示已完成的「创作」（作品：第一张照片排成格子，最新 8 件）和「文章」（标题、开头两行、日期和字数，最新 5 篇），之后才是合集、项目、其余的记录和照片；`/@handle/works`、`/@handle/articles` 列出全部，文章按年份分组。公开与否仍按每条记录的公开范围，作者看到的不公开的那些标着「仅链接可见」「仅自己可见」。不加表，见 [数据演进](/data/evolution.md#作品与文章)。
+* **Creation**: [访客视角](/product/features/showcase.md#访客视角)：作者在自己的主页、记录、合集和项目页上点「访客视角」（`?as=visitor`），页面不带登录信息重新读取，看到的就是没登录的人看到的；在里面点到访客也能打开的页面仍是访客视角，「退出」回到自己的视角。共享缓存为它另存一份，改动后不会显示旧的，见 [前端分区](/architecture/frontend.md#访客视角)。
+* **Update**: 访客视角审查发现的几处：作者改了照片、记录、合集或项目之后，访客视角不再显示改之前的样子（任何改动都丢掉缓存里的全部访客副本，个人主页的计数也跟着刷新）；照片页的上一张、下一张只用同一视角里的列表；在访客视角里打开 Living 仍是访客视角，只播放访客能看到的照片；合集页的锚点和地图页的高度让开横栏；「退出」的读屏名称是「退出访客视角」；作品、文章页的一级标题不含数字；记录多于 5000 条时，主页的作品和文章按类型另行读取，和各自页面一致。见 [前端分区](/architecture/frontend.md#访客视角)。
+* **Update**: [记录接口](/api/entries.md#get-apientries) 的列表加上 `type=`（几个类型用逗号隔开，别的词返回 400）和摘要的 `chars`（正文的码点数）。个人主页的合集一节加上标题。[账号](/product/features/accounts.md)、[记录](/product/features/entries.md)、[隐私](/product/features/privacy.md#记录)、[路线图](/product/roadmap.md)、[前端分区](/architecture/frontend.md) 随之更新。
+* **Creation**: 第四阶段：[日历与年度回顾](/product/features/calendar.md)。档案多了「日历」标签页（`/archive/calendar`）：一个月一张表，每天铺一张照片、画几个点表示几条记录，选一天在旁边看那天的全部，空着的日子可以「补记」（编辑器的 `/entries/new?date=`，见 [记录](/product/features/entries.md#写)）；方向键换日子。年度回顾（`/archive/<年份>`）：记录、照片、天数、最长连续、地点和字数，十二个小月历按每天的多少上色，收藏、项目、合集、常去的地点和常用的标签；时间线里每年的标题打开那一年的回顾。
+* **Creation**: [回顾接口](/api/review.md)：`GET /api/review` 列出有内容的年份，`GET /api/review/:year` 在服务器上汇总一年，只算自己的、不算已归档的记录。[记录](/api/entries.md#get-apientries) 和 [照片](/api/photos.md#get-apiphotos) 列表加上 `from`、`to`，日历按月读取，不受 5000 条上限的影响。不加表和索引，见 [数据演进](/data/evolution.md#日历与回顾)。
+* **Update**: [项目](/product/features/projects.md#节奏) 页加上「节奏」：最长和现在连续几天、平均每周几天、最近六个月每天的小月历，超过六个月的项目再加每个月的记录数；只算已完成的记录。[路线图](/product/roadmap.md)、[档案](/product/features/archive.md)、[前端结构](/architecture/frontend.md) 随之更新。
+* **Update**: 修正两处：[今天](/product/features/today.md) 的「写长文」把文字交给编辑器后，随手记框里不再留着这段文字；[搜索](/product/features/search.md) 的 `/` 键在页眉出现搜索按钮时就能用，不再漏掉刚加载完时按下的那一次。
+* **Update**: 回顾接口的路由测试发现的几处：只有结束日期的合集按那一天算进回顾，不再按建立的时间；没有日期的合集改为看里面有没有这一年的照片、记录或日子，和别处一样按本地日期，不再按服务器时间的建立年份；收藏多于 24 张时在一年里均匀地挑，不再只有年初的；只有里程碑或合集的年份也列出它们。[合集](/api/themes.md#patch-apithemesid本人) 只改一端日期时和另一端一起检查，建立时从照片取来的日期也不会让开始晚于结束，否则这样的合集在哪一年的回顾里都没有。文字里的空字符在保存前去掉（[约定](/api/conventions.md#错误)）。
+
+## 2026-11-17
+* **Creation**: 第四阶段：[搜索](/product/features/search.md)。`/search` 在自己的档案里找字，记录、照片、项目、合集、地点和标签分组列出，各带总数，片段里标出找到的字；页眉的放大镜或在任何页面按 `/` 打开。只搜自己的内容，包括草稿和仅自己可见的，见 [搜索接口](/api/search.md)。按字匹配（`LIKE`），不建 FTS5：D1 导出不支持虚拟表，理由见 [数据演进](/data/evolution.md#搜索)；迁移 `0009_search.sql` 加部分索引 `photos_owner_text`（[photos](/data/photos.md#索引)）。保留用户名加入 search。
+* **Creation**: [导出](/product/features/export.md)：设置里把自己的整个档案导出为 Markdown（记录、项目、合集各一个文件，带 frontmatter）、living.json 和照片原文件。下载 zip（每个约 1 GB，可分几个），或在 Chrome、Edge 里导出到文件夹，再次导出只下载新的照片、清理删去的文件；原文件缺了用大图代替。浏览器拼装，Worker 按页读出，见 [导出接口](/api/export.md)（含 [导出文件的格式](/api/export.md#导出的文件)）。
+* **Creation**: 运行手册 [备份与恢复](/runbooks/backup.md)：D1 用 `wrangler d1 export` 导出成 SQL，R2 用 rclone 复制到自己的硬盘；恢复先导入新库、核对后再换上。[愿景](/product/vision.md)、README 写明托管存储不等于本地自托管；[隐私](/product/features/privacy.md#搜索与导出)、[费用](/architecture/cloudflare.md#费用)、[路线图](/product/roadmap.md)、[数据演进](/data/evolution.md#导出与备份) 随之更新。
+* **Creation**: [分享链接](/product/features/sharing.md)：作者为自己的一条记录、一个合集或一个项目生成 `/s/<token>`，拿到的人不用登录就能看这一项和其中的内容，包括仅自己可见的；草稿、已归档的记录和原图除外，位置精度照旧。可随时删除，可设 1 天、7 天、30 天的有效期，设置里统一管理。迁移 `0008_shares_places.sql` 新增 [share_links](/data/share-links.md)；接口见 [分享链接接口](/api/shares.md)，打开过链接的浏览器把它记在 Cookie 里，读取接口每次核对，删除和过期立刻生效。
+* **Update**: 记录可以选一个地点（[entries](/data/entries.md#地点) 的 `poi_id`）：编辑器先列出照片所在的地点，也能按名称搜索；记录页和卡片显示地点，[地点页](/product/features/places.md) 列出在这里的记录（`GET /api/entries?poi=`）。能看到记录的人都能看到地点，在隐私区域内时编辑器提醒，见 [隐私](/product/features/privacy.md#记录)。
+* **Update**: 数据演进和路线图：第三阶段除新媒体和地图上的记录图层外都已完成，见 [数据演进](/data/evolution.md#分享链接)、[路线图](/product/roadmap.md)。保留用户名加入 s。
+
+## 2026-11-16
+* **Update**: 第三阶段：主题原地成为 [合集](/product/features/themes.md)，界面改称合集，`/themes`、`/t/:id`、已有内容、顺序和公开范围不变。迁移 `0007_collections.sql` 重建 [theme_items](/data/theme-items.md)（逐行照搬），加入记录条目（`kind = 'entry'`、`entry_id`）；旅程仍是旅程，没有变成项目，理由见 [数据演进](/data/evolution.md#合集)。
+* **Update**: [合集接口](/api/themes.md) 的条目可以是自己的记录；读者只看到能打开的记录和照片，`photoCount`、新的 `entryCount`、封面、路线和地点都只算这些，也算上记录里的照片。记录详情带上收录它的合集（`themes`，列表规则），删除记录时从合集里移除，见 [记录接口](/api/entries.md)。
+* **Update**: 合集编辑器能「添加记录」（按字和日期找，草稿、已归档的也列出并标明），每一行的「+」也能插入记录；公开或仅链接时提醒读者看不到的照片和记录。阅读页把记录排成卡片（合集写在前面的话、标题、开头一段、照片），Living 按合集播放时也放记录里的照片，记录页列出所属合集，见 [游记](/product/features/travelogue.md)。
+* **Update**: 新照片的默认公开范围可以在设置里选（[users](/data/users.md#新照片的默认公开范围) 的 `photo_visibility`，`PATCH /api/me`）。新账号是仅自己；已有账号设为公开、上传行为不变，直到自己修改；迁移不改任何照片的公开范围。上传页按它预先选好每张照片的公开范围，顶部写着当前默认值；接口收到没指定公开范围的上传也按它保存，见 [隐私](/product/features/privacy.md#新照片)。
+* **Creation**: 第二阶段：项目与成长档案。迁移 `0006_projects.sql` 新增 [projects](/data/projects.md)、[entry_projects](/data/entry-projects.md)、[milestones](/data/milestones.md)；[项目接口](/api/projects.md) 支持项目的列表、详情、创建、修改、删除和里程碑，记录接口加上 `project=` 和 `projectIds`。新项目默认仅自己可见；项目里只显示和统计读者凭链接能打开的记录和照片，记录上只列出读者能在列表里看到的项目。
+* **Creation**: 新页面 [项目](/product/features/projects.md)：项目列表（档案下与时间线并列）、项目页（天数与统计、最初与最近的作品、按里程碑分出的阶段、项目里的记录）、项目的新建与编辑；从项目页记一笔时记录预先放进项目，类型按项目定。「今天」列出进行中的项目，记录页列出所属项目，个人主页列出项目和项目数，见 [导航](/architecture/frontend.md#导航)。
+* **Update**: [接口约定](/api/conventions.md#可见性) 写明容器的规则：主题、记录、项目里显示并计入仅链接的内容，从内容找容器时按列表规则。保留用户名加入 projects，[认证接口](/api/auth.md) 的保留名单补上第一阶段加入的 today、archive、entries、e。
+* **Creation**: 方向调整为以记录为中心的个人数字档案（[Issue #47](https://github.com/ticoAg/Living/issues/47)）。第零阶段：[内容模型](/product/content-model.md)（记录、媒体、项目、合集的边界与关系，类型、时间、状态与可见性）、[数据演进](/data/evolution.md)（项目与合集的表、旧主题的兼容、迁移规则、照片默认可见性的评估）、[决策：以记录为中心](/architecture/decisions/0007-entry-first.md)；[产品愿景](/product/vision.md)、[用户与场景](/product/personas.md)、[路线图](/product/roadmap.md) 随之改写。
+* **Creation**: 第一阶段：记录成为一等公民。迁移 `0005_entries.sql` 新增 [entries](/data/entries.md)、[entry_media](/data/entry-media.md)、[entry_tags](/data/entry-tags.md)，[记录接口](/api/entries.md) 支持列表、详情、创建、修改（带 `revision`，过期返回 409）和删除；新记录默认仅自己可见，草稿和已归档的对他人不可见。
+* **Creation**: 新页面 [今天](/product/features/today.md)（随手记、今天的记录与照片、草稿、往年今天）、[档案](/product/features/archive.md)（记录与照片按天排成一条时间线，按类型、标签筛选，按年份跳转）、[记录](/product/features/entries.md) 的阅读页与编辑器（Markdown、自动保存、本机备份、冲突提示、关联自己的照片并写说明、标签、公开范围与状态）。
+* **Update**: 登录后的导航改为 今天、档案、图库、主题，图库、地图、索引合为一处并在页面顶部切换；访客的导航不变；登录和注册后来到今天，见 [导航](/architecture/frontend.md#导航)。
+* **Update**: 照片详情列出所属记录，个人主页列出已完成的记录和记录数，标签带 `entryCount`，都只算请求者能看到的；删除照片会从记录里移除并让记录的 `revision` 加一，删除标签一并移除记录上的标签，见 [照片接口](/api/photos.md)、[标签接口](/api/tags.md)、[数据模型总览](/data/overview.md)。
+* **Update**: 隐私规则加入记录：公开范围只对已完成的记录生效，记录不改变其中照片的公开范围，计数和照片页的所属记录按同一套规则过滤；照片上传默认公开暂不改，见 [隐私](/product/features/privacy.md#记录)。保留用户名加入 today、archive、entries、e。
+
 ## 2026-11-11
 * **Update**: 整站换成「画廊」视觉：暖白底、白色浮起的卡片、大圆角和柔和阴影；按钮和标签片是填充的胶囊，分段是带滑块的轨道，不再用描边方框、黑色硬块和虚线框；宋体只留给地名和标题，不再加宽字距。页眉改为字标、居中的分区、上传按钮三段，手机底栏每项带图标，见 [设计令牌](/architecture/frontend.md#设计令牌)。
 * **Update**: 上传页重排：「全部发布」移到顶栏右端，照片排在中栏最上面，右栏表单的名字放到控件上方，标签板排成每个分组一行的两列表；拖文件到页面上时整窗提示，三栏版面里 ↑ ↓ 换张，见 [版面](/product/features/upload.md#版面) 和 [打标签](/product/features/hierarchical-tags.md#打标签)。

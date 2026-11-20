@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { SessionUser, SiteInfo } from '../../shared/types';
 import { api, onSessionLost } from './api';
+import { clearDeviceDrafts } from './deviceDrafts';
 import { invalidate } from './useApi';
 
 interface SessionState {
@@ -66,6 +67,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    clearDeviceDrafts();
     userId.current = null;
     setUser(null);
     markExpired(false);
@@ -108,3 +110,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 }
 
 export const useSession = () => useContext(SessionContext);
+
+/** The pages inside see no one signed in, as a visitor would (lib/visitor.ts); the header outside still does. */
+export function AsVisitor({ children }: { children: ReactNode }) {
+  const real = useContext(SessionContext);
+  const value = useMemo(() => ({ ...real, user: null, loading: false, expired: false, reauth: false, askLogin: noop }), [real]);
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}

@@ -1,4 +1,5 @@
 import type { SessionUser } from '../shared/types';
+import type { Grant } from './lib/shares';
 
 export interface Env {
   DB: D1Database;
@@ -11,10 +12,11 @@ export interface Env {
   AMAP_KEY?: string;
 }
 
-/** Per-request memoised session lookups (see lib/session.ts). */
+/** Per-request memoised lookups: the session (lib/session.ts) and the share links held (lib/shares.ts). */
 export interface Variables {
   uid?: Promise<string | null>;
   user?: Promise<SessionUser | null>;
+  shares?: Promise<Grant[]>;
 }
 
 export type AppEnv = { Bindings: Env; Variables: Variables };

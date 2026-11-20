@@ -8,9 +8,11 @@ import {
   optBool,
   optColor,
   optDate,
+  enumList,
   optEnum,
   optFocus,
   optHeading,
+  optMarkdown,
   optNum,
   optPalette,
   optTakenAt,
@@ -92,6 +94,11 @@ describe('reqStr', () => {
     expect(reqStr({ n: ' ab ' }, 'n', '用户名', 2, 2)).toBe('ab');
     expect(invalidMessage(() => reqStr({ n: ' a ' }, 'n', '用户名', 2, 4))).toBe('用户名需要 2 到 4 个字符');
   });
+
+  it('drops NUL characters before trimming and measuring', () => {
+    expect(reqStr({ n: '\u0000 西\u0000湖 \u0000' }, 'n', '名称', 2, 2)).toBe('西湖');
+    expect(invalidMessage(() => reqStr({ n: '\u0000' }, 'n', '名称', 1, 10))).toBe('名称不能为空，且最多 10 个字符');
+  });
 });
 
 describe('optText', () => {
@@ -107,11 +114,36 @@ describe('optText', () => {
     expect(optText('12345', '标题', 5)).toBe('12345');
   });
 
+  it('drops NUL characters, so text of nothing else is absent', () => {
+    expect(optText(' a\u0000b ', '标题', 2)).toBe('ab');
+    expect(optText('\u0000 \u0000', '标题', 5)).toBeNull();
+  });
+
   it('rejects non-strings and over-long text', () => {
     expect(invalidMessage(() => optText(5, '标题', 5))).toBe('标题需要是文字');
     expect(invalidMessage(() => optText({}, '标题', 5))).toBe('标题需要是文字');
     expect(invalidMessage(() => optText('123456', '标题', 5))).toBe('标题最多 5 个字符');
     expect(invalidMessage(() => optText('😀'.repeat(6), '标题', 5))).toBe('标题最多 5 个字符');
+  });
+});
+
+describe('optMarkdown', () => {
+  it('keeps the text as written but for the blank lines before it, the whitespace after it and NUL characters', () => {
+    expect(optMarkdown('ab\u0000cdef', '正文', 6)).toBe('abcdef');
+    expect(optMarkdown('\u0000\r\n\n　段落\u0000\r\n  ', '正文', 10)).toBe('　段落');
+    expect(optMarkdown('# 标题\r\n\r\n正文', '正文', 10)).toBe('# 标题\n\n正文');
+  });
+
+  it('treats null, undefined and text of nothing but whitespace and NUL as absent', () => {
+    expect(optMarkdown(null, '正文', 5)).toBeNull();
+    expect(optMarkdown(undefined, '正文', 5)).toBeNull();
+    expect(optMarkdown(' \u0000\n\t', '正文', 5)).toBeNull();
+  });
+
+  it('rejects non-strings and text over the limit once NUL characters are gone', () => {
+    expect(invalidMessage(() => optMarkdown(5, '正文', 5))).toBe('正文需要是文字');
+    expect(invalidMessage(() => optMarkdown('123456', '正文', 5))).toBe('正文最多 5 个字符');
+    expect(optMarkdown('12345\u0000', '正文', 5)).toBe('12345');
   });
 });
 
@@ -171,6 +203,29 @@ describe('optEnum', () => {
 
   it('does not accept null: callers map it to undefined first', () => {
     expect(invalidMessage(() => optEnum(null, '公开范围', values))).toBe('公开范围需要是 public / unlisted / private 之一');
+  });
+});
+
+describe('enumList', () => {
+  const KINDS = ['a', 'bb', 'c'] as const;
+
+  it('is no filter when absent or empty', () => {
+    expect(enumList(undefined, 'kind', KINDS)).toBeNull();
+    expect(enumList('', 'kind', KINDS)).toBeNull();
+  });
+
+  it('keeps each listed word once, in the order first given', () => {
+    expect(enumList('bb', 'kind', KINDS)).toEqual(['bb']);
+    expect(enumList('c,a,c,bb,a', 'kind', KINDS)).toEqual(['c', 'a', 'bb']);
+  });
+
+  it('refuses any other word, an empty one between commas, spaces and another case, naming the choices', () => {
+    for (const v of ['d', 'a,', ',a', 'a,,c', 'a, c', 'A', 'b']) {
+      expect(
+        invalidMessage(() => enumList(v, 'kind', KINDS)),
+        v
+      ).toBe('kind 只能是 a / bb / c，可以用逗号隔开几个');
+    }
   });
 });
 

@@ -17,7 +17,15 @@ import {
   viewerId
 } from './session';
 
-const USER_ROW = { id: 'u_1', handle: 'ada', display_name: 'Ada', bio: '拍照的人', avatar_photo_id: 'ph_9', role: 'admin' as const };
+const USER_ROW = {
+  id: 'u_1',
+  handle: 'ada',
+  display_name: 'Ada',
+  bio: '拍照的人',
+  avatar_photo_id: 'ph_9',
+  role: 'admin' as const,
+  photo_visibility: 'unlisted' as const
+};
 const TOKEN = 'A'.repeat(43);
 
 /** The app's session helpers behind four tiny routes. */
@@ -163,7 +171,8 @@ describe('currentUser / requireUser', () => {
       displayName: 'Ada',
       bio: '拍照的人',
       avatarPhotoId: 'ph_9',
-      role: 'admin'
+      role: 'admin',
+      photoVisibility: 'unlisted'
     });
     expect(d1.calls[0].params).toEqual(['u_1']);
   });
@@ -221,7 +230,8 @@ describe('toSessionUser / isStaff / requireRole', () => {
       displayName: 'Ada',
       bio: '拍照的人',
       avatarPhotoId: 'ph_9',
-      role: 'admin'
+      role: 'admin',
+      photoVisibility: 'unlisted'
     });
     expect(toSessionUser({ ...USER_ROW, bio: null, avatar_photo_id: null })).toMatchObject({ bio: null, avatarPhotoId: null });
   });

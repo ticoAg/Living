@@ -1,0 +1,136 @@
+/* The calendar, the year in review, and the rhythm of a project: days drawn by what they hold.
+   Docs: /docs/product/features/calendar.md */
+
+/* one hue from light to dark for how much a day holds, the darkest the app's hydro; a day with nothing wears the mat */
+.hm-days, .cal { --heat-0: var(--mat); --heat-1: #99B9D1; --heat-2: #6F9CBF; --heat-3: #4A80AA; --heat-4: #2B5F86; }
+
+/* ---- the calendar: a month beside the day chosen ---- */
+.cal { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cal-title { margin: 0; font: 600 22px/1.3 var(--serif); letter-spacing: 0.04em; }
+.cal-title a { color: var(--ink-2); text-decoration: none; }
+.cal-title a:hover { color: var(--hydro); text-decoration: underline; }
+.cal-nav { display: flex; align-items: center; gap: 2px; }
+.cal-today.btn { margin-left: 6px; }
+.cal-sum { min-height: 1.6em; margin: 2px 0 14px; color: var(--ink-2); font-size: 14px; }
+.cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-week { margin-bottom: 6px; color: var(--ink-3); font-size: 12px; text-align: center; }
+.cal-pad { aspect-ratio: 1 / 1; }
+.cal-day { position: relative; display: block; aspect-ratio: 1 / 1; min-width: 0; padding: 0; overflow: hidden; border: 0; border-radius: 10px; background: transparent; color: var(--ink-3); cursor: pointer; transition: background 0.15s, box-shadow 0.15s; }
+.cal-day:hover { background: var(--mat); }
+.cal-day[data-has] { background: var(--sheet); color: var(--ink); box-shadow: var(--lift-1); }
+.cal-day[data-has]:hover { box-shadow: var(--lift-2); }
+.cal-day[aria-pressed='true'] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.cal-day:focus-visible { outline: 2px solid var(--hydro); outline-offset: 2px; }
+.cal-day > .img { position: absolute; inset: 0; }
+.cal-num { position: absolute; top: 6px; left: 6px; min-width: 20px; padding: 3px 4px; border-radius: var(--r-pill); font-size: 12.5px; line-height: 1; text-align: center; }
+.cal-day[data-cover] .cal-num { background: rgba(255, 255, 255, 0.88); color: var(--ink); }
+.cal-day[data-today] .cal-num { background: var(--hydro); color: #fff; }
+.cal-dots { position: absolute; left: 0; right: 0; bottom: 7px; display: flex; justify-content: center; gap: 3px; }
+.cal-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--hydro); }
+.cal-day[data-cover] .cal-dots i { background: #fff; box-shadow: 0 0 0 1px rgba(24, 25, 27, 0.25); }
+
+.cal-panel { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.cal-panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: var(--ctl); }
+.cal-panel-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 0; font-weight: 400; }
+.cal-panel-body { display: flex; flex-direction: column; gap: 12px; }
+.cal-none { margin: 0; padding: 32px 16px; border-radius: var(--r-card); background: var(--mat); color: var(--ink-2); text-align: center; }
+
+@media (min-width: 900px) {
+  .cal { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+  .cal-panel { position: sticky; top: calc(var(--header-h) + 16px); }
+}
+@media (max-width: 640px) {
+  .cal-week, .cal-grid { gap: 3px; }
+  .cal-day { border-radius: 8px; }
+  .cal-num { top: 3px; left: 3px; min-width: 18px; padding: 2px 3px; font-size: 11.5px; }
+  .cal-dots { bottom: 4px; gap: 2px; }
+  .cal-dots i { width: 4px; height: 4px; }
+}
+
+/* ---- a month of small days ---- */
+.hm { min-width: 0; }
+.hm-name { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 8px; font: 600 14px/1.4 var(--serif); letter-spacing: 0.04em; }
+.hm-name a { color: var(--ink); text-decoration: none; }
+.hm-name a:hover { color: var(--hydro); text-decoration: underline; }
+.hm-sum { color: var(--ink-3); font-size: 12px; font-weight: 400; letter-spacing: 0; white-space: nowrap; }
+.hm-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.hm-pad { aspect-ratio: 1 / 1; }
+.hm-day { position: relative; display: block; aspect-ratio: 1 / 1; border-radius: 3px; background: var(--heat-0); }
+.hm-day[data-level='1'] { background: var(--heat-1); }
+.hm-day[data-level='2'] { background: var(--heat-2); }
+.hm-day[data-level='3'] { background: var(--heat-3); }
+.hm-day[data-level='4'] { background: var(--heat-4); }
+/* days still ahead hold nothing yet: outlined, not filled */
+.hm-day[data-future] { background: transparent; box-shadow: inset 0 0 0 1px var(--rule); }
+.hm-day[data-today] { box-shadow: 0 0 0 1.5px var(--paper), 0 0 0 3px var(--ink); }
+a.hm-day:hover { box-shadow: 0 0 0 1.5px var(--paper), 0 0 0 3px var(--ink-2); }
+
+/* what a day or a month holds, above it while pointed at or focused, kept inside the grid at its edges */
+.hm-day[data-tip]:hover::after, .hm-day[data-tip]:focus-visible::after, .mb-col[data-tip]:hover::after {
+  content: attr(data-tip); position: absolute; z-index: 3; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  width: max-content; padding: 5px 9px; border-radius: 8px; background: var(--ink); color: #fff; font: 12px/1.3 var(--sans); white-space: nowrap;
+  pointer-events: none; box-shadow: var(--lift-2);
+}
+.hm-day[data-col='0']::after, .hm-day[data-col='1']::after, .mb-col[data-edge='start']::after { left: 0; transform: none; }
+.hm-day[data-col='5']::after, .hm-day[data-col='6']::after, .mb-col[data-edge='end']::after { left: auto; right: 0; transform: none; }
+
+/* ---- the year ---- */
+.rv-year { font-weight: 400; letter-spacing: 0.02em; }
+.en .ar-years a[aria-current='page'] { color: var(--ink); background: var(--mat); }
+.rv-stats { display: flex; flex-wrap: wrap; gap: 20px 44px; margin: 12px 0 0; }
+.rv-stats > div { display: flex; flex-direction: column-reverse; gap: 6px; }
+.rv-stats dt { color: var(--ink-3); font-size: 12.5px; }
+.rv-stats dd { margin: 0; }
+/* a figure on its own: proportional digits, which sit tighter than table digits at this size */
+.rv-stat-n { font: 500 40px/1 var(--latin); font-variant-numeric: lining-nums proportional-nums; }
+.rv-sec { display: flex; flex-direction: column; gap: 16px; margin-top: 44px; }
+.rv-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 24px 28px; }
+.rv-collections.th-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 32px 20px; }
+
+.rv-projects { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rv-projects > li { padding: 14px 16px; border-radius: 16px; background: var(--sheet); box-shadow: var(--lift-1); }
+.rv-project { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+.rv-project-name { color: var(--ink); font: 600 17px/1.45 var(--serif); letter-spacing: 0.03em; text-decoration: none; overflow-wrap: anywhere; }
+.rv-project-name:hover { color: var(--hydro); text-decoration: underline; }
+.rv-project-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--ink-2); font-size: 13px; }
+.rv-marks { list-style: none; margin: 12px 0 0; padding: 10px 0 0; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: 14px; }
+.rv-marks .mono { margin-right: 4px; color: var(--ink-3); font-size: 13px; }
+
+.rv-rank { list-style: none; margin: 0; padding: 0; }
+.rv-rank li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 10px 0; border-top: 1px solid var(--rule); }
+.rv-rank li:first-child { border-top: 0; }
+.rv-rank-name { color: var(--ink); font: 500 16px/1.5 var(--serif); letter-spacing: 0.04em; text-decoration: none; overflow-wrap: anywhere; }
+.rv-rank-name:hover { color: var(--hydro); text-decoration: underline; }
+.rv-rank-sub { color: var(--ink-3); font-size: 13px; }
+.rv-rank-n { margin-left: auto; color: var(--ink-2); font-size: 13px; }
+
+.rv-tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.rv-tags .chip { gap: 8px; text-decoration: none; }
+.rv-tag-n { color: var(--ink-3); font-size: 12px; }
+.rv-swatch { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(24, 25, 27, 0.12); }
+
+/* entry types as bars from one edge, the count beside each in ink */
+.rv-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rv-bars li { display: grid; grid-template-columns: 4em minmax(0, 1fr) 3em; align-items: center; gap: 12px; }
+.rv-bar-name { color: var(--ink-2); font-size: 14px; }
+.rv-bar-track { display: block; height: 14px; }
+.rv-bar { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--hydro); }
+.rv-bar-n { color: var(--ink); font-size: 13px; text-align: right; }
+
+/* ---- a project's rhythm ---- */
+.pj-rhythm { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; color: var(--ink-2); font-size: 15px; }
+.pj-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 24px 28px; }
+.mb { width: fit-content; max-width: 100%; margin: 0; }
+.mb-cols { list-style: none; width: fit-content; max-width: 100%; height: 112px; margin: 0; padding: 0; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--rule-2); }
+.mb-col { position: relative; flex: 0 1 auto; width: 24px; min-width: 2px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.mb-bar { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--hydro); }
+.mb-col:hover .mb-bar { background: var(--hydro-ink); }
+.mb-peak { margin-bottom: 4px; color: var(--ink-2); font-size: 11px; line-height: 1; }
+.mb-ends { display: flex; justify-content: space-between; gap: 16px; margin-top: 6px; color: var(--ink-3); font-size: 12px; }
+
+@media (max-width: 640px) {
+  .rv-stats { gap: 16px 28px; }
+  .rv-stat-n { font-size: 32px; }
+  .rv-months, .pj-months { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px; }
+}

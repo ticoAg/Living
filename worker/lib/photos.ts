@@ -1,8 +1,9 @@
+import { entryLabel, entryTypeLabel } from '../../shared/entries';
 import { fuzz } from '../../shared/geo';
-import type { GeoPrivacy, PhotoDetail, PhotoSummary, PoiMethod, Variants, Visibility } from '../../shared/types';
+import type { GeoPrivacy, PhotoDetail, PhotoEntryRef, PhotoSummary, PoiMethod, Variants, Visibility } from '../../shared/types';
 import { getPoiRow, toPoi } from './poi';
 import { parseJson, prepQ, Sql } from './sql';
-import { photoById } from './visibility';
+import { entryList, photoById } from './visibility';
 
 export interface PhotoRow {
   id: string;
@@ -103,10 +104,27 @@ export function toSummary(r: PhotoRow, viewer: string | null): PhotoSummary {
   };
 }
 
+/** Entries showing the photo that `viewer` may see in lists (the owner: all of theirs), latest first. */
+export async function entriesOfPhoto(db: D1Database, photoId: string, viewer: string | null): Promise<PhotoEntryRef[]> {
+  const q = new Sql();
+  const res = await prepQ(
+    db,
+    `SELECT e.id, e.type, e.title, substr(e.body, 1, 400) AS body_head, e.occurred_at
+     FROM entry_media em JOIN entries e ON e.id = em.entry_id
+     WHERE em.photo_id = ${q.p(photoId)} AND ${entryList(q, viewer)} ORDER BY e.occurred_at DESC, e.id DESC`,
+    q
+  ).all<{ id: string; type: string; title: string | null; body_head: string | null; occurred_at: string }>();
+  return res.results.map((e) => ({
+    id: e.id,
+    label: entryLabel(e.title, e.body_head) || entryTypeLabel(e.type),
+    occurredAt: e.occurred_at
+  }));
+}
+
 export async function toDetail(db: D1Database, r: PhotoRow, viewer: string | null): Promise<PhotoDetail> {
   const g = geoFor(r, viewer);
   const hidden = g.level === 'hidden';
-  const [poiRow, themes] = await Promise.all([
+  const [poiRow, themes, entries] = await Promise.all([
     r.poi_id && !hidden ? getPoiRow(db, r.poi_id) : Promise.resolve(null),
     // Themes the viewer may see; unlisted themes are not advertised from a photo page.
     db
@@ -115,7 +133,8 @@ export async function toDetail(db: D1Database, r: PhotoRow, viewer: string | nul
          WHERE ti.photo_id = ?1 AND (th.visibility = 'public' OR th.owner_id = ?2) ORDER BY th.updated_at DESC`
       )
       .bind(r.id, viewer ?? '')
-      .all<{ id: string; title: string }>()
+      .all<{ id: string; title: string }>(),
+    entriesOfPhoto(db, r.id, viewer)
   ]);
   return {
     ...toSummary(r, viewer),
@@ -134,6 +153,7 @@ export async function toDetail(db: D1Database, r: PhotoRow, viewer: string | nul
     shutter: r.shutter ?? null,
     iso: r.iso ?? null,
     themes: themes.results.map((t) => ({ id: t.id, title: t.title })),
+    entries,
     uploadedAt: r.uploaded_at as string,
     updatedAt: r.updated_at ?? null
   };
@@ -145,25 +165,35 @@ export async function loadPhotoRow(db: D1Database, id: string): Promise<PhotoRow
 }
 
 /** Detail for `viewer`, or null when missing or `private` and not theirs. */
-export async function loadPhotoDetail(db: D1Database, id: string, viewer: string | null): Promise<PhotoDetail | null> {
+/** The photo as `viewer` may open it; `grant`: the owner a share link reaching this photo opens it for (lib/shares.ts). */
+export async function loadPhotoDetail(
+  db: D1Database,
+  id: string,
+  viewer: string | null,
+  grant: string | null = null
+): Promise<PhotoDetail | null> {
   const row = await loadPhotoRow(db, id);
-  if (!row || (row.visibility === 'private' && row.owner_id !== viewer)) return null;
+  if (!row || (row.visibility === 'private' && row.owner_id !== viewer && row.owner_id !== grant)) return null;
   return toDetail(db, row, viewer);
 }
 
-/** Summaries for explicit ids that `viewer` can open by id (public, unlisted, or their own). Order is unspecified. */
+/**
+ * Summaries for explicit ids that `viewer` can open by id (public, unlisted, or their own; with a share link's `grant`,
+ * that owner's too). Order is unspecified.
+ */
 export async function summariesByIds(
   db: D1Database,
   viewer: string | null,
   ids: string[],
-  withNote = false
+  withNote = false,
+  grant: string | null = null
 ): Promise<Map<string, PhotoSummary & { note: string | null }>> {
   const out = new Map<string, PhotoSummary & { note: string | null }>();
   const unique = [...new Set(ids)];
   if (!unique.length) return out;
   const q = new Sql();
   const list = q.p(JSON.stringify(unique));
-  const vis = photoById(q, viewer);
+  const vis = photoById(q, viewer, 'p', grant);
   const cols = withNote ? `${SUMMARY_COLS}, p.note` : SUMMARY_COLS;
   const res = await prepQ(
     db,

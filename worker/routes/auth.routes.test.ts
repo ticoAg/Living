@@ -88,7 +88,7 @@ describe('POST /api/auth/register', () => {
   it('checks handle, display name and password', async () => {
     await newUser(platform, 'site_owner', 'owner');
     await platform.env.DB.prepare(`UPDATE settings SET value = 'open' WHERE key = 'registration'`).run();
-    for (const handle of ['ab', '_bob', 'bob!', 'a'.repeat(25), 'admin', 'Settings', 'www']) {
+    for (const handle of ['ab', '_bob', 'bob!', 'a'.repeat(25), 'admin', 'Settings', 'www', 'Today', 'archive', 'projects', 'Search']) {
       expect((await signUp(new Client(platform), handle)).status, handle).toBe(400);
     }
     expect((await signUp(new Client(platform), 'bob', undefined, 'short')).status).toBe(400);
@@ -110,6 +110,19 @@ describe('POST /api/auth/register', () => {
     const closed = await signUp(new Client(platform), 'dave', 'CLOSED1');
     expect(closed.status).toBe(403);
     expect(closed.body).toMatchObject({ error: 'forbidden' });
+  });
+
+  it('starts a new account with its new photos private', async () => {
+    await addInvite(platform, 'OWNERCODE1', 'owner');
+    await addInvite(platform, 'MEMBER1', 'member');
+    for (const [handle, invite] of [
+      ['alice', 'OWNERCODE1'],
+      ['bob', 'MEMBER1']
+    ]) {
+      const client = new Client(platform);
+      expect(expectStatus(await signUp(client, handle, invite), 201).user.photoVisibility, handle).toBe('private');
+      expect(expectStatus(await client.get('/api/auth/me'), 200).user.photoVisibility, handle).toBe('private');
+    }
   });
 
   it('does not give new users copies of the preset tags', async () => {
@@ -225,6 +238,32 @@ describe('PATCH /api/me', () => {
     const res = await alice.patch('/api/me', { displayName: '爱丽丝', bio: '拍照的人' });
     expect(expectStatus(res, 200).user).toMatchObject({ displayName: '爱丽丝', bio: '拍照的人' });
     expect((await alice.patch('/api/me', { avatarPhotoId: 'ph_not_mine' })).status).toBe(400);
+  });
+
+  it('sets who sees the photos uploaded from now on', async () => {
+    const alice = await newUser(platform, 'alice', 'owner');
+    for (const photoVisibility of ['unlisted', 'private', 'public'] as const) {
+      const user = expectStatus(await alice.patch('/api/me', { photoVisibility }), 200).user;
+      expect(user, photoVisibility).toMatchObject({ id: alice.me.id, displayName: 'alice', photoVisibility });
+      expect(expectStatus(await alice.get('/api/auth/me'), 200).user, photoVisibility).toEqual(user);
+    }
+  });
+
+  it('takes only public, unlisted or private for new photos, and keeps the setting otherwise', async () => {
+    const alice = await newUser(platform, 'alice', 'owner');
+    for (const photoVisibility of ['secret', null]) {
+      expect(expectStatus(await alice.patch('/api/me', { photoVisibility }), 400), String(photoVisibility)).toEqual({
+        error: 'invalid_input',
+        message: '新照片的公开范围需要是 public / unlisted / private 之一'
+      });
+    }
+    expect(expectStatus(await alice.get('/api/auth/me'), 200).user.photoVisibility).toBe('public');
+  });
+
+  it('needs a session', async () => {
+    const res = await new Client(platform).patch('/api/me', { photoVisibility: 'private' });
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchObject({ error: 'unauthenticated' });
   });
 });
 

@@ -15,7 +15,7 @@ const context = (fields: FieldKey[], over: Partial<CaptionContext> = {}): Captio
   ...over
 });
 
-const NOTHING = { big: '', icon: null, sub: '', meta: [], geo: [], exif: '', tags: '' };
+const NOTHING = { big: '', icon: null, sub: '', entry: '', meta: [], geo: [], exif: '', tags: '' };
 
 describe('exifLine', () => {
   it('is empty without a detail', () => {
@@ -84,6 +84,14 @@ describe('buildCaption', () => {
       icon: null,
       sub: ''
     });
+  });
+
+  it('names the entry it plays from, when the field is on and Living plays entries', () => {
+    expect(buildCaption(lake, context(['place', 'entry'], { entry: '湖边的早晨' }))).toMatchObject({ big: '杭州', entry: '湖边的早晨' });
+    expect(buildCaption(lake, context(['entry'], { entry: '湖边的早晨' }))).toEqual({ ...NOTHING, entry: '湖边的早晨' });
+    expect(buildCaption(lake, context(['place'], { entry: '湖边的早晨' })).entry).toBe('');
+    expect(buildCaption(lake, context(['entry'], { entry: null }))).toEqual(NOTHING);
+    expect(buildCaption(lake, context(['entry']))).toEqual(NOTHING);
   });
 
   it('falls back to the city as the place, without a category symbol', () => {
@@ -155,6 +163,7 @@ describe('hasCaption', () => {
   it('is true as soon as any part has content', () => {
     expect(hasCaption({ ...NOTHING, big: '断桥' })).toBe(true);
     expect(hasCaption({ ...NOTHING, sub: '标题' })).toBe(true);
+    expect(hasCaption({ ...NOTHING, entry: '湖边的早晨' })).toBe(true);
     expect(hasCaption({ ...NOTHING, meta: ['2026.11.08'] })).toBe(true);
     expect(hasCaption({ ...NOTHING, geo: ['0° 北'] })).toBe(true);
     expect(hasCaption({ ...NOTHING, exif: 'X100V' })).toBe(true);
@@ -170,6 +179,12 @@ describe('announceText', () => {
   it('reads title, place and date for a screen reader, whichever fields are shown', () => {
     expect(announceText(photo('p', { title: '清晨的断桥', city: '杭州', takenAt: '2026-11-08T07:15:30' }), poi('poi_1'))).toBe(
       '清晨的断桥，断桥，2026.11.08'
+    );
+  });
+
+  it('ends with the entry it plays from', () => {
+    expect(announceText(photo('p', { city: '杭州', takenAt: '2026-11-08T07:15:30' }), null, '湖边的早晨')).toBe(
+      '杭州，2026.11.08，湖边的早晨'
     );
   });
 

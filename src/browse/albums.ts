@@ -1,9 +1,11 @@
-import type { PhotoSummary, Poi } from '../../shared/types';
+import { entryLabel } from '../../shared/entries';
+import type { EntrySummary, LocatedPlace, PhotoSummary, Poi } from '../../shared/types';
 import { shortCity, shortCounty, shortProvince } from './regions';
 
 // 图集 for the map: the located photos grouped at the administrative level that suits the zoom (province → city →
 // county → place → single photo), merged where their markers would overlap on screen, and named by what the merged
-// photos share. Pure: components/mapAlbums.ts draws what this computes. Spec: docs/product/features/map.md#图集
+// photos share. The entries layer groups located entries the same way, a single entry at the deepest level. Pure:
+// components/mapAlbums.ts draws what this computes. Spec: docs/product/features/map.md#图集
 //
 //  1. levelAt(zoom) picks the level; photos are grouped by their unit at that level (all of 杭州, all of 断桥…). A photo
 //     whose unit is unknown (no city yet, no place) is a group of its own.
@@ -46,10 +48,16 @@ export const layoutZoom = (z: number) => Math.max(0, Math.min(MAX_LAYOUT_ZOOM, M
 const PARENT: Partial<Record<Level, Level>> = { city: 'province', county: 'city', place: 'county', photo: 'place' };
 const CHILD: Partial<Record<Level, Level>> = { province: 'city', city: 'county', county: 'place' };
 
-/** A located photo with its administrative path. Names are '' when unknown. */
-export interface Spot {
-  photo: PhotoSummary;
-  poi: Poi | null;
+/** A located photo, or a located entry, with its administrative path. Names are '' when unknown. */
+export interface Spot<T = PhotoSummary> {
+  item: T;
+  /** the photo's or the entry's id */
+  id: string;
+  /** what one alone is called: its title; '' for none */
+  title: string;
+  /** what its album shows, best first: a photo itself, an entry's photos (none for an entry without) */
+  covers: readonly PhotoSummary[];
+  poi: LocatedPlace | null;
   lat: number;
   lng: number;
   /** Web Mercator, 0..1 across and down */
@@ -61,11 +69,11 @@ export interface Spot {
   county: string;
   /** the ~300 m square it is in: anchors and cover variety */
   cell: number;
-  /** cover order: favourites, then newest */
+  /** cover order: favourite photos, then the newest */
   rank: number;
 }
 
-export interface Album {
+export interface Album<T = PhotoSummary> {
   /** marker identity: the same while the album is the same, across zooms where possible; unique within a layout */
   key: string;
   /** what selecting it selects, `pv:` `ct:` `co:` `pl:` `ph:`; '' when it is only a merge on screen */
@@ -80,33 +88,33 @@ export interface Album {
   lat: number;
   lng: number;
   /** members, best cover first */
-  spots: Spot[];
+  spots: Spot<T>[];
   /** the units above it that all members share, coarse to fine, full names */
   parents: string[];
 }
 
-export interface Unit {
+export interface Unit<T = PhotoSummary> {
   ref: string;
   name: string;
   label: string;
-  spots: Spot[];
+  spots: Spot<T>[];
 }
 
-interface Group {
+interface Group<T> {
   key: string;
-  spots: Spot[];
+  spots: Spot<T>[];
   x: number;
   y: number;
 }
 
-export interface AlbumIndex {
-  /** located photos, best cover first */
-  spots: Spot[];
-  byId: Map<string, Spot>;
-  /** photos per unit (`pv:` `ct:` `co:` `pl:`) */
+export interface AlbumIndex<T = PhotoSummary> {
+  /** located items, best cover first */
+  spots: Spot<T>[];
+  byId: Map<string, Spot<T>>;
+  /** items per unit (`pv:` `ct:` `co:` `pl:`) */
   unitSize: Map<string, number>;
-  groups: Map<Level, Group[]>;
-  layouts: Map<number, Album[]>;
+  groups: Map<Level, Group<T>[]>;
+  layouts: Map<number, Album<T>[]>;
 }
 
 // ---- geometry -------------------------------------------------------------------------------------------------
@@ -131,12 +139,15 @@ const cellOf = (x: number, y: number) => Math.min(CELLS - 1, Math.floor(x * CELL
 
 /** Keys use short names, so 杭州 and 杭州市 are one city; a comma would break the `area` link parameter. */
 const keyName = (s: string) => s.replace(/,/g, '，');
-const pvOf = (s: Spot) => (s.province ? keyName(shortProvince(s.province)) : '');
-const ctOf = (s: Spot) => (s.city ? keyName(shortCity(s.city)) : '');
-const coOf = (s: Spot) => (s.county ? keyName(shortCounty(s.county)) : '');
+/** Any spot, whatever it holds: what grouping and naming read. */
+type AnySpot = Spot<unknown>;
 
-/** The unit a photo belongs to at a level; '' when unknown. */
-export function unitOf(level: Level, s: Spot): string {
+const pvOf = (s: AnySpot) => (s.province ? keyName(shortProvince(s.province)) : '');
+const ctOf = (s: AnySpot) => (s.city ? keyName(shortCity(s.city)) : '');
+const coOf = (s: AnySpot) => (s.county ? keyName(shortCounty(s.county)) : '');
+
+/** The unit a photo or an entry belongs to at a level ('photo': itself); '' when unknown. */
+export function unitOf(level: Level, s: AnySpot): string {
   switch (level) {
     case 'province':
       return s.province ? `pv:${pvOf(s)}` : '';
@@ -147,7 +158,7 @@ export function unitOf(level: Level, s: Spot): string {
     case 'place':
       return s.poi ? `pl:${s.poi.id}` : '';
     case 'photo':
-      return `ph:${s.photo.id}`;
+      return `ph:${s.id}`;
   }
 }
 
@@ -177,38 +188,29 @@ function mode(values: Iterable<string>): string {
   return best;
 }
 
+/** Where a photo is as the viewer is shown it: its own coordinates, else its place's; null when neither. */
+function whereIs(photo: PhotoSummary, pois: ReadonlyMap<string, Poi>): { lat: number; lng: number; poi: Poi | null } | null {
+  const poi = (photo.poiId && pois.get(photo.poiId)) || null;
+  if (photo.lat != null && photo.lng != null) return { lat: photo.lat, lng: photo.lng, poi };
+  return poi ? { lat: poi.lat, lng: poi.lng, poi } : null;
+}
+
+type Placed<T> = Omit<Spot<T>, 'x' | 'y' | 'cell' | 'rank'>;
+
 /**
- * Places the photos that have a position, their own or their place's, and fills gaps in their administrative path
- * from photos that have it: a city's province, and a county's city within its province.
+ * The spots, in cover order, with the gaps in their administrative path filled from spots that have it (theirs or
+ * the `hints`, e.g. the located photos for the entries): a city's province, and a county's city within its province.
  */
-export function buildIndex(photos: readonly PhotoSummary[], pois: ReadonlyMap<string, Poi>): AlbumIndex {
-  const spots: Spot[] = [];
-  for (const photo of [...photos].sort(byCover)) {
-    const poi = (photo.poiId && pois.get(photo.poiId)) || null;
-    const own = photo.lat != null && photo.lng != null;
-    if (!own && !poi) continue;
-    const lat = own ? (photo.lat as number) : (poi as Poi).lat;
-    const lng = own ? (photo.lng as number) : (poi as Poi).lng;
-    const x = mercX(lng);
-    const y = mercY(lat);
-    spots.push({
-      photo,
-      poi,
-      lat,
-      lng,
-      x,
-      y,
-      province: photo.province ?? '',
-      city: photo.city ?? poi?.city ?? '',
-      county: photo.district ?? poi?.district ?? '',
-      cell: cellOf(x, y),
-      rank: spots.length
-    });
-  }
+function indexOf<T>(placed: readonly Placed<T>[], hints: readonly AnySpot[]): AlbumIndex<T> {
+  const spots = placed.map((p, rank): Spot<T> => {
+    const x = mercX(p.lng);
+    const y = mercY(p.lat);
+    return { ...p, x, y, cell: cellOf(x, y), rank };
+  });
 
   const provinceOf = new Map<string, string[]>();
   const cityOf = new Map<string, string[]>();
-  for (const s of spots) {
+  for (const s of [...spots, ...hints]) {
     if (s.city && s.province) push(provinceOf, ctOf(s), s.province);
     if (s.county && s.city && s.province) push(cityOf, `${pvOf(s)},${coOf(s)}`, s.city);
   }
@@ -224,13 +226,74 @@ export function buildIndex(photos: readonly PhotoSummary[], pois: ReadonlyMap<st
       if (u) unitSize.set(u, (unitSize.get(u) ?? 0) + 1);
     }
   }
-  return { spots, byId: new Map(spots.map((s) => [s.photo.id, s])), unitSize, groups: new Map(), layouts: new Map() };
+  return { spots, byId: new Map(spots.map((s) => [s.id, s])), unitSize, groups: new Map(), layouts: new Map() };
+}
+
+/** Places the photos that have a position, their own or their place's. */
+export function buildIndex(photos: readonly PhotoSummary[], pois: ReadonlyMap<string, Poi>): AlbumIndex {
+  const placed: Placed<PhotoSummary>[] = [];
+  for (const photo of [...photos].sort(byCover)) {
+    const at = whereIs(photo, pois);
+    if (!at) continue;
+    placed.push({
+      item: photo,
+      id: photo.id,
+      title: photo.title ?? '',
+      covers: [photo],
+      poi: at.poi,
+      lat: at.lat,
+      lng: at.lng,
+      province: photo.province ?? '',
+      city: photo.city ?? at.poi?.city ?? '',
+      county: photo.district ?? at.poi?.district ?? ''
+    });
+  }
+  return indexOf(placed, []);
+}
+
+const byOccurred = (a: EntrySummary, b: EntrySummary) => b.occurredAt.localeCompare(a.occurredAt) || a.id.localeCompare(b.id);
+
+/**
+ * Places the entries, newest first: at their own place, else where the first of their photos with a position is
+ * (`photos` holds the ones the viewer is shown). `hints` lend provinces to the places' cities, which carry none.
+ */
+export function buildEntryIndex(
+  entries: readonly EntrySummary[],
+  photos: ReadonlyMap<string, PhotoSummary>,
+  pois: ReadonlyMap<string, Poi>,
+  hints: readonly AnySpot[] = []
+): AlbumIndex<EntrySummary> {
+  const placed: Placed<EntrySummary>[] = [];
+  for (const entry of [...entries].sort(byOccurred)) {
+    const covers = entry.photoIds.map((id) => photos.get(id)).filter((p): p is PhotoSummary => !!p);
+    const base = { item: entry, id: entry.id, title: entryLabel(entry.title, entry.excerpt), covers };
+    if (entry.poi) {
+      const { poi } = entry;
+      placed.push({ ...base, poi, lat: poi.lat, lng: poi.lng, province: '', city: poi.city ?? '', county: poi.district ?? '' });
+      continue;
+    }
+    for (const photo of covers) {
+      const at = whereIs(photo, pois);
+      if (!at) continue;
+      placed.push({
+        ...base,
+        poi: at.poi,
+        lat: at.lat,
+        lng: at.lng,
+        province: photo.province ?? '',
+        city: photo.city ?? at.poi?.city ?? '',
+        county: photo.district ?? at.poi?.district ?? ''
+      });
+      break;
+    }
+  }
+  return indexOf(placed, hints);
 }
 
 // ---- grouping -------------------------------------------------------------------------------------------------
 
 /** The densest spot of a set of photos: the mean position around the square with the most photos in its 3×3. */
-export function anchorOf(spots: readonly Spot[]): { x: number; y: number } {
+export function anchorOf(spots: readonly AnySpot[]): { x: number; y: number } {
   if (spots.length === 1) return { x: spots[0].x, y: spots[0].y };
   const count = new Map<number, number>();
   for (const s of spots) count.set(s.cell, (count.get(s.cell) ?? 0) + 1);
@@ -264,11 +327,11 @@ export function anchorOf(spots: readonly Spot[]): { x: number; y: number } {
   return { x: x / n, y: y / n };
 }
 
-function groupsAt(index: AlbumIndex, level: Level): Group[] {
+function groupsAt<T>(index: AlbumIndex<T>, level: Level): Group<T>[] {
   const cached = index.groups.get(level);
   if (cached) return cached;
-  const by = new Map<string, Spot[]>();
-  for (const s of index.spots) push(by, unitOf(level, s) || `ph:${s.photo.id}`, s);
+  const by = new Map<string, Spot<T>[]>();
+  for (const s of index.spots) push(by, unitOf(level, s) || `ph:${s.id}`, s);
   const groups = [...by].map(([key, spots]) => ({ key, spots, ...anchorOf(spots) }));
   groups.sort((a, b) => b.spots.length - a.spots.length || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   index.groups.set(level, groups);
@@ -280,7 +343,7 @@ function groupsAt(index: AlbumIndex, level: Level): Group[] {
 type Agreement = { kind: 'one'; unit: string } | { kind: 'many' } | { kind: 'none' };
 
 /** Whether the photos are in one unit at a level: all that know theirs agree, and they are at least half. */
-function agree(spots: readonly Spot[], level: Level): Agreement {
+function agree(spots: readonly AnySpot[], level: Level): Agreement {
   let unit = '';
   let known = 0;
   for (const s of spots) {
@@ -295,7 +358,7 @@ function agree(spots: readonly Spot[], level: Level): Agreement {
 }
 
 /** Full and short name of a unit, from the photos in it. */
-function nameOf(level: Level, unit: string, spots: readonly Spot[]): { name: string; label: string } {
+function nameOf(level: Level, unit: string, spots: readonly AnySpot[]): { name: string; label: string } {
   const inUnit = spots.filter((s) => unitOf(level, s) === unit);
   switch (level) {
     case 'province': {
@@ -315,12 +378,12 @@ function nameOf(level: Level, unit: string, spots: readonly Spot[]): { name: str
       return { name, label: name };
     }
     case 'photo':
-      return { name: inUnit[0]?.photo.title ?? '', label: '' };
+      return { name: inUnit[0]?.title ?? '', label: '' };
   }
 }
 
 /** The units above `level` that every member shares, coarse to fine. */
-function parentsOf(spots: readonly Spot[], level: Level | 'region'): string[] {
+function parentsOf(spots: readonly AnySpot[], level: Level | 'region'): string[] {
   const out: string[] = [];
   for (const l of ['province', 'city', 'county'] as const) {
     if (level === 'region' || LEVELS.indexOf(l) >= LEVELS.indexOf(level)) break;
@@ -332,18 +395,18 @@ function parentsOf(spots: readonly Spot[], level: Level | 'region'): string[] {
 }
 
 /** The unit at a level holding the most of the photos. */
-function largest(spots: readonly Spot[], level: Level): string {
+function largest(spots: readonly AnySpot[], level: Level): string {
   return mode(spots.map((s) => unitOf(level, s)));
 }
 
 type Described = Pick<Album, 'ref' | 'type' | 'merged' | 'name' | 'label' | 'parents'>;
 
-function named(level: Level, unit: string, spots: readonly Spot[]): Described {
+function named(level: Level, unit: string, spots: readonly AnySpot[]): Described {
   return { ref: unit, type: level, merged: false, ...nameOf(level, unit, spots), parents: parentsOf(spots, level) };
 }
 
 /** Type and name of an album laid out at `level` (rules in the comment at the top). */
-export function describe(index: AlbumIndex, spots: readonly Spot[], level: Level): Described {
+export function describe<T>(index: AlbumIndex<T>, spots: readonly Spot<T>[], level: Level): Described {
   if (level === 'photo' && spots.length === 1) return named('photo', unitOf('photo', spots[0]), spots);
   const at: Level = level === 'photo' ? 'place' : level;
   const a = agree(spots, at);
@@ -367,7 +430,7 @@ export function describe(index: AlbumIndex, spots: readonly Spot[], level: Level
 // ---- layout ---------------------------------------------------------------------------------------------------
 
 /** The albums at an integer zoom; cached per zoom. */
-export function layoutAt(index: AlbumIndex, z: number): Album[] {
+export function layoutAt<T>(index: AlbumIndex<T>, z: number): Album<T>[] {
   const cached = index.layouts.get(z);
   if (cached) return cached;
   const level = levelAt(z);
@@ -377,7 +440,7 @@ export function layoutAt(index: AlbumIndex, z: number): Album[] {
   interface Bin {
     px: number;
     py: number;
-    groups: Group[];
+    groups: Group<T>[];
   }
   const bins: Bin[] = [];
   const grid = new Map<string, Bin[]>();
@@ -429,12 +492,14 @@ export function layoutAt(index: AlbumIndex, z: number): Album[] {
 
 const REF_LEVEL: Record<string, Level> = { pv: 'province', ct: 'city', co: 'county', pl: 'place', ph: 'photo' };
 
-/** The whole unit a `ref` names, as an album at its own spot; null when no located photo is in it. */
-export function albumOf(index: AlbumIndex, ref: string): Album | null {
+/** The whole unit a `ref` names, as an album at its own spot; null when nothing located is in it. */
+export function albumOf<T>(index: AlbumIndex<T>, ref: string): Album<T> | null {
   const level = REF_LEVEL[ref.slice(0, 2)];
   if (!level || ref[2] !== ':') return null;
   const spots =
-    level === 'photo' ? [index.byId.get(ref.slice(3))].filter((s): s is Spot => !!s) : index.spots.filter((s) => unitOf(level, s) === ref);
+    level === 'photo'
+      ? [index.byId.get(ref.slice(3))].filter((s): s is Spot<T> => !!s)
+      : index.spots.filter((s) => unitOf(level, s) === ref);
   if (!spots.length) return null;
   const at = anchorOf(spots);
   return { key: ref, ...named(level, ref, spots), lat: unMercY(at.y), lng: unMercX(at.x), spots };
@@ -448,16 +513,16 @@ export function refOfArea(area: string): string {
 }
 export const areaOfRef = (ref: string): string | null => (/^(pv|ct|co):/.test(ref) ? ref.slice(3) : null);
 
-export interface Parts {
+export interface Parts<T = PhotoSummary> {
   level: Level;
   /** largest first */
-  units: Unit[];
-  /** photos without a unit at that level */
+  units: Unit<T>[];
+  /** items without a unit at that level */
   rest: number;
 }
 
-function partsAt(spots: readonly Spot[], level: Level): Parts {
-  const by = new Map<string, Spot[]>();
+function partsAt<T>(spots: readonly Spot<T>[], level: Level): Parts<T> {
+  const by = new Map<string, Spot<T>[]>();
   let rest = 0;
   for (const s of spots) {
     const u = unitOf(level, s);
@@ -471,15 +536,15 @@ function partsAt(spots: readonly Spot[], level: Level): Parts {
 }
 
 /** The parts of an album: provinces of a region, the units of a merge, else the units one level down. */
-export function partsOf(album: Album): Parts | null {
+export function partsOf<T>(album: Album<T>): Parts<T> | null {
   if (album.type === 'spot') return null;
   const level = album.type === 'region' ? 'province' : album.merged ? album.type : CHILD[album.type];
   return level ? partsAt(album.spots, level) : null;
 }
 
 /** The highest level with more than one unit (provinces, else cities, …), for the panel with nothing selected. */
-export function overview(index: AlbumIndex): Parts | null {
-  let last: Parts | null = null;
+export function overview<T>(index: AlbumIndex<T>): Parts<T> | null {
+  let last: Parts<T> | null = null;
   for (const level of ['province', 'city', 'county', 'place'] as const) {
     const parts = partsAt(index.spots, level);
     if (!parts.units.length) continue;
@@ -493,19 +558,19 @@ export function overview(index: AlbumIndex): Parts | null {
  * Where clicking an album takes the map: in to the first zoom at which its photos come apart, centred on all of them
  * when they fit at that zoom, else on the album. Places and single photos never move the map.
  */
-export function zoomTarget(
-  index: AlbumIndex,
-  album: Album,
+export function zoomTarget<T>(
+  index: AlbumIndex<T>,
+  album: Album<T>,
   z: number,
   view: { w: number; h: number },
   pad = 48
 ): { lat: number; lng: number; zoom: number } | null {
   if (album.type === 'photo' || (album.type === 'place' && !album.merged)) return null;
-  const ids = new Set(album.spots.map((s) => s.photo.id));
+  const ids = new Set(album.spots.map((s) => s.id));
   for (let z2 = z + 1; z2 <= MAX_LAYOUT_ZOOM; z2++) {
     let seen = 0;
     for (const a of layoutAt(index, z2)) {
-      if (a.spots.some((s) => ids.has(s.photo.id)) && ++seen > 1) break;
+      if (a.spots.some((s) => ids.has(s.id)) && ++seen > 1) break;
     }
     if (seen < 2) continue;
     const xs = album.spots.map((s) => s.x);
@@ -520,24 +585,37 @@ export function zoomTarget(
 // ---- decoration -----------------------------------------------------------------------------------------------
 
 /**
- * Up to `max` photos for the album's carousel: the best of each spot first (a different place or ~300 m square), so a
- * province shows several of its places rather than four shots of one; matching photos only, unless none match.
+ * Up to `max` photos for the album's carousel: the first of each spot first, one per place or ~300 m square, so a
+ * province shows several of its places rather than four shots of one; then the first of the other spots, then the
+ * rest of their photos (an entry's). Matching spots only, unless none match; none when they have no photos.
  */
-export function coversOf(spots: readonly Spot[], matches: (p: PhotoSummary) => boolean, max = 4): PhotoSummary[] {
-  const hits = spots.filter((s) => matches(s.photo));
+export function coversOf<T>(spots: readonly Spot<T>[], matches: (s: Spot<T>) => boolean, max = 4): PhotoSummary[] {
+  const hits = spots.filter(matches);
   const pool = hits.length ? hits : spots;
-  const out: Spot[] = [];
+  const out: PhotoSummary[] = [];
+  const taken = new Set<string>();
+  const add = (p: PhotoSummary) => {
+    if (out.length < max && !taken.has(p.id)) {
+      taken.add(p.id);
+      out.push(p);
+    }
+  };
+  // two entries can hold the same photo: each spot shows the first of its photos not shown yet
+  const next = (s: Spot<T>) => s.covers.find((p) => !taken.has(p.id));
   const seen = new Set<string>();
+  const shown = new Set<Spot<T>>();
   for (const s of pool) {
     const where = s.poi ? `p${s.poi.id}` : `c${s.cell}`;
-    if (seen.has(where)) continue;
+    const p = seen.has(where) ? undefined : next(s);
+    if (!p) continue;
     seen.add(where);
-    out.push(s);
-    if (out.length === max) break;
+    shown.add(s);
+    add(p);
   }
   for (const s of pool) {
-    if (out.length >= max) break;
-    if (!out.includes(s)) out.push(s);
+    const p = shown.has(s) ? undefined : next(s);
+    if (p) add(p);
   }
-  return out.map((s) => s.photo);
+  for (const s of pool) for (const p of s.covers) add(p);
+  return out;
 }

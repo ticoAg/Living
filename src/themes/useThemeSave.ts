@@ -89,13 +89,15 @@ export function useThemeSave({ draft, setDraft, initial, setMsg, onCreated, onDe
         setSaved({ meta: serverMeta, items: serverItems });
       }
       invalidate('/api/themes');
+      // entry pages list the collections holding them
+      invalidate('/api/entries/');
       setDraft(dropEmptyText);
       // saved from /themes/new (possibly after a retry): continue on the theme's own edit route
       if (!initial) onCreated(id, last ?? null);
       else setMsg({ kind: 'ok', text: '已保存' });
     } catch (e) {
       const created = !themeId && id;
-      setMsg({ kind: 'error', text: created ? `主题已创建，但后面的内容没有保存成功：${errorMessage(e)}` : errorMessage(e) });
+      setMsg({ kind: 'error', text: created ? `合集已创建，但后面的内容没有保存成功：${errorMessage(e)}` : errorMessage(e) });
     } finally {
       setSaving(false);
     }
@@ -107,6 +109,7 @@ export function useThemeSave({ draft, setDraft, initial, setMsg, onCreated, onDe
     try {
       await api(`/api/themes/${themeId}`, { method: 'DELETE' });
       invalidate('/api/themes');
+      invalidate('/api/entries/');
       onDeleted();
     } catch (e) {
       setDeleting(false);

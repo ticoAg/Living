@@ -35,6 +35,9 @@ export default defineConfig({
       // A camera that is not there, for the site's own camera: getUserMedia gets a generated picture, and the
       // question whether the page may use it is answered yes (the headless shell refuses the camera without this).
       args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+      // Chromium names files in the locale's encoding: without a UTF-8 one (a container with LANG unset), the
+      // export into a folder cannot make the Chinese file names a person's browser makes.
+      env: { ...process.env, LANG: process.env.LANG?.toUpperCase().includes('UTF-8') ? process.env.LANG : 'C.UTF-8' },
       ...(process.env.E2E_CHROMIUM ? { executablePath: process.env.E2E_CHROMIUM } : {})
     }
   },
@@ -42,7 +45,11 @@ export default defineConfig({
     // registers the owner, uploads and publishes the sample photos, walks every page and saves the session
     { name: 'story', testMatch: 'story.spec.ts', use: desktop },
     // fixes worth guarding, run on the story's data and session
-    { name: 'regressions', testMatch: 'regressions.spec.ts', dependencies: ['story'], use: desktop }
+    { name: 'regressions', testMatch: 'regressions.spec.ts', dependencies: ['story'], use: desktop },
+    // videos, recordings and files; after the regressions, which count the story's entries
+    { name: 'attachments', testMatch: 'attachments.spec.ts', dependencies: ['regressions'], use: desktop },
+    // the library, the gallery's entry layer and Living over entries; after the attachments, whose files it lists
+    { name: 'library', testMatch: 'library.spec.ts', dependencies: ['attachments'], use: desktop }
   ],
   webServer: {
     // a fresh database on every run, then the build `npm run test:e2e` has just made

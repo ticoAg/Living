@@ -1,12 +1,20 @@
 import { Suspense } from 'react';
-import { Route, Switch, useLocation } from 'wouter';
+import { Route, Switch, useLocation, useSearch } from 'wouter';
 import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import ReLogin from './components/ReLogin';
+import VisitorView from './components/VisitorView';
 import { SessionProvider } from './lib/session';
+import { isVisitorSearch } from './lib/visitor';
 import {
+  Archive,
+  Articles,
+  Calendar,
+  EntryEditor,
+  EntryReader,
   Explore,
   IndexPage,
+  Library,
   Living,
   Login,
   MapPage,
@@ -16,33 +24,62 @@ import {
   Place,
   PlaceEdit,
   Profile,
+  ProjectForm,
+  ProjectPage,
+  Projects,
   Register,
+  Search,
   Settings,
+  ShareOpen,
   TagsManager,
   ThemeEditor,
   ThemeReader,
   Themes,
-  Upload
+  Today,
+  Upload,
+  Works,
+  YearReview
 } from './routes';
 
 // Route table. Each page module is owned by one area (see /docs/architecture/frontend.md):
+// entries — Today, Archive, EntryReader, EntryEditor
+// projects — Projects, ProjectPage, ProjectForm
 // browse — Explore, Profile, Photo, Place, MapPage, IndexPage
+// library — Library
+// showcase — Works, Articles
 // living — Living
 // studio — Upload, PhotoEdit, PlaceEdit, TagsManager, Login, Register, Settings
 // themes — Themes, ThemeReader, ThemeEditor
+// shares — ShareOpen
+// search — Search
 // The lazy page modules and their prefetching live in ./routes.
 
 function Routes() {
   return (
     <Switch>
       <Route path="/" component={Explore} />
+      <Route path="/today" component={Today} />
+      <Route path="/archive" component={Archive} />
+      <Route path="/archive/calendar" component={Calendar} />
+      <Route path={/^\/archive\/(?<year>\d{4})$/} component={YearReview} />
+      {/* one route for both, so the editor of a new entry stays as it is when the entry's first save moves it to
+          the entry's own address */}
+      <Route path={/^\/(?:entries\/new|e\/(?<id>[^/]+)\/edit)$/} component={EntryEditor} />
+      <Route path="/e/:id" component={EntryReader} />
+      <Route path="/projects" component={Projects} />
+      <Route path="/projects/new" component={ProjectForm} />
+      <Route path="/projects/:id/edit" component={ProjectForm} />
+      <Route path="/projects/:id" component={ProjectPage} />
       {/* wouter reads "@:handle" as a literal segment, and static assets redirect /@x to /%40x;
           a RegExp route captures the handle in either form */}
       <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/?$/i} component={Profile} />
+      <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/works\/?$/i} component={Works} />
+      <Route path={/^\/(?:@|%40)(?<handle>[^/]+)\/articles\/?$/i} component={Articles} />
       <Route path="/p/:id" component={Photo} />
       <Route path="/place/:id" component={Place} />
       <Route path="/map" component={MapPage} />
       <Route path="/index" component={IndexPage} />
+      <Route path="/library" component={Library} />
       <Route path="/living" component={Living} />
       <Route path="/upload" component={Upload} />
       <Route path="/studio/photo/:id" component={PhotoEdit} />
@@ -55,6 +92,8 @@ function Routes() {
       <Route path="/themes/new" component={ThemeEditor} />
       <Route path="/t/:id/edit" component={ThemeEditor} />
       <Route path="/t/:id" component={ThemeReader} />
+      <Route path="/s/:token" component={ShareOpen} />
+      <Route path="/search" component={Search} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -63,16 +102,21 @@ function Routes() {
 export default function App() {
   const [path] = useLocation();
   const immersive = path.startsWith('/living');
+  const visitor = isVisitorSearch(useSearch());
+  // the header stays outside: an error in a page (or its chunk) still leaves the navigation
+  const pages = (
+    <ErrorBoundary resetKey={path}>
+      {/* the fallback fades in late: a chunk that arrives quickly never flashes it */}
+      <Suspense fallback={<p className="loading loading-late">加载中</p>}>
+        <Routes />
+      </Suspense>
+    </ErrorBoundary>
+  );
   return (
     <SessionProvider>
       {!immersive && <Header />}
-      {/* the header stays outside: an error in a page (or its chunk) still leaves the navigation */}
-      <ErrorBoundary resetKey={path}>
-        {/* the fallback fades in late: a chunk that arrives quickly never flashes it */}
-        <Suspense fallback={<p className="loading loading-late">加载中</p>}>
-          <Routes />
-        </Suspense>
-      </ErrorBoundary>
+      {/* ?as=visitor: the pages as someone not signed in sees them; the header still shows who is */}
+      {visitor ? <VisitorView>{pages}</VisitorView> : pages}
       <ReLogin />
     </SessionProvider>
   );

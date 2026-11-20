@@ -88,6 +88,7 @@ sources:
 - `photos_visibility_taken`（`visibility`, `taken_at`）：首页公开照片按时间排序。
 - `photos_poi`（`poi_id`）：地点页取该地点的照片。
 - `photos_region_todo`（`id`）：仅 `province IS NULL` 的行，即每小时的补全任务还要查的照片；补上后离开索引。
+- `photos_owner_text`（`owner_id`, `taken_at`）：仅有标题或笔记（`title IS NOT NULL OR note IS NOT NULL`）的行，[搜索](/api/search.md#读取的行数) 只读这些照片，不必走遍没写字的。
 
 # 省、市、区县
 
@@ -100,7 +101,8 @@ sources:
 - 所有者 [users](/data/users.md)：删除用户时照片级联删除。
 - 地点 [pois](/data/pois.md)：`poi_id`，地点删除时置空。
 - 标签：通过 [photo_tags](/data/photo-tags.md) 多对多关联 [tags](/data/tags.md)。
-- 主题：[theme_items](/data/theme-items.md) 的 `photo_id` 引用照片，照片删除时条目级联删除；[themes](/data/themes.md) 的 `cover_photo_id` 引用封面，删除时置空。
+- 合集：[theme_items](/data/theme-items.md) 的 `photo_id` 引用照片，照片删除时条目级联删除；[themes](/data/themes.md) 的 `cover_photo_id` 引用封面，删除时置空。
+- 记录：[entry_media](/data/entry-media.md) 的 `photo_id` 引用照片，照片删除时关联级联删除，Worker 同时让这些记录的 `revision` 加一。照片在记录里只是被引用，公开范围、标签和笔记仍属于照片自己。
 - 头像：`users.avatar_photo_id` 指向照片但没有外键，删除照片时由 Worker 置空。
 - 文件：R2 中的原图和三种尺寸图，D1 外键管不到，删除照片时由 Worker 一并删除。
 - 功能说明：[上传与整理](/product/features/upload.md)、[照片详情](/product/features/photo-detail.md)、[图库](/product/features/gallery.md)、[隐私](/product/features/privacy.md)。接口：[照片接口](/api/photos.md)。

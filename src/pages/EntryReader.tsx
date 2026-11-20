@@ -1,0 +1,193 @@
+import { Link, useParams } from 'wouter';
+import { ENTRY_STATUS_LABELS, entryLabel, entryTypeLabel, hasTime, occurredDay } from '../../shared/entries';
+import type { EntryDetail, EntryStatus } from '../../shared/types';
+import { livingEntry } from '../browse/links';
+import { LoadError, Loading } from '../browse/ui';
+import { useTagMap } from '../entries/api';
+import Markdown from '../entries/Markdown';
+import AttachmentView from '../attachments/AttachmentView';
+import { Icon } from '../components/icons';
+import Img from '../components/Img';
+import { fmtLongDay, fmtTime } from '../lib/format';
+import { useSession } from '../lib/session';
+import { useApi } from '../lib/useApi';
+import { MY_PROJECTS, useProjectList } from '../projects/api';
+import ShareButton from '../shares/ShareButton';
+import VisitorLink from '../components/VisitorLink';
+import { useDocumentTitle, useScrollTop } from '../themes/hooks';
+import { VISIBILITY_LABEL } from '../themes/util';
+import '../styles/browse.css';
+import '../styles/entries.css';
+
+// /e/:id — an entry to read: the projects it is in, its text as Markdown, its photos and attachments with their
+// captions, the collections holding it and its tags. Others see it only once it is finished and not private; its photos
+// are each shown or left out by their own visibility, its attachments go with it. Docs: /docs/product/features/entries.md
+
+/** A link to an entry opens only while it is finished. */
+const SHARE_NOTICE: Record<EntryStatus, string | undefined> = {
+  draft: '还是草稿：完成后链接才打得开。',
+  published: undefined,
+  archived: '已归档：链接暂时打不开，取消归档后恢复。'
+};
+
+function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
+  const tags = useTagMap(own ? '/api/tags' : `/api/tags?owner=${encodeURIComponent(e.ownerHandle)}`);
+  const tagNames = e.tagIds.map((id) => tags.byId.get(id)?.name).filter((n): n is string => !!n);
+  // the projects it is in that the reader may see listed: the author's own, or the public ones
+  const { projects } = useProjectList(
+    e.projectIds.length ? (own ? MY_PROJECTS : `/api/projects?owner=${encodeURIComponent(e.ownerHandle)}`) : null
+  );
+  const inProjects = (projects ?? []).filter((p) => e.projectIds.includes(p.id));
+  const day = fmtLongDay(occurredDay(e.occurredAt));
+  const marks = [
+    e.type !== 'note' ? entryTypeLabel(e.type) : '',
+    own && e.status !== 'published' ? ENTRY_STATUS_LABELS[e.status] : '',
+    own ? `${VISIBILITY_LABEL[e.visibility]}${e.visibility === 'public' ? '' : '可见'}` : ''
+  ].filter(Boolean);
+
+  return (
+    <article className="er">
+      <header className="er-head">
+        {inProjects.length > 0 && (
+          <p className="er-projects">
+            {inProjects.map((p) => (
+              <Link key={p.id} href={`/projects/${p.id}`}>
+                {p.title}
+              </Link>
+            ))}
+          </p>
+        )}
+        <p className="er-meta">
+          <span>
+            {e.occurredAt.slice(0, 4)} · {day}
+            {hasTime(e.occurredAt) && <span className="mono"> {fmtTime(e.occurredAt)}</span>}
+          </span>
+          {e.poi && (
+            <Link href={`/place/${e.poi.id}`} className="er-place">
+              <Icon name="pin" size={15} />
+              {e.poi.name}
+            </Link>
+          )}
+          {marks.map((m) => (
+            <span key={m} className="en-mark">
+              {m}
+            </span>
+          ))}
+        </p>
+        <h1 className="display display-l er-title">{e.title ?? (e.body ? day : entryTypeLabel(e.type))}</h1>
+        {!own && (
+          <p className="er-by">
+            <Link href={`/@${e.ownerHandle}`}>@{e.ownerHandle}</Link>
+          </p>
+        )}
+      </header>
+
+      {e.status === 'draft' && own && (
+        <p className="notice er-draft">
+          还是草稿，只有你能看到。
+          <Link href={`/e/${e.id}/edit`}>继续写</Link>
+        </p>
+      )}
+
+      {e.body && <Markdown text={e.body} className="er-body" />}
+
+      {e.media.length > 0 && (
+        <div className="er-media">
+          {e.media.map((m) => (
+            <figure key={m.photoId} className="er-figure">
+              <Link href={`/p/${m.photoId}`} className="er-photo" aria-label={m.caption ?? m.photo.title ?? '查看照片'}>
+                <Img photo={m.photo} fit="contain" sizes="(max-width: 880px) 100vw, 880px" alt="" />
+              </Link>
+              {m.caption && <figcaption>{m.caption}</figcaption>}
+            </figure>
+          ))}
+        </div>
+      )}
+
+      {e.attachments.length > 0 && (
+        <div className="er-media er-attachments">
+          {e.attachments.map((a) => (
+            <AttachmentView key={a.id} a={a} />
+          ))}
+        </div>
+      )}
+
+      {(tagNames.length > 0 || e.themes.length > 0 || own || e.media.length > 0) && (
+        <footer className="er-foot">
+          {(tagNames.length > 0 || e.themes.length > 0) && (
+            <div className="er-foot-main">
+              {e.themes.length > 0 && (
+                <ul className="er-themes" aria-label="所属合集">
+                  {e.themes.map((t) => (
+                    <li key={t.id}>
+                      <Link href={`/t/${t.id}`}>
+                        <Icon name="book" size={16} />
+                        {t.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {tagNames.length > 0 && (
+                <p className="er-tags">
+                  {tagNames.map((n) => (
+                    <span key={n}>#{n}</span>
+                  ))}
+                </p>
+              )}
+            </div>
+          )}
+          {(own || e.media.length > 0) && (
+            <div className="row er-own">
+              {e.media.length > 0 && (
+                <Link
+                  href={livingEntry(e.id)}
+                  className="btn btn-quiet btn-living"
+                  aria-label={`Living，播放这条记录的 ${e.media.length} 张照片`}
+                >
+                  <Icon name="play" size={16} />
+                  Living
+                </Link>
+              )}
+              {own && (
+                <>
+                  <ShareButton kind="entry" id={e.id} notice={SHARE_NOTICE[e.status]} />
+                  <VisitorLink href={`/e/${e.id}`} />
+                  <Link href={`/e/${e.id}/edit`} className="btn btn-quiet">
+                    <Icon name="edit" size={16} />
+                    编辑
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+        </footer>
+      )}
+    </article>
+  );
+}
+
+export default function EntryReader() {
+  const { id } = useParams<{ id: string }>();
+  const { user } = useSession();
+  const { data, error, reload } = useApi<EntryDetail>(`/api/entries/${encodeURIComponent(id)}`);
+  useDocumentTitle(data ? entryLabel(data.title, data.body) || entryTypeLabel(data.type) : null);
+  useScrollTop(id);
+
+  let body;
+  if (data) body = <Reader entry={data} own={!!user && user.id === data.ownerId} />;
+  else if (error) {
+    body = (
+      <LoadError
+        error={error}
+        onRetry={reload}
+        notFound={{
+          title: '记录不存在，或你没有权限查看',
+          back: user ? { href: '/archive', label: '回到档案' } : { href: '/', label: '回到图库' }
+        }}
+      />
+    );
+  } else body = <Loading />;
+
+  return <main className="page-narrow en">{body}</main>;
+}

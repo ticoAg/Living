@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import {
   DEFAULT_SETTINGS,
+  FIELD_KEYS,
   STORE_KEY,
   buildQuery,
   defaultOrder,
   readInitial,
   readStored,
+  replaceUrl,
   sourceFromQuery,
   writeStored,
   type Settings,
@@ -53,6 +55,8 @@ describe('sourceFromQuery', () => {
       place: '',
       city: '',
       theme: '',
+      entry: '',
+      types: [],
       user: '',
       order: 'shuffle'
     });
@@ -113,6 +117,23 @@ describe('sourceFromQuery', () => {
   it('decodes percent-encoded values', () => {
     expect(sourceFromQuery(q('city=%E6%9D%AD%E5%B7%9E')).city).toBe('杭州');
   });
+
+  it('plays one entry in its own order, or entries of the types the link names', () => {
+    expect(sourceFromQuery(q('src=entry&entry=en_1'))).toMatchObject({ src: 'entry', entry: 'en_1', order: 'time' });
+    expect(sourceFromQuery(q('entry=%20en_1%20'))).toMatchObject({ src: 'entry', entry: 'en_1' });
+    expect(sourceFromQuery(q('src=entry&entry=en_1&order=shuffle')).order).toBe('shuffle');
+    // an entry to play, or none: everything
+    expect(sourceFromQuery(q('src=entry')).src).toBe('all');
+    expect(sourceFromQuery(q('src=entries'))).toMatchObject({ src: 'entries', types: [], order: 'shuffle' });
+    // the types it knows, in their own order, each once
+    expect(sourceFromQuery(q('src=entries&type=creation,%20practice%20,bogus,creation')).types).toEqual(['practice', 'creation']);
+    expect(sourceFromQuery(q('src=entries&type=Practice')).types).toEqual([]);
+  });
+
+  it('prefers a theme to an entry, and an entry to a city, when several are given', () => {
+    expect(sourceFromQuery(q('theme=t&entry=e&city=c')).src).toBe('theme');
+    expect(sourceFromQuery(q('entry=e&city=c')).src).toBe('entry');
+  });
 });
 
 describe('readInitial', () => {
@@ -122,7 +143,7 @@ describe('readInitial', () => {
   });
 
   it('lets what the device remembers override the defaults', () => {
-    stubStorage(JSON.stringify({ every: 30, fx: 'fade', fields: ['place', 'title'], night: true }));
+    stubStorage(JSON.stringify({ every: 30, fx: 'fade', fields: ['place', 'title'], fieldKeys: FIELD_KEYS, night: true }));
     expect(readInitial('').settings).toEqual({ ...DEFAULT_SETTINGS, every: 30, fx: 'fade', fields: ['place', 'title'], night: true });
   });
 
@@ -216,9 +237,35 @@ describe('readStored / writeStored', () => {
 
   it('coerces what it finds, dropping bad entries', () => {
     stubStorage(
-      JSON.stringify({ every: '45', fx: 'zoom', fit: 'contain', fields: 'place,exif', brief: 1, clock: 'maybe', size: 3, junk: true })
+      JSON.stringify({
+        every: '45',
+        fx: 'zoom',
+        fit: 'contain',
+        fields: 'place,exif',
+        fieldKeys: FIELD_KEYS,
+        brief: 1,
+        clock: 'maybe',
+        size: 3,
+        junk: true
+      })
     );
     expect(readStored()).toEqual({ every: 45, fit: 'contain', fields: ['place', 'exif'], brief: true });
+  });
+
+  it('shows a field added since the settings were saved as it is shown by default; a choice made since stays', () => {
+    // saved before `entry` existed
+    stubStorage(JSON.stringify({ every: 20, fields: ['place', 'date'] }));
+    expect(readStored()).toEqual({ every: 20, fields: ['place', 'entry', 'date'] });
+    stubStorage(JSON.stringify({ fields: ['date', 'exif'], fieldKeys: 'junk' }));
+    expect(readStored().fields).toEqual(['entry', 'date', 'exif']);
+    // saved since: turned off
+    stubStorage(JSON.stringify({ fields: ['place', 'date'], fieldKeys: FIELD_KEYS }));
+    expect(readStored().fields).toEqual(['place', 'date']);
+    // no field at all stays so; none saved stays none
+    stubStorage(JSON.stringify({ fields: 'none' }));
+    expect(readStored().fields).toEqual([]);
+    stubStorage(JSON.stringify({ every: 20 }));
+    expect(readStored()).toEqual({ every: 20 });
   });
 
   it('ignores damaged or unexpected content', () => {
@@ -238,7 +285,7 @@ describe('readStored / writeStored', () => {
   it('writes the settings as JSON under the settings key', () => {
     const setItem = stubStorage(null);
     writeStored({ ...DEFAULT_SETTINGS, every: 60 });
-    expect(setItem).toHaveBeenCalledWith(STORE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, every: 60 }));
+    expect(setItem).toHaveBeenCalledWith(STORE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, every: 60, fieldKeys: FIELD_KEYS }));
   });
 
   it('carries on when storage is blocked', () => {
@@ -271,11 +318,22 @@ describe('readStored / writeStored', () => {
 });
 
 describe('buildQuery', () => {
-  const all: Source = { src: 'all', tags: [], match: 'any', place: '', city: '', theme: '', user: '', order: 'shuffle' };
+  const all: Source = {
+    src: 'all',
+    tags: [],
+    match: 'any',
+    place: '',
+    city: '',
+    theme: '',
+    entry: '',
+    types: [],
+    user: '',
+    order: 'shuffle'
+  };
 
   it('writes every setting, so the link behaves the same on any device', () => {
     expect(buildQuery(all, DEFAULT_SETTINGS)).toBe(
-      'src=all&order=shuffle&every=10&fx=drift&fit=cover&fields=place,date&pos=bl&size=m&brief=0&clock=0&awake=1&night=0'
+      'src=all&order=shuffle&every=10&fx=drift&fit=cover&fields=place,entry,date&pos=bl&size=m&brief=0&clock=0&awake=1&night=0'
     );
   });
 
@@ -347,5 +405,38 @@ describe('buildQuery', () => {
       const s = { ...DEFAULT_SETTINGS };
       expect(readInitial(`?${buildQuery(all, s)}`).settings).toEqual(s);
     });
+  });
+
+  it('writes an entry, or the entry types, only for their source; never a city or a user for an entry', () => {
+    const entry = buildQuery({ ...all, src: 'entry', entry: 'en_1', city: '杭州', user: 'ada', order: 'time' }, DEFAULT_SETTINGS);
+    expect(entry).toMatch(/^src=entry&entry=en_1&order=time&/);
+    const entries = buildQuery({ ...all, src: 'entries', types: ['practice', 'creation'], city: '杭州', user: 'ada' }, DEFAULT_SETTINGS);
+    expect(entries).toMatch(/^src=entries&type=practice,creation&city=%E6%9D%AD%E5%B7%9E&user=ada&order=shuffle&/);
+    expect(buildQuery({ ...all, entry: 'en_1', types: ['practice'] }, DEFAULT_SETTINGS)).toMatch(/^src=all&order=shuffle&/);
+    // and the link reads back as it was
+    expect(sourceFromQuery(new URLSearchParams(entries))).toMatchObject({
+      src: 'entries',
+      types: ['practice', 'creation'],
+      city: '杭州',
+      user: 'ada'
+    });
+  });
+});
+
+describe('replaceUrl', () => {
+  /** A window at `/living` + `search`, recording what the address is replaced with. */
+  function at(search: string) {
+    const replaceState = vi.fn();
+    vi.stubGlobal('window', { location: { pathname: '/living', search, hash: '' }, history: { state: null, replaceState } });
+    return replaceState;
+  }
+
+  it('writes the configuration over the address, and keeps the visitor view in it', () => {
+    const plain = at('?src=all');
+    replaceUrl('src=all&every=10');
+    expect(plain).toHaveBeenCalledWith(null, '', '/living?src=all&every=10');
+    const visitor = at('?src=all&as=visitor');
+    replaceUrl('src=all&every=10');
+    expect(visitor).toHaveBeenCalledWith(null, '', '/living?src=all&every=10&as=visitor');
   });
 });

@@ -10,7 +10,8 @@ const tag = (id: string, name: string, parentId: string | null = null, sort = 0)
   ownerId: null,
   color: null,
   sort,
-  count: 0
+  count: 0,
+  entryCount: 0
 });
 const at = (takenAt: string | null, tagIds: string[] = []) => ({ takenAt, tagIds });
 

@@ -5,6 +5,12 @@ export const fmtDay = (t: string | null | undefined) => (t ? t.slice(0, 10).repl
 export const fmtTime = (t: string | null | undefined) => (t && t.length >= 16 ? t.slice(11, 16) : '');
 export const fmtMonth = (t: string | null | undefined) => (t ? t.slice(0, 7).replace('-', '.') : '');
 
+const pad = (n: number) => String(n).padStart(2, '0');
+/** This device's calendar day, `YYYY-MM-DD`. */
+export const localDay = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** This device's wall-clock time, `YYYY-MM-DDTHH:mm:ss`, the form capture and entry times take. */
+export const localDateTime = (d = new Date()) => `${localDay(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 /** 11月8日 星期日 */
 export function fmtLongDay(t: string): string {
@@ -34,4 +40,17 @@ export function dayPart(t: string | null | undefined): '晨' | '昼' | '暮' | '
   if (h >= 9 && h < 16) return '昼';
   if (h >= 16 && h < 19) return '暮';
   return '夜';
+}
+
+/** A size in bytes, in the unit that reads best: 820 KB, 3.4 MB, 12 GB. */
+export function fmtBytes(n: number): string {
+  if (n < 1000) return `${n} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1000 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${i === 0 || v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
 }

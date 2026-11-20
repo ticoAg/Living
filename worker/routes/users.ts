@@ -4,7 +4,7 @@ import type { AppEnv } from '../env';
 import { listCache, notFound } from '../lib/http';
 import { viewerId } from '../lib/session';
 import { prepQ, Sql } from '../lib/sql';
-import { photoList, themeList } from '../lib/visibility';
+import { entryList, photoList, projectList, themeList } from '../lib/visibility';
 
 export const users = new Hono<AppEnv>({ strict: false });
 
@@ -16,11 +16,15 @@ users.get('/:handle', async (c) => {
   const q = new Sql();
   const photoVis = photoList(q, viewer, 'p');
   const themeVis = themeList(q, viewer, 'th');
+  const entryVis = entryList(q, viewer, 'e');
+  const projectVis = projectList(q, viewer, 'pj');
   const row = await prepQ(
     c.env.DB,
     `SELECT u.id, u.handle, u.display_name, u.bio, u.avatar_photo_id, u.created_at,
         (SELECT COUNT(*) FROM photos p WHERE p.owner_id = u.id AND ${photoVis}) AS photo_count,
-        (SELECT COUNT(*) FROM themes th WHERE th.owner_id = u.id AND ${themeVis}) AS theme_count
+        (SELECT COUNT(*) FROM themes th WHERE th.owner_id = u.id AND ${themeVis}) AS theme_count,
+        (SELECT COUNT(*) FROM entries e WHERE e.owner_id = u.id AND ${entryVis}) AS entry_count,
+        (SELECT COUNT(*) FROM projects pj WHERE pj.owner_id = u.id AND ${projectVis}) AS project_count
      FROM users u WHERE u.handle = ${q.p(handle)}`,
     q
   ).first<{
@@ -32,6 +36,8 @@ users.get('/:handle', async (c) => {
     created_at: string;
     photo_count: number;
     theme_count: number;
+    entry_count: number;
+    project_count: number;
   }>();
   if (!row) throw notFound('用户不存在');
 
@@ -44,6 +50,8 @@ users.get('/:handle', async (c) => {
     avatarPhotoId: row.avatar_photo_id,
     photoCount: row.photo_count,
     themeCount: row.theme_count,
+    entryCount: row.entry_count,
+    projectCount: row.project_count,
     createdAt: row.created_at
   };
   return c.json(profile);

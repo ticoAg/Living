@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 
-const api = vi.fn<(path: string) => Promise<unknown>>();
-vi.mock('./api', () => ({ api: (path: string) => api(path) }));
+const api = vi.fn<(path: string, opts?: { anonymous?: boolean }) => Promise<unknown>>();
+vi.mock('./api', () => ({
+  api: (path: string, opts?: { anonymous?: boolean }) => (opts === undefined ? api(path) : api(path, opts))
+}));
 
 /** A fresh copy of the module: the cache is module state. */
 async function fresh() {
@@ -118,5 +120,100 @@ describe('invalidate', () => {
     expect(peek('/api/tags')).toBeDefined();
     prefetch('/api/photos');
     expect(api).toHaveBeenCalledTimes(4);
+  });
+
+  it('drops what is counted from the paths too: a change to entries or photos leaves the review stale', async () => {
+    const { prefetch, invalidate, peek } = await fresh();
+    api.mockResolvedValue({});
+    for (const p of ['/api/review', '/api/review/2026', '/api/entries?mine=1', '/api/users/ada']) prefetch(p);
+    await settle();
+    invalidate('/api/users/');
+    expect(peek('/api/review/2026')).toBeDefined();
+    prefetch('/api/users/ada');
+    await settle();
+    invalidate('/api/entries?');
+    expect(peek('/api/entries?mine=1')).toBeUndefined();
+    expect(peek('/api/review')).toBeUndefined();
+    expect(peek('/api/review/2026')).toBeUndefined();
+    // a profile counts them too
+    expect(peek('/api/users/ada')).toBeUndefined();
+    prefetch('/api/review/2026');
+    await settle();
+    invalidate('/api/photos/');
+    expect(peek('/api/review/2026')).toBeUndefined();
+  });
+
+  it('leaves the library stale after a change to one’s entries, photos or attachments, and nothing else', async () => {
+    const { prefetch, invalidate, peek } = await fresh();
+    api.mockResolvedValue({});
+    for (const changed of ['/api/entries?', '/api/photos', '/api/attachments']) {
+      prefetch('/api/library');
+      await settle();
+      invalidate('/api/tags');
+      invalidate('/api/themes');
+      expect(peek('/api/library'), changed).toBeDefined();
+      invalidate(changed);
+      expect(peek('/api/library'), changed).toBeUndefined();
+    }
+  });
+});
+
+describe('the visitor view', () => {
+  it('asks for a visitor key without cookies, and keeps it apart from the same path asked as oneself', async () => {
+    const { prefetch, peek, visitorKey } = await fresh();
+    api.mockImplementation(async (_path, opts) => ({ as: opts?.anonymous ? 'visitor' : 'me' }));
+    prefetch('/api/users/ada');
+    prefetch(visitorKey('/api/users/ada'));
+    await settle();
+    expect(api.mock.calls).toEqual([['/api/users/ada'], ['/api/users/ada', { anonymous: true }]]);
+    expect(peek('/api/users/ada')?.data).toEqual({ as: 'me' });
+    expect(peek(visitorKey('/api/users/ada'))?.data).toEqual({ as: 'visitor' });
+  });
+
+  it('drops every visitor copy on any change: what a visitor sees hangs on more than the paths changed', async () => {
+    const { prefetch, invalidate, forget, setCached, peek, visitorKey: v } = await fresh();
+    api.mockResolvedValue({});
+    const paths = ['/api/entries?owner=ada', '/api/entries/en_1', '/api/themes/th_1', '/api/users/ada', '/api/tags?owner=ada'];
+    const fill = async () => {
+      for (const p of paths) {
+        prefetch(p);
+        prefetch(v(p));
+      }
+      await settle();
+    };
+    await fill();
+    // a photo made public: the author's entries stay as they were, a visitor's do not
+    invalidate('/api/photos');
+    for (const p of paths) expect(peek(v(p)), p).toBeUndefined();
+    expect(peek('/api/entries/en_1')).toBeDefined();
+    expect(peek('/api/tags?owner=ada')).toBeDefined();
+    await fill();
+    forget('/api/entries/en_1');
+    expect(peek('/api/entries/en_1')).toBeUndefined();
+    for (const p of paths) expect(peek(v(p)), p).toBeUndefined();
+    expect(peek('/api/themes/th_1')).toBeDefined();
+    await fill();
+    setCached('/api/themes/th_1', { theme: 1 });
+    expect(peek('/api/themes/th_1')?.data).toEqual({ theme: 1 });
+    for (const p of paths) expect(peek(v(p)), p).toBeUndefined();
+    expect(peek('/api/entries/en_1')).toBeDefined();
+    // a session change drops everything, the visitor's copies included
+    await fill();
+    invalidate('/api');
+    for (const p of paths) {
+      expect(peek(p)).toBeUndefined();
+      expect(peek(v(p))).toBeUndefined();
+    }
+  });
+
+  it("invalidating a visitor key (a retry in the view) drops the visitor copies and none of the author's", async () => {
+    const { prefetch, invalidate, peek, visitorKey: v } = await fresh();
+    api.mockResolvedValue({});
+    prefetch('/api/entries/en_1');
+    prefetch(v('/api/entries/en_1'));
+    await settle();
+    invalidate(v('/api/entries/en_1'));
+    expect(peek(v('/api/entries/en_1'))).toBeUndefined();
+    expect(peek('/api/entries/en_1')).toBeDefined();
   });
 });

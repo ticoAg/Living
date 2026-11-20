@@ -34,13 +34,15 @@ const MAX_JSON_BYTES = 256 * 1024;
 export async function readJson(c: Ctx, maxBytes = MAX_JSON_BYTES): Promise<Record<string, unknown>> {
   const declared = Number(c.req.header('content-length') ?? 0);
   if (declared > maxBytes) throw tooLarge('请求内容太大');
-  let text: string;
+  // in bytes, as the declared length is: a request without one (streamed) may not bring more than one that says it
+  let bytes: ArrayBuffer;
   try {
-    text = await c.req.text();
+    bytes = await c.req.arrayBuffer();
   } catch {
     throw invalid('无法读取请求内容');
   }
-  if (text.length > maxBytes) throw tooLarge('请求内容太大');
+  if (bytes.byteLength > maxBytes) throw tooLarge('请求内容太大');
+  const text = new TextDecoder().decode(bytes);
   let data: unknown;
   try {
     data = JSON.parse(text);

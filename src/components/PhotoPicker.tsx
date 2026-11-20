@@ -1,23 +1,35 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { PhotoSummary, Tag } from '../../shared/types';
-import Img from '../components/Img';
-import { Icon } from '../components/icons';
 import { fmtDay } from '../lib/format';
 import { buildTagTree, filterByTags, inclusiveCounts, isSwatch, swatchFill, type TagNode } from '../lib/tags';
 import { useApi } from '../lib/useApi';
-import { byTaken, type EditorPhoto } from './draft';
-import { dayOf } from './util';
+import { Icon } from './icons';
+import Img from './Img';
+import PickerDialog from './PickerDialog';
+
+// The owner's own photos in a dialog, to add to a collection (theme) or an entry: a date range and tag filters, several at once.
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** ids of photos already in the theme: shown, but not selectable */
+  /** ids of photos already there: shown, but not selectable */
   existing: ReadonlySet<string>;
-  /** date range to start with (the trip's own dates) */
+  /** what they are added to, for the label of a photo already in it: 合集, 记录 */
+  noun: string;
+  /** date range to start with (a trip's own dates, an entry's day) */
   from?: string;
   to?: string;
-  onAdd: (photos: EditorPhoto[]) => void;
+  onAdd: (photos: PhotoSummary[]) => void;
 }
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}/;
+const dayOf = (s: string | null | undefined): string => (s && DAY_RE.test(s) ? s.slice(0, 10) : '');
+/** Capture order, undated last. */
+const byTaken = (a: PhotoSummary, b: PhotoSummary): number => {
+  const x = a.takenAt ?? '\uffff';
+  const y = b.takenAt ?? '\uffff';
+  return x < y ? -1 : x > y ? 1 : a.id < b.id ? -1 : 1;
+};
 
 const PAGE = 120;
 
@@ -25,7 +37,7 @@ function flatten(node: TagNode): TagNode[] {
   return node.children.flatMap((c) => [c, ...flatten(c)]);
 }
 
-function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Props, 'open'> & { titleId: string }) {
+function Body({ existing, noun, from = '', to = '', onAdd, onClose, titleId }: Omit<Props, 'open'> & { titleId: string }) {
   const photosReq = useApi<{ photos: PhotoSummary[] }>('/api/photos?mine=1');
   const tagsReq = useApi<{ tags: Tag[] }>('/api/tags');
   const tree = useMemo(() => buildTagTree(tagsReq.data?.tags ?? []), [tagsReq.data]);
@@ -192,7 +204,7 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
               {filtered.slice(0, limit).map((p) => {
                 const added = existing.has(p.id);
                 const on = selected.has(p.id);
-                const label = [fmtDay(p.takenAt), p.title ?? p.city, added ? '已在主题里' : ''].filter(Boolean).join('，') || '照片';
+                const label = [fmtDay(p.takenAt), p.title ?? p.city, added ? `已在${noun}里` : ''].filter(Boolean).join('，') || '照片';
                 return (
                   <li key={p.id}>
                     <button
@@ -262,37 +274,19 @@ function Body({ existing, from = '', to = '', onAdd, onClose, titleId }: Omit<Pr
 
 /** Modal over the owner's own photos: date range and tag filters, multi-select. */
 export default function PhotoPicker(props: Props) {
-  const { open, onClose } = props;
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-  // a press that starts inside the panel and ends on the backdrop (text selection, a date picker) must not close it
-  const pressedBackdrop = useRef(false);
-
-  useEffect(() => {
-    const d = ref.current;
-    if (!d) return;
-    if (open && !d.open) d.showModal();
-    else if (!open && d.open) d.close();
-  }, [open]);
-
   return (
-    <dialog
-      ref={ref}
-      className="pp"
-      aria-labelledby={titleId}
-      onCancel={(e) => {
-        e.preventDefault();
-        onClose();
-      }}
-      onClose={onClose}
-      onMouseDown={(e) => {
-        pressedBackdrop.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        if (pressedBackdrop.current && e.target === e.currentTarget) onClose();
-      }}
-    >
-      {open && <Body existing={props.existing} from={props.from} to={props.to} onAdd={props.onAdd} onClose={onClose} titleId={titleId} />}
-    </dialog>
+    <PickerDialog open={props.open} onClose={props.onClose}>
+      {(titleId) => (
+        <Body
+          existing={props.existing}
+          noun={props.noun}
+          from={props.from}
+          to={props.to}
+          onAdd={props.onAdd}
+          onClose={props.onClose}
+          titleId={titleId}
+        />
+      )}
+    </PickerDialog>
   );
 }

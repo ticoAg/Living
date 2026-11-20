@@ -25,9 +25,9 @@ function fakeCtx(parts: { headers?: Record<string, string>; body?: string | Erro
   const c = {
     req: {
       header: (name: string) => headers.get(name.toLowerCase()),
-      text: async () => {
+      arrayBuffer: async () => {
         if (parts.body instanceof Error) throw parts.body;
-        return parts.body ?? '';
+        return new TextEncoder().encode(parts.body ?? '').buffer;
       },
       param: (name: string) => parts.params?.[name]
     },
@@ -195,6 +195,13 @@ describe('readJson', () => {
   it('answers 413 when the body turns out bigger than the limit', async () => {
     const big = JSON.stringify({ text: 'x'.repeat(300_000) });
     expect(await rejection(readJson(fakeCtx({ body: big }).c))).toMatchObject({ status: 413, code: 'too_large' });
+  });
+
+  it('counts the body in bytes, as Content-Length does', async () => {
+    // 100 000 Chinese characters: 100 000 code units, 300 000 bytes of UTF-8
+    const chinese = JSON.stringify({ text: '湖'.repeat(100_000) });
+    expect(await rejection(readJson(fakeCtx({ body: chinese }).c))).toMatchObject({ status: 413, code: 'too_large' });
+    expect(await readJson(fakeCtx({ body: chinese }).c, 300_100)).toEqual({ text: '湖'.repeat(100_000) });
   });
 
   it('honours a custom limit, inclusive', async () => {

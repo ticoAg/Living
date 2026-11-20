@@ -14,6 +14,8 @@ export interface CaptionData {
   icon: string | null;
   /** title under the place name */
   sub: string;
+  /** the entry it plays from, when Living plays entries */
+  entry: string;
   /** mono line: city, date, time, age */
   meta: string[];
   /** mono line: coordinates, heading */
@@ -29,6 +31,8 @@ export interface CaptionContext {
   /** loaded lazily; only needed for the camera line */
   detail: PhotoDetail | null;
   today: Date;
+  /** the name of the entry it plays from, or null when Living plays no entries */
+  entry?: string | null;
 }
 
 const trim1 = (v: number) => String(Math.round(v * 10) / 10);
@@ -58,6 +62,7 @@ export function buildCaption(p: PhotoSummary, ctx: CaptionContext): CaptionData 
     big: place || title,
     icon: place && ctx.poi ? ctx.poi.category : null,
     sub: place && title ? title : '',
+    entry: f.has('entry') ? (ctx.entry ?? '') : '',
     meta: [
       f.has('city') && p.city && !cityIsBig ? p.city : '',
       f.has('date') ? fmtDay(p.takenAt) : '',
@@ -79,9 +84,9 @@ export function buildCaption(p: PhotoSummary, ctx: CaptionContext): CaptionData 
 }
 
 export const hasCaption = (c: CaptionData | null): c is CaptionData =>
-  !!c && !!(c.big || c.sub || c.meta.length || c.geo.length || c.exif || c.tags);
+  !!c && !!(c.big || c.sub || c.entry || c.meta.length || c.geo.length || c.exif || c.tags);
 
 /** One sentence for the screen-reader live region, independent of which fields are shown. */
-export function announceText(p: PhotoSummary, poi: Poi | null): string {
-  return [p.title, poi?.name ?? p.city, fmtDay(p.takenAt)].filter(Boolean).join('，');
+export function announceText(p: PhotoSummary, poi: Poi | null, entry: string | null = null): string {
+  return [p.title, poi?.name ?? p.city, fmtDay(p.takenAt), entry].filter(Boolean).join('，');
 }

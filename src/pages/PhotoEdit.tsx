@@ -274,7 +274,7 @@ function Editor({ id }: { id: string }) {
           <ExifList x={base} />
           {base.themes.length > 0 && (
             <p className="small" style={{ margin: 0 }}>
-              <span className="muted">所属主题：</span>
+              <span className="muted">所属合集：</span>
               {base.themes.map((t, i) => (
                 <span key={t.id}>
                   {i > 0 && '、'}
@@ -327,7 +327,7 @@ function Editor({ id }: { id: string }) {
               </button>
             ) : (
               <ConfirmBar
-                prompt="删除后无法恢复：原图和三种尺寸一并删除，它会从所有主题里移除。"
+                prompt="删除后无法恢复：原图和三种尺寸一并删除，它会从所有合集和记录里移除。"
                 confirmLabel="确认删除"
                 busy={deleting}
                 onConfirm={() => void remove()}

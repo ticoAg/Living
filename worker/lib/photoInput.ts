@@ -1,7 +1,7 @@
 // Validation of the JSON `meta` part of POST /api/photos (CreatePhotoMeta).
 
 import { PHOTO_LIMITS, REGION_LIMITS } from '../../shared/limits';
-import type { GeoPrivacy, NewPoi, PoiMethod, Visibility } from '../../shared/types';
+import { VISIBILITIES, type GeoPrivacy, type NewPoi, type PoiMethod, type Visibility } from '../../shared/types';
 import { invalid } from './http';
 import { parseNewPoi } from './poi';
 import {
@@ -19,7 +19,7 @@ import {
   type Body
 } from './validate';
 
-export const VISIBILITIES = ['public', 'unlisted', 'private'] as const;
+export { VISIBILITIES };
 export const GEO_PRIVACIES = ['exact', 'fuzzy', 'hidden'] as const;
 export const POI_METHODS = ['auto', 'confirmed', 'inferred', 'manual'] as const;
 
@@ -53,7 +53,8 @@ export interface ParsedMeta {
   thumbhash: string | null;
   palette: string[] | null;
   focus: [number, number] | null;
-  visibility: Visibility;
+  /** null when the upload names none: the uploader's setting decides (users.photo_visibility) */
+  visibility: Visibility | null;
   inLiving: boolean;
   favorite: boolean;
   sha256: string | null;
@@ -124,13 +125,13 @@ export function parseCreateMeta(raw: unknown): ParsedMeta {
     thumbhash,
     palette: optPalette(m.palette),
     focus: optFocus(m.focus),
-    visibility: optEnum<Visibility>(m.visibility, '公开范围', VISIBILITIES) ?? 'public',
+    visibility: optEnum<Visibility>(m.visibility, '公开范围', VISIBILITIES) ?? null,
     inLiving: optBool(m.inLiving, 'inLiving') ?? true,
     favorite: optBool(m.favorite, 'favorite') ?? false,
     sha256: sha === null ? null : (sha as string).toLowerCase(),
     tagIds: strArray(m.tagIds, '标签', PHOTO_LIMITS.tagCount),
     suggestedTagIds: strArray(m.suggestedTagIds, '建议标签', PHOTO_LIMITS.tagCount),
-    themeIds: strArray(m.themeIds, '主题', PHOTO_LIMITS.themeCount)
+    themeIds: strArray(m.themeIds, '合集', PHOTO_LIMITS.themeCount)
   };
 }
 

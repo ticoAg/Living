@@ -11,12 +11,14 @@ import { isSwatch, swatchFill, type TagNode, type TagTree } from '../lib/tags';
 interface Props {
   tree: TagTree;
   selected: readonly string[];
-  /** inclusive photo counts for the current result set */
+  /** inclusive counts for the current result set */
   counts: ReadonlyMap<string, number>;
   onToggle: (id: string) => void;
+  /** what is counted: 张 for photos, 项 for entries and photos together */
+  unit?: string;
 }
 
-export default function TagFilter({ tree, selected, counts, onToggle }: Props) {
+export default function TagFilter({ tree, selected, counts, onToggle, unit = '张' }: Props) {
   const { sel, included, open } = useMemo(() => {
     const sel = new Set(selected);
     const included = new Set<string>();
@@ -37,7 +39,7 @@ export default function TagFilter({ tree, selected, counts, onToggle }: Props) {
       'aria-pressed': pressed,
       disabled: !pressed && n === 0,
       'data-included': included.has(node.id) ? 'true' : undefined,
-      title: n ? `${n} 张` : undefined,
+      title: n ? `${n} ${unit}` : undefined,
       onClick: () => onToggle(node.id)
     };
     return isSwatch(node) ? (

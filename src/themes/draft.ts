@@ -1,5 +1,5 @@
 import { THEME_LIMITS } from '../../shared/limits';
-import type { PhotoSummary, PutThemeItemsBody, ThemeDetail, ThemeKind, UpdateThemeBody, Visibility } from '../../shared/types';
+import type { PhotoSummary, PutThemeItemsBody, ThemeDetail, ThemeEntry, ThemeKind, UpdateThemeBody, Visibility } from '../../shared/types';
 import { dayOf } from './util';
 
 // The editor works on a draft: plain strings for every input, a client-side key per item (server item
@@ -9,10 +9,12 @@ import { dayOf } from './util';
 /** A photo as the editor knows it; `note` is only known for photos that came with the theme. */
 export type EditorPhoto = PhotoSummary & { note?: string | null };
 
+/** `entry` is null for an entry the editor cannot show; saving leaves it out, as it does a photo that is gone. */
 export type DraftItem =
   | { key: string; kind: 'photo'; photoId: string; text: string; photo: EditorPhoto | null }
   | { key: string; kind: 'text'; text: string }
-  | { key: string; kind: 'day'; day: string; text: string };
+  | { key: string; kind: 'day'; day: string; text: string }
+  | { key: string; kind: 'entry'; entryId: string; text: string; entry: ThemeEntry | null };
 
 export interface Draft {
   kind: ThemeKind;
@@ -35,6 +37,7 @@ export const nextKey = () => `k${++seq}`;
 export const photoItem = (photo: EditorPhoto): DraftItem => ({ key: nextKey(), kind: 'photo', photoId: photo.id, text: '', photo });
 export const textItem = (): DraftItem => ({ key: nextKey(), kind: 'text', text: '' });
 export const dayItem = (day = ''): DraftItem => ({ key: nextKey(), kind: 'day', day, text: '' });
+export const entryItem = (entry: ThemeEntry): DraftItem => ({ key: nextKey(), kind: 'entry', entryId: entry.id, text: '', entry });
 
 export const emptyDraft = (kind: ThemeKind = 'trip'): Draft => ({
   kind,
@@ -61,6 +64,7 @@ export function draftFromTheme(t: ThemeDetail): Draft {
     items: t.items.map((it): DraftItem => {
       if (it.kind === 'photo') return { key: nextKey(), kind: 'photo', photoId: it.photoId, text: it.text ?? '', photo: it.photo };
       if (it.kind === 'text') return { key: nextKey(), kind: 'text', text: it.text };
+      if (it.kind === 'entry') return { key: nextKey(), kind: 'entry', entryId: it.entryId, text: it.text ?? '', entry: it.entry };
       return { key: nextKey(), kind: 'day', day: dayOf(it.day), text: it.text ?? '' };
     })
   };
@@ -81,15 +85,21 @@ export function metaPayload(d: Draft): Required<Omit<UpdateThemeBody, 'photoIds'
   };
 }
 
-/** Body of PUT /api/themes/:id/items. Empty text blocks, undated day sections and photos that are gone are left out. */
+/**
+ * Body of PUT /api/themes/:id/items. Empty text blocks, undated day sections, and photos or entries that are gone are
+ * left out.
+ */
 export function itemsPayload(items: readonly DraftItem[]): PutThemeItemsBody['items'] {
   const out: PutThemeItemsBody['items'] = [];
+  const caption = (text: string) => (text.trim() ? text.trimEnd() : null);
   for (const it of items) {
     if (it.kind === 'photo') {
-      if (it.photo) out.push({ kind: 'photo', photoId: it.photoId, text: it.text.trim() ? it.text.trimEnd() : null });
+      if (it.photo) out.push({ kind: 'photo', photoId: it.photoId, text: caption(it.text) });
     } else if (it.kind === 'text') {
       if (it.text.trim()) out.push({ kind: 'text', text: it.text.trimEnd() });
-    } else if (it.day) out.push({ kind: 'day', day: it.day, text: it.text.trim() ? it.text.trimEnd() : null });
+    } else if (it.kind === 'entry') {
+      if (it.entry) out.push({ kind: 'entry', entryId: it.entryId, text: caption(it.text) });
+    } else if (it.day) out.push({ kind: 'day', day: it.day, text: caption(it.text) });
   }
   return out;
 }
@@ -99,16 +109,20 @@ export function validate(d: Draft): { text: string; field: string } | null {
   if (!d.title.trim()) return { text: '请填写标题', field: 'th-title' };
   if (d.kind === 'trip' && d.startDate && d.endDate && d.endDate < d.startDate)
     return { text: '结束日期不能早于开始日期', field: 'th-end' };
-  if (itemsPayload(d.items).length > MAX_ITEMS) return { text: `一个主题最多 ${MAX_ITEMS} 个条目，请先移除一些`, field: 'th-add-photo' };
+  if (itemsPayload(d.items).length > MAX_ITEMS) return { text: `一个合集最多 ${MAX_ITEMS} 个条目，请先移除一些`, field: 'th-add-photo' };
   const undated = d.items.findIndex((it) => it.kind === 'day' && !it.day);
   if (undated >= 0) return { text: `第 ${undated + 1} 项是日期分段，请选择日期`, field: `th-day-${d.items[undated].key}` };
   return null;
 }
 
-/** Earliest and latest capture day among the photo items, if any have one. */
-export function photoDayRange(items: readonly DraftItem[]): { start: string; end: string } | null {
+/** Earliest and latest day of the items: when the photos were taken, entries' photos too, and when the entries happened. */
+export function contentDayRange(items: readonly DraftItem[]): { start: string; end: string } | null {
   const days = items
-    .flatMap((it) => (it.kind === 'photo' && it.photo ? [dayOf(it.photo.takenAt)] : []))
+    .flatMap((it) => {
+      if (it.kind === 'photo') return it.photo ? [dayOf(it.photo.takenAt)] : [];
+      if (it.kind === 'entry' && it.entry) return [dayOf(it.entry.occurredAt), ...it.entry.photos.map((p) => dayOf(p.takenAt))];
+      return [];
+    })
     .filter(Boolean)
     .sort();
   return days.length ? { start: days[0], end: days[days.length - 1] } : null;

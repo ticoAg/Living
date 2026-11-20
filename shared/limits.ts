@@ -13,6 +13,13 @@ export const POI_SEARCH_LIMITS = {
   queryMax: 60
 } as const;
 
+/** Searching one's archive (`GET /api/search?q=`). */
+export const SEARCH_LIMITS = {
+  queryMax: 100,
+  /** words of one query; a quoted phrase is one */
+  termCount: 5
+} as const;
+
 /** Province, city and district names, on photos and on new places. */
 export const REGION_LIMITS = {
   nameMax: 60
@@ -48,6 +55,58 @@ export const THEME_ITEM_LIMITS = {
   textMax: 20000
 } as const;
 
+/** `POST /api/entries`, `PATCH /api/entries/:id`. */
+export const ENTRY_LIMITS = {
+  titleMax: 200,
+  /** Markdown, as written */
+  bodyMax: 50000,
+  /** photos one entry shows */
+  mediaCount: 200,
+  /** under one photo of an entry */
+  captionMax: 2000,
+  tagCount: 200
+} as const;
+
+/** `POST /api/attachments` and an entry's `attachments`. */
+export const ATTACHMENT_LIMITS = {
+  /** one file, in bytes (2 GiB) */
+  maxBytes: 2 * 1024 ** 3,
+  /** attachments one entry holds */
+  perEntry: 20,
+  /** the file's name */
+  nameMax: 200,
+  /** under one attachment of an entry */
+  captionMax: 2000,
+  /** uploads one person has begun and not completed */
+  uploadingMax: 10,
+  /** a video's frame, in bytes */
+  posterMaxBytes: 2 * 1024 * 1024
+} as const;
+
+/**
+ * An attachment goes up in parts of this many bytes, the last one shorter: an R2 multipart upload takes parts of at
+ * least 5 MiB, all but the last of one size, and the Workers plans take request bodies of up to 100 MB.
+ */
+export const ATTACHMENT_PART_BYTES = 16 * 1024 * 1024;
+
+/** `POST /api/projects`, `PATCH /api/projects/:id`. */
+export const PROJECT_LIMITS = {
+  titleMax: 100,
+  /** Markdown */
+  descriptionMax: 5000,
+  /** projects one entry belongs to */
+  perEntry: 50
+} as const;
+
+/** `POST /api/projects/:id/milestones` and its `PATCH`. */
+export const MILESTONE_LIMITS = {
+  titleMax: 100,
+  /** Markdown */
+  bodyMax: 20000,
+  /** milestones of one project */
+  count: 500
+} as const;
+
 export const TAG_LIMITS = {
   nameMax: 24
 } as const;
@@ -72,6 +131,18 @@ export const PRIVACY_ZONE_LIMITS = {
   radiusMax: 5000,
   /** zones per user */
   count: 50
+} as const;
+
+/** Rows in one request to `/api/import/*`; the browser also keeps each request's JSON to about 1 MB. */
+export const IMPORT_LIMITS = {
+  /** ids (for photos, SHA-256) of each kind in one `resolve` */
+  resolve: 1000,
+  tags: 2000,
+  places: 500,
+  zones: 10,
+  projects: 50,
+  entries: 100,
+  collections: 20
 } as const;
 
 /** `POST /api/admin/invites`. */

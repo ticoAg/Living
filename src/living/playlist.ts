@@ -1,6 +1,6 @@
 import type { PhotoSummary } from '../../shared/types';
 import type { TagTree } from '../lib/tags';
-import type { Source } from './settings';
+import { ownOrder, type Source } from './settings';
 
 // Turning the photos the API returned into the ordered list Living plays.
 // The API already applied visibility and location privacy; this module only narrows and orders.
@@ -59,7 +59,7 @@ export function isNearToday(takenAt: string | null, today: Date, window = 10): b
 }
 
 export interface PlaylistInput {
-  /** photos as returned for the source (list, place list or theme items in order) */
+  /** photos as returned for the source (list, place list, theme items or an entry's photos in order) */
   photos: readonly PhotoSummary[];
   source: Source;
   /** tag tree, or null when it could not be loaded (tags then match directly) */
@@ -79,7 +79,7 @@ export function buildPlaylist({ photos, source, tree, seed, today, startId }: Pl
     return true;
   });
 
-  if (source.city && source.src !== 'theme') list = list.filter((p) => p.city === source.city);
+  if (source.city && !ownOrder(source.src)) list = list.filter((p) => p.city === source.city);
 
   if (source.src === 'tags' && source.tags.length) {
     const wanted = source.tags;
@@ -93,8 +93,9 @@ export function buildPlaylist({ photos, source, tree, seed, today, startId }: Pl
   if (source.src === 'today') list = list.filter((p) => isNearToday(p.takenAt, today));
 
   if (source.order === 'time') {
-    // A theme's "time" order is the order of its items; everything else is chronological.
-    return source.src === 'theme' ? list : sortByTime(list);
+    // A theme's "time" order is the order of its items, an entry's the order of its photos; everything else is
+    // chronological.
+    return ownOrder(source.src) ? list : sortByTime(list);
   }
   list = shuffle(list, seed);
   const at = startId ? list.findIndex((p) => p.id === startId) : -1;

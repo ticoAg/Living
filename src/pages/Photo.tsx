@@ -17,6 +17,7 @@ import { compass, fmtDay, fmtDistance, fmtTime } from '../lib/format';
 import { useSession } from '../lib/session';
 import { swatchFill } from '../lib/tags';
 import { useApi } from '../lib/useApi';
+import { useVisitor } from '../lib/visitor';
 import '../styles/browse.css';
 
 const MAIN_SIZES = '(max-width: 900px) calc(100vw - 72px), 62vw';
@@ -130,8 +131,9 @@ export default function PhotoPage() {
 
   // prev / next: the list the visitor came from, else the gallery order
   const { photos: all } = usePhotoList('');
+  const visitor = useVisitor();
   const ids = useMemo(() => {
-    const ctx = getBrowseList();
+    const ctx = getBrowseList(visitor);
     if (ctx && ctx.includes(id)) return ctx;
     return all
       ? all
@@ -139,7 +141,7 @@ export default function PhotoPage() {
           .sort(byTakenDesc)
           .map((p) => p.id)
       : [];
-  }, [id, all]);
+  }, [id, all, visitor]);
   const idx = ids.indexOf(id);
   const prevId = idx > 0 ? ids[idx - 1] : null;
   const nextId = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
@@ -416,12 +418,26 @@ export default function PhotoPage() {
           )}
 
           {photo.themes.length > 0 && (
-            <ul className="pho-themes" aria-label="所属主题">
+            <ul className="pho-themes" aria-label="所属合集">
               {photo.themes.map((t) => (
                 <li key={t.id}>
                   <Link href={`/t/${t.id}`}>
                     <Icon name="book" size={16} />
                     {t.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {photo.entries.length > 0 && (
+            <ul className="pho-themes" aria-label="所属记录">
+              {photo.entries.map((e) => (
+                <li key={e.id}>
+                  <Link href={`/e/${e.id}`}>
+                    <Icon name="note" size={16} />
+                    <span>{e.label}</span>
+                    <span className="pho-entry-day mono">{fmtDay(e.occurredAt)}</span>
                   </Link>
                 </li>
               ))}

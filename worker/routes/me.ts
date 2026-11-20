@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { ACCOUNT_LIMITS } from '../../shared/limits';
+import { VISIBILITIES, type Visibility } from '../../shared/types';
 import type { AppEnv } from '../env';
 import { hashPassword, verifyPassword } from '../lib/crypto';
 import { invalid, readJson } from '../lib/http';
 import { requireUser, toSessionUser, USER_COLS } from '../lib/session';
-import { has, optText, reqStr } from '../lib/validate';
+import { has, optEnum, optText, reqStr } from '../lib/validate';
 
 export const me = new Hono<AppEnv>({ strict: false });
 
@@ -21,6 +22,12 @@ me.patch('/', async (c) => {
 
   if (has(body, 'displayName')) set('display_name', reqStr(body, 'displayName', '显示名', 1, ACCOUNT_LIMITS.displayNameMax));
   if (has(body, 'bio')) set('bio', optText(body.bio, '简介', ACCOUNT_LIMITS.bioMax));
+  if (has(body, 'photoVisibility')) {
+    // who sees a new photo unless its upload says otherwise; photos already uploaded keep theirs
+    const v = optEnum<Visibility>(body.photoVisibility, '新照片的公开范围', VISIBILITIES);
+    if (!v) throw invalid('新照片的公开范围需要是 public / unlisted / private 之一');
+    set('photo_visibility', v);
+  }
   if (has(body, 'avatarPhotoId')) {
     const id = body.avatarPhotoId;
     if (id === null) set('avatar_photo_id', null);

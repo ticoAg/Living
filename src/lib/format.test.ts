@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vite-plus/test';
 import * as geo from '../../shared/geo';
-import { compass, dayPart, fmtAgo, fmtDay, fmtDistance, fmtLat, fmtLng, fmtLongDay, fmtMonth, fmtTime } from './format';
+import {
+  compass,
+  dayPart,
+  fmtAgo,
+  fmtDay,
+  fmtDistance,
+  fmtLat,
+  fmtLng,
+  fmtLongDay,
+  fmtMonth,
+  fmtTime,
+  localDateTime,
+  localDay
+} from './format';
 
 // Capture times are local wall-clock strings (`YYYY-MM-DDTHH:mm:ss`, no offset). Nothing here may depend on the
 // machine's time zone, so every Date below is built from local calendar fields (`new Date(y, m, d)`), never from an
@@ -139,6 +152,14 @@ describe('dayPart', () => {
     expect(dayPart('2026-11-08')).toBe('');
     expect(dayPart('2026-11-08T0')).toBe('');
     expect(dayPart('2026-11-08T14')).toBe('昼');
+  });
+});
+
+describe('localDay / localDateTime', () => {
+  it('read the device clock as a wall-clock string', () => {
+    const d = new Date(2026, 0, 5, 7, 3, 9);
+    expect(localDay(d)).toBe('2026-01-05');
+    expect(localDateTime(d)).toBe('2026-01-05T07:03:09');
   });
 });
 

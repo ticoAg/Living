@@ -35,7 +35,7 @@ export default function UploadDetails({ item, all, onPatch, onPublish }: Props) 
               disabled={locked}
             />
             <div className="pf-row pf-top">
-              <span className="pf-k">主题</span>
+              <span className="pf-k">合集</span>
               <div className="pf-v">
                 <ThemePicker
                   value={item.themeIds}

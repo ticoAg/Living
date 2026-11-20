@@ -11,6 +11,14 @@ function item(over: Partial<Item> = {}): Item {
 const ready = (over: Partial<Item> = {}) => item({ stage: 'ready', p: at(30.25, 120.15), ...over });
 const loaded = { radius: 300, loading: false, error: null, res: null };
 
+describe('newItem', () => {
+  it('starts with the visibility it is given, the account’s setting for new photos', () => {
+    const f = new File(['x'], 'a.jpg', { type: 'image/jpeg' });
+    expect(newItem(f, null, 'private').visibility).toBe('private');
+    expect(newItem(f, null, 'unlisted').visibility).toBe('unlisted');
+  });
+});
+
 describe('inBulk', () => {
   it('takes every photo that is not on the site or in flight, processed or not', () => {
     expect(inBulk(ready())).toBe(true);

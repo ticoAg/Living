@@ -52,7 +52,7 @@ describe('parseCreateMeta', () => {
       thumbhash: null,
       palette: null,
       focus: null,
-      visibility: 'public',
+      visibility: null,
       inLiving: true,
       favorite: false,
       sha256: null,
@@ -345,7 +345,7 @@ describe('parseCreateMeta', () => {
         '标签最多 200 项'
       );
       expect(invalidMessage(() => parseCreateMeta({ ...minimal(), themeIds: Array.from({ length: 51 }, (_, i) => `t${i}`) }))).toBe(
-        '主题最多 50 项'
+        '合集最多 50 项'
       );
       expect(invalidMessage(() => parseCreateMeta({ ...minimal(), tagIds: 'lake' }))).toBe('标签需要是数组');
       expect(invalidMessage(() => parseCreateMeta({ ...minimal(), suggestedTagIds: [1] }))).toBe('建议标签里有无效的值');

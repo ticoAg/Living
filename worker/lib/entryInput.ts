@@ -1,0 +1,92 @@
+// Validation of the JSON bodies of POST /api/entries and PATCH /api/entries/:id (CreateEntryBody, UpdateEntryBody).
+// Docs: /docs/api/entries.md
+
+import { ENTRY_LIMITS, PROJECT_LIMITS } from '../../shared/limits';
+import { parseEntryAttachments, type AttachmentField } from './attachments';
+import { ENTRY_STATUSES, ENTRY_TYPES, VISIBILITIES, type EntryStatus, type EntryType, type Visibility } from '../../shared/types';
+import { ID_RE, invalid } from './http';
+import { has, isPlainObject, optEnum, optMarkdown, optNum, optOccurredAt, optText, strArray, type Body } from './validate';
+
+export interface MediaField {
+  photoId: string;
+  caption: string | null;
+}
+
+/** What a request sets; a key that is absent stays as it is. */
+export interface EntryFields {
+  type?: EntryType;
+  title?: string | null;
+  body?: string | null;
+  occurredAt?: string;
+  visibility?: Visibility;
+  status?: EntryStatus;
+  media?: MediaField[];
+  /** the route checks that they are the author's, uploaded, and loose or the entry's own */
+  attachments?: AttachmentField[];
+  tagIds?: string[];
+  projectIds?: string[];
+  /** an existing place, or null for none; the route checks that it exists */
+  poiId?: string | null;
+  /** PATCH only: the revision the edit started from */
+  revision?: number;
+}
+
+/** The body as written, Markdown (see optMarkdown). Blank → null. */
+export const optBody = (v: unknown): string | null => optMarkdown(v, '正文', ENTRY_LIMITS.bodyMax);
+
+/** The photos of an entry, in order. A photo listed twice counts once, where it first appears. */
+export function parseMedia(v: unknown): MediaField[] {
+  if (!Array.isArray(v)) throw invalid('照片需要是数组');
+  if (v.length > ENTRY_LIMITS.mediaCount) throw invalid(`一条记录最多 ${ENTRY_LIMITS.mediaCount} 张照片`);
+  const out: MediaField[] = [];
+  const seen = new Set<string>();
+  v.forEach((raw: unknown, i) => {
+    const at = `第 ${i + 1} 张照片`;
+    if (!isPlainObject(raw) || typeof raw.photoId !== 'string' || !ID_RE.test(raw.photoId)) throw invalid(`${at}格式不对`);
+    if (seen.has(raw.photoId)) return;
+    seen.add(raw.photoId);
+    out.push({ photoId: raw.photoId, caption: optText(raw.caption, `${at}的说明`, ENTRY_LIMITS.captionMax) });
+  });
+  return out;
+}
+
+export function parseEntryFields(body: Body, create: boolean): EntryFields {
+  const f: EntryFields = {};
+  const type = optEnum<EntryType>(body.type, '记录类型', ENTRY_TYPES);
+  if (type) f.type = type;
+  if (has(body, 'title')) f.title = optText(body.title, '标题', ENTRY_LIMITS.titleMax);
+  if (has(body, 'body')) f.body = optBody(body.body);
+  if (create || has(body, 'occurredAt')) {
+    const at = optOccurredAt(body.occurredAt);
+    if (!at) throw invalid('请填写发生时间，格式为 YYYY-MM-DD 或 YYYY-MM-DDTHH:mm:ss');
+    f.occurredAt = at;
+  }
+  const visibility = optEnum<Visibility>(body.visibility, '公开范围', VISIBILITIES);
+  if (visibility) f.visibility = visibility;
+  const status = optEnum<EntryStatus>(body.status, '状态', ENTRY_STATUSES);
+  if (status) f.status = status;
+  if (has(body, 'media')) f.media = parseMedia(body.media);
+  if (has(body, 'attachments')) f.attachments = parseEntryAttachments(body.attachments);
+  if (has(body, 'tagIds')) {
+    if (!Array.isArray(body.tagIds)) throw invalid('标签需要是数组');
+    f.tagIds = strArray(body.tagIds, '标签', ENTRY_LIMITS.tagCount);
+  }
+  if (has(body, 'projectIds')) {
+    if (!Array.isArray(body.projectIds)) throw invalid('项目需要是数组');
+    f.projectIds = strArray(body.projectIds, '项目', PROJECT_LIMITS.perEntry);
+  }
+  if (has(body, 'poiId')) {
+    if (body.poiId !== null && (typeof body.poiId !== 'string' || !ID_RE.test(body.poiId))) throw invalid('poiId 需要是地点 id 或 null');
+    f.poiId = body.poiId;
+  }
+  if (!create && has(body, 'revision')) {
+    const rev = optNum(body.revision, 'revision', { int: true, min: 1 });
+    if (rev !== null) f.revision = rev;
+  }
+  return f;
+}
+
+/** An entry says something: a title, some text, a photo or an attachment (`held`: photos and attachments). */
+export function assertNotEmpty(title: string | null | undefined, body: string | null | undefined, held: number): void {
+  if (!title && !body && held === 0) throw invalid('记录不能是空的：写点文字，或者加一张照片、一个附件');
+}

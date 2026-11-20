@@ -1,0 +1,71 @@
+/* The pickers' dialog (components/PickerDialog.tsx): the photo picker over the owner's own photos, used by the
+   collection and entry editors, and the entry picker of the collection editor. */
+
+body:has(dialog.pp[open]) { overflow: hidden; }
+.pp { width: min(1080px, calc(100vw - 32px)); max-width: none; max-height: min(90vh, 920px); padding: 0; overflow: hidden; border: 0; border-radius: var(--r-stage); background: var(--paper); color: var(--ink); box-shadow: var(--lift-3); }
+.pp::backdrop { background: rgba(24, 25, 27, 0.42); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.pp-panel { display: flex; flex-direction: column; max-height: min(90vh, 920px); }
+.pp-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 10px 24px; border-bottom: 1px solid var(--rule); }
+.pp-title { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.5; }
+.pp-filters { display: flex; flex-direction: column; gap: 8px; padding: 12px 24px; border-bottom: 1px solid var(--rule); }
+.pp-dates { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.pp-dates .field { flex: 1 1 140px; max-width: 200px; }
+.pp-tags > summary { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink-2); font-size: 14px; list-style: none; cursor: pointer; }
+.pp-tags > summary::-webkit-details-marker { display: none; }
+.pp-tags > summary::before { content: ''; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform 0.15s; }
+.pp-tags[open] > summary::before { transform: rotate(45deg); }
+.pp-tags-on { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.pp-taglist { display: flex; flex-direction: column; gap: 10px; max-height: 220px; padding: 4px 0 8px; overflow-y: auto; }
+.pp-taggroup { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.pp-taggroup-name { min-width: 4.5em; color: var(--ink-3); font-size: 12.5px; }
+.pp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pp .chip { min-height: var(--ctl-s); }
+.pp-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }
+.pp-chip[data-depth='1'] { margin-left: 8px; font-weight: 600; }
+.pp-chip[data-depth='1']:first-child { margin-left: 0; }
+.pp-chip-n { color: var(--ink-3); font-size: 11px; }
+.pp-chip[aria-pressed='true'] .pp-chip-n { color: #fff; opacity: 0.7; }
+.pp-dot { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(24, 25, 27, 0.2); }
+
+.pp-scroll { flex: 1; min-height: 0; padding: 16px 24px; overflow-y: auto; overscroll-behavior: contain; }
+.pp-scroll .loading { padding: 48px 0; }
+.pp-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.pp-cell { position: relative; display: block; width: 100%; padding: 0; border: 0; border-radius: var(--r-img); background: var(--mat); overflow: hidden; cursor: pointer; }
+.pp-cell:disabled { cursor: default; }
+.pp-cell:disabled .img { opacity: 0.4; }
+.pp-cell img { -webkit-user-drag: none; user-select: none; }
+.pp-cell[aria-pressed='true']::after { content: ''; position: absolute; inset: 0; border: 3px solid var(--ink); border-radius: inherit; pointer-events: none; }
+.pp-date { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 6px 4px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.55)); color: #fff; font-size: 11px; text-align: left; pointer-events: none; }
+.pp-added { position: absolute; top: 6px; left: 6px; padding: 0 8px; border-radius: var(--r-pill); background: rgba(255, 255, 255, 0.92); font-size: 11px; line-height: 20px; }
+.pp-check { position: absolute; top: 6px; right: 6px; z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #fff; }
+.pp-more { display: flex; justify-content: center; padding: 20px 0 4px; }
+
+.pp-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 24px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--rule); background: var(--paper); }
+.pp-stat { display: flex; gap: 16px; color: var(--ink-2); font-size: 14px; }
+.pp-stat b { color: var(--ink); font-weight: 500; }
+.pp-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+
+@media (max-width: 640px) {
+  .pp { width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
+  .pp-panel { height: 100dvh; max-height: none; }
+  .pp-head { padding-left: 16px; }
+  .pp-filters, .pp-scroll, .pp-foot { padding-left: 16px; padding-right: 16px; }
+  .pp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* The entry picker (themes/EntryPicker.tsx): the same dialog, a list of rows instead of a grid. */
+.pp-dates .ep-words { flex: 2 1 220px; max-width: none; }
+.ep-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ep-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 8px 12px 8px 8px; border: 1px solid var(--rule); border-radius: 14px; background: var(--sheet); color: var(--ink); text-align: left; cursor: pointer; }
+.ep-row:hover { border-color: var(--rule-2); }
+.ep-row[aria-pressed='true'] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.ep-row:disabled { cursor: default; opacity: 0.55; }
+.ep-row:focus-visible { outline: 2px solid var(--hydro); outline-offset: 2px; }
+.ep-thumb { display: block; overflow: hidden; border-radius: 10px; background: var(--mat); }
+.ep-thumb-blank { display: grid; place-items: center; aspect-ratio: 1 / 1; color: var(--ink-3); }
+.ep-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ep-meta { display: flex; flex-wrap: wrap; gap: 0 10px; color: var(--ink-3); font-size: 12.5px; }
+.ep-label { overflow: hidden; font: 600 15px/1.5 var(--serif); letter-spacing: 0.02em; text-overflow: ellipsis; white-space: nowrap; }
+.ep-check { display: grid; place-items: center; width: 24px; height: 24px; border: 1.5px solid var(--rule-2); border-radius: 50%; }
+.ep-row[aria-pressed='true'] .ep-check { border-color: var(--ink); background: var(--ink); color: #fff; }
+.ep-added { padding: 0 8px; border-radius: var(--r-pill); background: var(--mat); color: var(--ink-2); font-size: 11px; line-height: 20px; }

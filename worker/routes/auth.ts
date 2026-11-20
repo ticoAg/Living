@@ -13,9 +13,10 @@ import { reqStr } from '../lib/validate';
 
 export const auth = new Hono<AppEnv>({ strict: false });
 
-const RESERVED = new Set(
-  'admin api media living login register settings studio themes upload map index place t p www root owner'.split(' ')
-);
+const RESERVED = new Set([
+  ...'admin api media living login register settings studio themes upload map index place t p www root owner'.split(' '),
+  ...'today archive entries e projects s search'.split(' ')
+]);
 
 interface InviteRow {
   code: string;

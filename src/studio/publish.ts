@@ -15,9 +15,14 @@ const FALLBACK: Record<number, string> = {
   502: '存储服务暂时不可用，请稍后重试'
 };
 
-export function uploadPhoto(form: FormData, onProgress?: (fraction: number) => void): Promise<PublishResult> {
+export function uploadPhoto(form: FormData, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<PublishResult> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
+    if (signal?.aborted) {
+      resolve({ ok: false, status: 0, code: 'abort', message: '已取消' });
+      return;
+    }
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
     xhr.open('POST', '/api/photos');
     xhr.withCredentials = true;
     xhr.responseType = 'text';

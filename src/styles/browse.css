@@ -58,6 +58,12 @@
    at most 4. The script reads the gaps from .msn and sizes tiles from the photo's ratio plus the caption heights
    fixed here (GalleryTile.tsx, PlaceTile.tsx), so a caption is one line that never wraps. */
 .gal-masonry { padding-top: 28px; }
+/* the entry layer (browse/EntryShelf.tsx): works' tiles, newest first */
+.gal-layers { flex: none; }
+.gal-entries { padding-top: 28px; }
+.gal-limit + .gal-entries { padding-top: 20px; }
+.gal-entries-skel > li { aspect-ratio: 4 / 5; border-radius: var(--r-img); background: var(--mat); animation: gal-pulse 1.3s ease-in-out infinite alternate; }
+.gal-more { display: flex; justify-content: center; padding-top: 32px; }
 .msn { position: relative; column-gap: clamp(12px, 1.6vw, 24px); row-gap: 26px; }
 .msn-cell { position: absolute; }
 .msn-end { height: 1px; }
@@ -81,10 +87,11 @@
 .prof-name { font-size: clamp(30px, 3.4vw, 46px); letter-spacing: 0.04em; }
 .prof-handle { margin: 8px 0 0; font-size: 14px; color: var(--ink-2); }
 .prof-bio { margin: 12px 0 0; max-width: 56ch; line-height: 1.8; color: var(--ink-2); }
+.prof-own { margin: 16px 0 0; }
 .prof-counts { margin: 0; display: flex; gap: 28px; align-items: baseline; }
 .prof-num { font: 500 40px / 1 var(--latin); font-variant-numeric: lining-nums tabular-nums; }
 .prof-unit { margin-left: 6px; font-size: 14px; color: var(--ink-2); }
-.prof-themes { padding-top: 28px; }
+.prof-themes { display: flex; flex-direction: column; gap: 18px; padding-top: 32px; }
 .prof-themes ul { list-style: none; margin: 0; padding: 0 0 6px; display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x proximity; }
 .prof-themes li { flex: none; scroll-snap-align: start; }
 .prof-theme { display: flex; flex-direction: column; gap: 8px; width: 208px; }
@@ -93,7 +100,10 @@
 .prof-theme-title { font: 600 16px / 1.4 var(--serif); letter-spacing: 0.04em; }
 .prof-theme-meta { display: flex; flex-wrap: wrap; gap: 0 10px; font: 12px var(--mono); color: var(--ink-2); }
 .prof-theme-meta em { font-style: normal; color: var(--sienna); }
-.prof-head ~ .gal, .prof-themes ~ .gal { padding-top: 20px; }
+.prof-entries { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; max-width: 880px; padding-top: 32px; }
+.prof-entries > .bw-h2, .prof-entries > .en-list { align-self: stretch; }
+.prof-projects { display: flex; flex-direction: column; gap: 14px; padding-top: 32px; }
+.prof-head ~ .gal, .prof-themes ~ .gal, .prof-projects ~ .gal, .prof-entries ~ .gal { padding-top: 20px; }
 
 /* ---------- photo ---------- */
 .pho { display: flex; flex-direction: column; gap: 12px; padding-bottom: 88px; }
@@ -155,6 +165,7 @@
 .pho-themes a { display: flex; align-items: center; gap: 10px; min-height: 44px; font: 500 15px var(--serif); letter-spacing: 0.04em; }
 .pho-themes a svg { color: var(--ink-3); }
 .pho-themes a:hover { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.pho-themes a > .pho-entry-day { margin-left: auto; color: var(--ink-3); font: 12px var(--mono); letter-spacing: 0; }
 
 .pho-strip { margin-top: 28px; padding-top: 28px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 10px; }
 .pho-strip-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -203,6 +214,9 @@ a.pho-strip-all:hover { color: var(--ink); }
 .plc-cap-title { grid-column: 1; font-size: 13px; font-weight: 500; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plc-cap-day { grid-column: 2; grid-row: 1; font-size: 11px; color: var(--ink-3); }
 .plc-cap-owner { grid-column: 1 / -1; font-size: 11px; line-height: 18px; color: var(--hydro); }
+.plc-entries { display: flex; flex-direction: column; gap: 16px; }
+.plc-entries .bw-h2 { padding: 0; border: 0; font-size: 20px; }
+.plc-entries .en-list { max-width: 760px; }
 .plc-near { padding-top: 32px; border-top: 1px solid var(--rule); display: flex; flex-direction: column; gap: 18px; }
 .plc-near .bw-h2 { padding: 0; border: 0; font-size: 20px; }
 .plc-near ul { list-style: none; margin: 0 -10px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 4px 20px; }
@@ -223,7 +237,7 @@ a.pho-strip-all:hover { color: var(--ink); }
 .mpg-cities { display: flex; flex-wrap: wrap; gap: 0 6px; margin-left: -10px; }
 .mpg-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
 .mpg-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 28px 40px; }
-.mpg-map { position: relative; flex: 999 1 620px; min-width: 0; height: clamp(420px, calc(100vh - 230px), 780px); border-radius: var(--r-stage); background: var(--land); overflow: hidden; }
+.mpg-map { position: relative; flex: 999 1 620px; min-width: 0; height: clamp(420px, calc(100vh - var(--vv-h, 0px) - 230px), 780px); border-radius: var(--r-stage); background: var(--land); overflow: hidden; }
 .swapmap { position: absolute; inset: 0; }
 .swapmap-layer { position: absolute; inset: 0; transition: opacity 0.26s ease; }
 .swapmap-layer[data-pending='true'] { opacity: 0; pointer-events: none; }
@@ -312,22 +326,30 @@ a.idx-place:hover .idx-place-name { text-decoration: underline; text-underline-o
   .plc-top { margin-top: -20px; }
   .pho-mat { padding: 12px; border-radius: var(--r-card); }
   .plc-map, .mpg-map { border-radius: var(--r-card); }
-  /* title and filter button on one row, the cities scrolling sideways below, the season and light chips folded:
+  /* title, layer switch and filter button on one row, the cities scrolling sideways below, the filter chips folded:
      the map takes the rest of the screen (136px: the rows above it and their gaps) */
   .mpg { gap: 12px; }
   .mpg-top { align-items: center; gap: 8px 12px; padding-top: 12px; }
   .mpg-title { display: contents; }
-  .mpg-h1 { order: 1; flex: 1 1 auto; }
+  .mpg-h1 { order: 1; }
+  .mpg-layers { order: 1; margin-right: auto; }
   .mpg-top > .bw-filter { order: 2; }
   .mpg-cities { order: 3; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) 0 calc(var(--gutter) - 10px); scrollbar-width: none; }
   .mpg-cities::-webkit-scrollbar { display: none; }
   .mpg-cities > * { flex: none; }
   .mpg-filters { order: 4; flex: 1 1 100%; }
   .mpg-filters[data-open='false'] { display: none; }
-  .mpg-map { flex-basis: 100%; height: calc(100svh - var(--header-h) - var(--nav-foot, 0px) - 136px); min-height: 320px; }
+  .mpg-map { flex-basis: 100%; height: calc(100svh - var(--header-h) - var(--vv-h, 0px) - var(--nav-foot, 0px) - 136px); min-height: 320px; }
   .mpg-top > .mpg-limit { order: 5; }
-  .mpg:has(.mpg-limit) .mpg-map { height: calc(100svh - var(--header-h) - var(--nav-foot, 0px) - 162px); }
+  .mpg:has(.mpg-limit) .mpg-map { height: calc(100svh - var(--header-h) - var(--vv-h, 0px) - var(--nav-foot, 0px) - 162px); }
   .mpg-panel { flex-basis: 100%; max-width: none; }
   .idx { gap: 40px; }
   .idx-head { padding-top: 28px; }
 }
+
+/* ---- the library's own tabs, for someone signed in (LibraryTabs.tsx) ------------------------------ */
+
+.lib-tabs { display: flex; gap: 2px; margin: 16px 0 -8px -12px; }
+.lib-tab { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: var(--r-pill); color: var(--ink-2); font-size: 14px; text-decoration: none; }
+.lib-tab:hover { color: var(--ink); background: var(--mat); }
+.lib-tab[aria-current='page'] { color: var(--ink); font-weight: 500; background: var(--mat); }

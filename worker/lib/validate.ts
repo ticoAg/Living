@@ -1,3 +1,4 @@
+import { endOfDay, isDay } from '../../shared/days';
 import { invalid } from './http';
 
 export type Body = Record<string, unknown>;
@@ -8,26 +9,45 @@ export const has = (o: Body, k: string): boolean => Object.prototype.hasOwnPrope
 /** Length in Unicode code points, so Chinese and emoji count as one. */
 export const cpLen = (s: string): number => [...s].length;
 
+/** Text without NUL characters: SQLite's string functions stop at one, so what follows would be lost to search and counts. */
+const noNul = (s: string): string => (s.includes('\u0000') ? s.replaceAll('\u0000', '') : s);
+
 export function isPlainObject(v: unknown): v is Body {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** Required string, trimmed, with a code-point length range. */
+/** Required string, trimmed and without NUL, with a code-point length range. */
 export function reqStr(o: Body, key: string, label: string, min: number, max: number): string {
   const v = o[key];
   if (typeof v !== 'string') throw invalid(`请填写${label}`);
-  const s = v.trim();
+  const s = noNul(v).trim();
   const n = cpLen(s);
   if (n < min || n > max) throw invalid(min <= 1 ? `${label}不能为空，且最多 ${max} 个字符` : `${label}需要 ${min} 到 ${max} 个字符`);
   return s;
 }
 
-/** Optional text: null/undefined/blank → null, otherwise trimmed and length-checked. */
+/** Optional text: null/undefined/blank → null, otherwise trimmed, without NUL and length-checked. */
 export function optText(v: unknown, label: string, max: number): string | null {
   if (v === null || v === undefined) return null;
   if (typeof v !== 'string') throw invalid(`${label}需要是文字`);
-  const s = v.trim();
+  const s = noNul(v).trim();
   if (s === '') return null;
+  if (cpLen(s) > max) throw invalid(`${label}最多 ${max} 个字符`);
+  return s;
+}
+
+/**
+ * Optional Markdown, kept as written: blank lines before it, whitespace after it and NUL characters go, line ends become
+ * `\n`, and the first line keeps its own indentation (a paragraph may open with full-width spaces). Blank → null.
+ */
+export function optMarkdown(v: unknown, label: string, max: number): string | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== 'string') throw invalid(`${label}需要是文字`);
+  const s = noNul(v)
+    .replace(/\r\n?/g, '\n')
+    .replace(/^(?:[ \t　]*\n)+/, '')
+    .replace(/\s+$/, '');
+  if (!s.trim()) return null;
   if (cpLen(s) > max) throw invalid(`${label}最多 ${max} 个字符`);
   return s;
 }
@@ -60,6 +80,18 @@ export function optEnum<T extends string>(v: unknown, label: string, values: rea
   return v as T;
 }
 
+/**
+ * A query parameter (`label`, its name) naming some of `values`, comma-separated, each counted once: absent or empty →
+ * null (no filter); any other word is a 400.
+ */
+export function enumList<T extends string>(v: string | undefined, label: string, values: readonly T[]): T[] | null {
+  if (!v) return null;
+  const out = [...new Set(v.split(','))];
+  if (out.some((x) => !(values as readonly string[]).includes(x)))
+    throw invalid(`${label} 只能是 ${values.join(' / ')}，可以用逗号隔开几个`);
+  return out as T[];
+}
+
 export function optBool(v: unknown, label: string): boolean | undefined {
   if (v === undefined) return undefined;
   if (typeof v !== 'boolean') throw invalid(`${label}需要是 true 或 false`);
@@ -83,10 +115,19 @@ export function strArray(v: unknown, label: string, maxItems: number, maxLen = 6
 }
 
 /** `YYYY-MM-DD` that is a real calendar date. */
-export function isDate(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(`${s}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+export const isDate = isDay;
+
+/**
+ * A list's `from` and `to` days (YYYY-MM-DD, both inclusive, either may be left out) as bounds on a local date-time
+ * column, day-only ('2026-11-16') or timed ('2026-11-16T09:30:00'): `>= from` and `< until`, just past `to`.
+ */
+export function dayRange(from: string | undefined, to: string | undefined): { from: string | null; until: string | null } {
+  const f = from || null;
+  const t = to || null;
+  if (f !== null && !isDay(f)) throw invalid('from 的格式应为 YYYY-MM-DD');
+  if (t !== null && !isDay(t)) throw invalid('to 的格式应为 YYYY-MM-DD');
+  if (f && t && t < f) throw invalid('to 不能早于 from');
+  return { from: f, until: t ? endOfDay(t) : null };
 }
 
 export function optDate(v: unknown, label: string): string | null {
@@ -95,14 +136,32 @@ export function optDate(v: unknown, label: string): string | null {
   return v;
 }
 
+/** `YYYY-MM-DDTHH:mm:ss` from a local date-time, tolerating a missing seconds part or a fractional/zone suffix; else null. */
+function wallClock(v: string): string | null {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/.exec(v.trim());
+  return m && isDate(m[1]) && +m[2] < 24 && +m[3] < 60 && +(m[4] ?? 0) < 60 ? `${m[1]}T${m[2]}:${m[3]}:${m[4] ?? '00'}` : null;
+}
+
 /** Local capture time `YYYY-MM-DDTHH:mm:ss`; tolerates a missing seconds part or a fractional/zone suffix. */
 export function optTakenAt(v: unknown): string | null {
   if (v === null || v === undefined || v === '') return null;
-  if (typeof v === 'string') {
-    const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/.exec(v.trim());
-    if (m && isDate(m[1]) && +m[2] < 24 && +m[3] < 60 && +(m[4] ?? 0) < 60) return `${m[1]}T${m[2]}:${m[3]}:${m[4] ?? '00'}`;
-  }
+  const t = typeof v === 'string' ? wallClock(v) : null;
+  if (t) return t;
   throw invalid('拍摄时间格式应为 YYYY-MM-DDTHH:mm:ss');
+}
+
+/**
+ * When an entry happened, local wall-clock time: `YYYY-MM-DD` when only the day is known, else `YYYY-MM-DDTHH:mm:ss`
+ * (read like a capture time). Null when not given.
+ */
+export function optOccurredAt(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    const t = isDate(s) ? s : wallClock(s);
+    if (t) return t;
+  }
+  throw invalid('发生时间格式应为 YYYY-MM-DD 或 YYYY-MM-DDTHH:mm:ss');
 }
 
 /** UTC offset such as `+08:00`. With `lenient`, anything else is dropped instead of rejected (it is only descriptive). */

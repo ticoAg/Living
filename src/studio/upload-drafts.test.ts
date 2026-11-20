@@ -68,6 +68,12 @@ describe('draftOf', () => {
     expect(draftOf(item({ title: '   ' }), 5)).toBeNull();
   });
 
+  it('counts a visibility as chosen only when it differs from the one new photos start with', () => {
+    expect(draftOf(item({ visibility: 'private' }), 5, 'private')).toBeNull();
+    expect(draftOf(item({ visibility: 'public' }), 5, 'private')).toMatchObject({ visibility: 'public' });
+    expect(draftOf(item({ visibility: 'private' }), 5)).toMatchObject({ visibility: 'private' });
+  });
+
   it('keeps the text and the choices, not the pixels', () => {
     const place = choiceFromCandidate(cand(), 'confirmed');
     const d = draftOf(

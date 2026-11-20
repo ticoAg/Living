@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { Visibility } from '../../shared/types';
 import { DraftStore, browserStorage, draftOf, fileKey, restoreDraft, type Draft } from './upload-drafts';
 import type { Item } from './upload-model';
 
@@ -10,7 +11,7 @@ const SAVE_DELAY = 400;
  * file is added again. Saves shortly after each change and at once when the tab is hidden or closed.
  * Docs: /docs/product/features/upload.md#草稿
  */
-export function useUploadDrafts(userId: string | null, items: Item[]) {
+export function useUploadDrafts(userId: string | null, items: Item[], base: Visibility) {
   const store = useMemo(() => (userId ? new DraftStore(browserStorage(), `living:upload-drafts:${userId}`) : null), [userId]);
   const latest = useRef(items);
   latest.current = items;
@@ -23,9 +24,9 @@ export function useUploadDrafts(userId: string | null, items: Item[]) {
     const now = Date.now();
     const changes = new Map<string, Draft | null>();
     // an unreadable file shows no form: whatever was kept for it stays for the next try
-    for (const it of latest.current) if (it.stage !== 'error') changes.set(fileKey(it.file), draftOf(it, now));
+    for (const it of latest.current) if (it.stage !== 'error') changes.set(fileKey(it.file), draftOf(it, now, base));
     if (changes.size) store.update(changes);
-  }, [store]);
+  }, [store, base]);
 
   useEffect(() => {
     clearTimeout(timer.current);

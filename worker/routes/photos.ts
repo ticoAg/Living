@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { PHOTO_LIMITS } from '../../shared/limits';
 import { distance } from '../../shared/geo';
 import {
+  PHOTO_IDS_LIMIT,
   PHOTO_LIST_LIMIT,
   type GeoPrivacy,
   type PhotoListResponse,
@@ -17,16 +18,16 @@ import { GEO_PRIVACIES, POI_METHODS, VISIBILITIES } from '../lib/photoInput';
 import { loadPhotoDetail, loadPhotoRow, PHOTO_FROM, SUMMARY_COLS, toSummary, type PhotoRow } from '../lib/photos';
 import { findOrCreatePoi, getPoiRow, parseNewPoi, type PoiRow } from '../lib/poi';
 import { requireUser, viewerId } from '../lib/session';
+import { grantFor, sharedCache } from '../lib/shares';
 import { capped, nowIso, parseJson, prep, prepQ, Sql } from '../lib/sql';
 import { usableTagIds } from '../lib/tags';
 import { readUploadForm, resolveUpload, savePhoto, storeFiles, uploadFiles, type Upload } from '../lib/upload';
-import { has, optBool, optEnum, optFocus, optTakenAt, optText, strArray } from '../lib/validate';
+import { dayRange, has, optBool, optEnum, optFocus, optTakenAt, optText, strArray } from '../lib/validate';
 import { photoById, photoList, photoLocation } from '../lib/visibility';
 import type { SessionUser } from '../../shared/types';
 
 export const photos = new Hono<AppEnv>({ strict: false });
 
-const IDS_LIMIT = 200;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 // ---- list -----------------------------------------------------------------------------------------------------
@@ -39,6 +40,8 @@ photos.get('/', async (c) => {
   const idsParam = c.req.query('ids');
   const wantMine = ['1', 'true'].includes(c.req.query('mine') ?? '');
   if (wantMine && !viewer) throw unauthenticated();
+  // photos without a capture time are on no day, so a range leaves them out
+  const range = dayRange(c.req.query('from'), c.req.query('to'));
 
   let ids: string[] | null = null;
   if (idsParam !== undefined) {
@@ -50,7 +53,7 @@ photos.get('/', async (c) => {
           .filter(Boolean)
       )
     ];
-    if (ids.length > IDS_LIMIT) throw invalid(`一次最多指定 ${IDS_LIMIT} 张照片`);
+    if (ids.length > PHOTO_IDS_LIMIT) throw invalid(`一次最多指定 ${PHOTO_IDS_LIMIT} 张照片`);
   }
 
   let ownerId: string | null = null;
@@ -71,6 +74,8 @@ photos.get('/', async (c) => {
   if (ownerId) where.push(`p.owner_id = ${q.p(ownerId)}`);
   if (poi) where.push(`p.poi_id = ${q.p(poi)}`, photoLocation(q, viewer));
   if (ids) where.push(`p.id IN (SELECT value FROM json_each(${q.p(JSON.stringify(ids))}))`);
+  if (range.from) where.push(`p.taken_at >= ${q.p(range.from)}`);
+  if (range.until) where.push(`p.taken_at < ${q.p(range.until)}`);
 
   const res = await prepQ(
     db,
@@ -90,8 +95,12 @@ photos.get('/', async (c) => {
 // ---- detail ---------------------------------------------------------------------------------------------------
 
 photos.get('/:id', async (c) => {
-  const detail = await loadPhotoDetail(c.env.DB, paramId(c), await viewerId(c));
+  const id = paramId(c);
+  // a share link opens the photos shown in what it shares (lib/shares.ts)
+  const grant = await grantFor(c, 'photo', id);
+  const detail = await loadPhotoDetail(c.env.DB, id, await viewerId(c), grant);
   if (!detail) throw notFound('照片不存在，或你没有权限查看');
+  if (grant) sharedCache(c);
   return c.json(detail);
 });
 
@@ -103,7 +112,14 @@ photos.post('/', async (c) => {
   const form = await readUploadForm(c.req.raw);
   const refs = await resolveUpload(db, user.id, form.meta);
   const photoId = newId.photo();
-  const upload: Upload = { photoId, ownerId: user.id, form, refs, files: uploadFiles(user.id, photoId, form) };
+  const upload: Upload = {
+    photoId,
+    ownerId: user.id,
+    defaultVisibility: user.photoVisibility,
+    form,
+    refs,
+    files: uploadFiles(user.id, photoId, form)
+  };
   // R2 first: if storage fails nothing is written to D1; if D1 fails the files are deleted again.
   await storeFiles(c.env.MEDIA, upload);
   await savePhoto(db, c.env.MEDIA, upload);
@@ -225,6 +241,14 @@ photos.delete('/:id', async (c) => {
     prep(db, 'UPDATE themes SET updated_at = ?1 WHERE id IN (SELECT theme_id FROM theme_items WHERE photo_id = ?2)', now, row.id),
     prep(db, 'UPDATE themes SET cover_photo_id = NULL WHERE cover_photo_id = ?1', row.id),
     prep(db, 'UPDATE users SET avatar_photo_id = NULL WHERE avatar_photo_id = ?1', row.id),
+    // the entries that showed it have changed: an open editor hears of it (revision) instead of saving the photo back
+    prep(
+      db,
+      'UPDATE entries SET updated_at = ?1, revision = revision + 1 WHERE id IN (SELECT entry_id FROM entry_media WHERE photo_id = ?2)',
+      now,
+      row.id
+    ),
+    prep(db, 'DELETE FROM entry_media WHERE photo_id = ?1', row.id),
     prep(db, 'DELETE FROM theme_items WHERE photo_id = ?1', row.id),
     prep(db, 'DELETE FROM photo_tags WHERE photo_id = ?1', row.id),
     prep(db, 'DELETE FROM photos WHERE id = ?1', row.id)
