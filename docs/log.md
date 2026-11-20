@@ -1,5 +1,11 @@
 # Directory Update Log
 
+## 2026-11-20
+* **Creation**: [媒体库](/product/features/library.md)（`/library`，登录后图库的第四个标签页）：自己的照片、视频、音频和文件，各有多少、多大；照片和附件都能筛出不在任何记录里的；附件写着在哪条记录里，或者不在记录里、几天后删去，可以下载、删除；「选择」几张照片和不在记录里的附件，「写一条记录」打开编辑器，它们已经放好，日期是照片里最早的拍摄日。接口 [`GET /api/library`](/api/library.md) 一次给出附件和它们所在的记录、删去的时间、各类的数量和大小，以及自己的记录用到了哪些照片；不加表。
+* **Creation**: [图库的记录一层](/product/features/gallery.md#记录)：首页筛选栏最前面切换「照片 | 记录」（`?layer=entries`），所有人公开的已完成记录和作品一样排成格子，按类型筛选（`type=`），Living 放这些记录里的照片。
+* **Creation**: [Living 放记录](/product/features/living-mode.md#记录)：`src=entry&entry=<id>` 按一条记录里的顺序放它的照片，记录页有照片时最下面有 Living；`src=entries` 放已完成记录里的照片（`type=`、`user=` 可选），同一张只放一次，算在最新的那条里。字幕多一行「记录」，默认显示，写照片所在记录的名字；设置面板的来源多一个「记录」。
+* **Update**: 不在记录里的附件什么时候删去，清理任务和媒体库用同一处规则（`KEPT_DAYS`、`purgeAt`）。[记录](/product/features/entries.md)、[附件](/product/features/attachments.md)、[路线图](/product/roadmap.md)、[前端分区](/architecture/frontend.md)、[接口索引](/api/index.md) 随之更新。
+
 ## 2026-11-19
 * **Creation**: 第三阶段的最后一项：[附件](/product/features/attachments.md)。记录里可以放视频、录音和其他文件：编辑器的「附件」里添加或直接录音，随手记的麦克风录好就和文字一起记下；选好就分片上传，显示进度，断了从断的那一片接着传。阅读页里视频带封面直接放，声音是播放条，其他文件下载（PDF 在浏览器里打开）；卡片显示附件，作品没有照片时用视频的封面。迁移 `0010_attachments.sql` 新增 [attachments](/data/attachments.md)，接口见 [附件接口](/api/attachments.md)：R2 分片上传，每片 16 MiB，一个最多 2 GiB，一条记录最多 20 个。另建一张表、不并进照片，理由见 [数据演进](/data/evolution.md#媒体)。
 * **Update**: 附件没有自己的公开范围，跟着所在的记录：能打开记录的人（包括凭分享链接打开的）就能播放、下载，不在记录里的只有作者能读，`/media/a/` 下的文件一律不进缓存。手机视频和语音备忘录（MP4、MOV、M4A）里的拍摄地点，上传前在浏览器里原地抹掉；浏览器能放的视频和声音、PDF 在页面里打开，其余（网页、SVG……）只能下载，并带 `sandbox` 的内容安全策略。没传完的一天后、不在记录里的七天后由每小时的定时任务删掉。见 [隐私](/product/features/privacy.md#附件)、[分享链接](/product/features/sharing.md#能看到什么)、[Cloudflare 资源](/architecture/cloudflare.md#定时任务)。

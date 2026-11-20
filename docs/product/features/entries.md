@@ -17,6 +17,7 @@ area: entries
 
 - **随手记**：[今天](/product/features/today.md) 顶部的输入框。记下即为一条已完成的随记，发生时间是此刻，仅自己可见；Ctrl/Cmd+Enter 也能记下。没记下的文字留在这台设备上。
 - **写长文**：把输入框里的文字带进编辑器继续写；也可以从 `/entries/new` 直接开始。从 [日历](/product/features/calendar.md) 补记某一天时是 `/entries/new?date=YYYY-MM-DD`：日期就是那天，以前的日子只有日期、不带时刻。
+- **从媒体库**：在 [媒体库](/product/features/library.md#写一条记录) 里选几张照片和不在记录里的附件，「写一条记录」打开新记录，它们已经放好，日期是照片里最早的拍摄日。
 - **编辑器**：类型、日期、时间（可勾「全天」只留日期）、标题、正文、照片、附件、地点、项目、标签、公开范围。正文用 Markdown，可切换「预览」。
 - **照片**：只能从自己的照片里选，默认显示与记录同一天拍的；每张可以写一句这条记录里的说明，可调整顺序、移除。移除不会删除照片，说明不改变照片自己的 [笔记](/product/features/photo-notes.md)。
 - **附件**：视频、录音和其他文件，在编辑器里添加或直接录音，边传边写，每个可以写一句说明，见 [附件](/product/features/attachments.md)。随手记也能录音。
@@ -42,6 +43,7 @@ area: entries
 # 阅读
 
 - `/e/:id`：所属的项目、日期、地点（链到 [地点页](/product/features/places.md)）、类型、标题（没有标题时以日期作标题）、正文、照片和说明、附件、收录它的 [合集](/product/features/themes.md)、标签。作者看到「分享」「访客视角」和「编辑」；草稿显示「继续写」。
+- 看得到照片时，最下面有 Living：按这条记录里的顺序全屏播放这些照片，字幕写着记录的名字（见 [Living 模式](/product/features/living-mode.md#记录)）。
 - 列表里的记录卡片也显示地点和附件。
 - 「分享」生成 [分享链接](/product/features/sharing.md)：拿到的人能看这条记录、它的全部照片和附件；记录要已完成，链接才打得开。
 - 照片可点开到照片页；照片页列出它所属的记录。
@@ -54,5 +56,5 @@ area: entries
 
 # 相关
 
-- [内容模型](/product/content-model.md)、[今天](/product/features/today.md)、[档案](/product/features/archive.md)、[附件](/product/features/attachments.md)、[隐私](/product/features/privacy.md)
+- [内容模型](/product/content-model.md)、[今天](/product/features/today.md)、[档案](/product/features/archive.md)、[附件](/product/features/attachments.md)、[媒体库](/product/features/library.md)、[隐私](/product/features/privacy.md)
 - 接口 [记录接口](/api/entries.md)、[附件接口](/api/attachments.md)，数据 [entries](/data/entries.md)、[attachments](/data/attachments.md)

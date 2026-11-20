@@ -18,7 +18,7 @@ area: entries
 - 编辑器里照片的下面是「附件」：「录音」直接录，「添加」选文件，一次可以选几个。
 - 视频和声音能在页面里放，其他文件（文档、表格、压缩包……）下载后打开。图片请放进照片：照片有尺寸图、位置和标签，附件没有。
 - 一条记录最多 20 个附件，一个最多 2 GB；空文件加不了。
-- 每个附件可以写一句说明、调整顺序、移除。移除的附件离开这条记录，七天后删去。
+- 每个附件可以写一句说明、调整顺序、移除。移除的附件离开这条记录，七天后删去；这之前在 [媒体库](/product/features/library.md) 里还找得到。
 - 选好就开始上传，一个接一个，显示进度。断网、服务器忙时自动重试几次；还不行就停下，「重试」从断的那一片接着传，「取消」丢掉它。
 - 上传之前，浏览器读出视频的时长和尺寸，截一帧作封面；声音读出时长。读不出也照样能传。
 - 上传中「完成」按不了，底部写着「附件上传中…」，关闭或刷新页面前浏览器会先问一句。正文照常自动保存。
@@ -63,7 +63,11 @@ area: entries
 - [导出](/product/features/export.md) 勾选「包含照片原文件和附件」时，附件的文件和视频的封面放在 `media/` 下，Markdown 里是指向它们的链接；不勾选时，Markdown 里写着附件的文件名。
 - [导入](/product/features/import.md) 把附件的文件重新上传，放回原来的记录。
 
+# 媒体库
+
+[媒体库](/product/features/library.md) 列出自己的全部附件：在哪条记录里，或者不在记录里、什么时候删去。不在记录里的能在那里下载、删掉，或者选上写进一条新记录；在记录里的要在记录里去掉。
+
 # 相关
 
-- [记录](/product/features/entries.md)、[今天](/product/features/today.md)、[隐私](/product/features/privacy.md#附件)
+- [记录](/product/features/entries.md)、[今天](/product/features/today.md)、[媒体库](/product/features/library.md)、[隐私](/product/features/privacy.md#附件)
 - 接口 [附件接口](/api/attachments.md)，数据 [attachments](/data/attachments.md)

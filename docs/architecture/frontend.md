@@ -31,6 +31,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 | `/place/:id` | `src/pages/Place.tsx` | browse |
 | `/map` | `src/pages/MapPage.tsx` | browse |
 | `/index` | `src/pages/IndexPage.tsx` | browse |
+| `/library` | `src/pages/Library.tsx` | library |
 | `/living` | `src/pages/Living.tsx` | living |
 | `/upload` | `src/pages/Upload.tsx` | studio |
 | `/studio/photo/:id` | `src/pages/PhotoEdit.tsx` | studio |
@@ -56,7 +57,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 - 其他渲染错误显示「出错了」和「刷新」按钮。
 - `React.lazy` 一旦失败会一直抛同一个错误，所以恢复靠整页跳转，不在页面内重试；预取失败不会让 `lazy` 失败，渲染时会重新请求。
 
-分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品、节奏和列表顺序在 `src/projects/stages.ts`；日历的周、每天的格子、颜色深浅、连续天数和按月计数在 `src/review/calendar.ts`，小月历和按月的柱子是 `src/review/HeatMonth.tsx`、`MonthBars.tsx`，日期的加减在 `shared/days.ts`（Worker 也用它划定日期范围）；分享链接的请求、地址和有效期文字在 `src/shares/api.ts`，记录、合集、项目页上的「分享」对话框是 `src/shares/ShareButton.tsx`，设置里的列表复用同一个 `ShareItem.tsx`；[作品与文章](/product/features/showcase.md) 的分组、按年份分段、字数、封面照片和按类型读取的地址在 `src/showcase/showcase.ts`，作品的格子和按批请求封面在 `WorkTile.tsx`、`WorkGrid.tsx`，文章的一行在 `ArticleRow.tsx`，个人主页也用它们；[导出](/product/features/export.md) 的文件和 living.json 由 `src/export/archive.ts` 从接口读到的行算出，ZIP 在 `zip.ts`、`crc32.ts`，写到 ZIP 还是文件夹在 `sinks.ts`，流程在 `run.ts`；[导入](/product/features/import.md) 读文件夹和 zip 在 `src/import/source.ts`、`unzip.ts`，living.json 的检查、每一行要送的内容和链接的改写在 `archive.ts`，计划和流程在 `run.ts`；两者在设置里的一节是 `src/studio/settings/ExportSection.tsx`、`ImportSection.tsx`。
+分区的私有代码放在 `src/<分区>/`，样式放在 `src/styles/<分区>.css` 并由该分区页面引入。页面组件只做编排：状态与流程放在分区目录的 Hook 里（`use*.ts`，一个 Hook 管一件事），可以写成纯函数的部分单独成模块并配单元测试。例如上传页的队列、读取、地点匹配、发布与选择分别在 `src/studio/useUploadQueue.ts`、`useProcessQueue.ts`、`usePlaceMatching.ts`、`usePublishing.ts`、`useQueueSelection.ts`；Living 的数据、播放与控制条在 `src/living/useLivingData.ts`、`usePlayback.ts`、`useBar.ts`，记录里的照片怎么排、哪些还要按 id 要在 `src/living/entries.ts`；合集编辑的保存与删除、拖拽排序在 `src/themes/useThemeSave.ts`、`useItemDrag.ts`，草稿与条目的换算在 `draft.ts`、`items.ts`，阅读页的分块、路线和 Living 播放的照片在 `model.ts`；记录编辑的自动保存、本机备份和冲突处理在 `src/entries/useEntryAutosave.ts`，草稿与请求体的换算在 `src/entries/draft.ts`，从随手记、媒体库带进编辑器的文字、照片和附件（`history.state`）在 `src/entries/handoff.ts`，时间线与「今天」的分组在 `src/entries/timeline.ts`，Markdown 的解析与渲染在 `src/entries/markdown.ts`、`Markdown.tsx`；项目的天数、按里程碑分阶段、最初与最近的作品、节奏和列表顺序在 `src/projects/stages.ts`；日历的周、每天的格子、颜色深浅、连续天数和按月计数在 `src/review/calendar.ts`，小月历和按月的柱子是 `src/review/HeatMonth.tsx`、`MonthBars.tsx`，日期的加减在 `shared/days.ts`（Worker 也用它划定日期范围）；分享链接的请求、地址和有效期文字在 `src/shares/api.ts`，记录、合集、项目页上的「分享」对话框是 `src/shares/ShareButton.tsx`，设置里的列表复用同一个 `ShareItem.tsx`；[作品与文章](/product/features/showcase.md) 的分组、按年份分段、字数、封面照片和按类型读取的地址在 `src/showcase/showcase.ts`，作品的格子和按批请求封面在 `WorkTile.tsx`、`WorkGrid.tsx`，文章的一行在 `ArticleRow.tsx`，个人主页和图库的记录一层（`src/browse/EntryShelf.tsx`）也用它们；[媒体库](/product/features/library.md) 的类型与筛选、删去时间的文字、选中的东西怎样成为一条新记录在 `src/library/model.ts`；[导出](/product/features/export.md) 的文件和 living.json 由 `src/export/archive.ts` 从接口读到的行算出，ZIP 在 `zip.ts`、`crc32.ts`，写到 ZIP 还是文件夹在 `sinks.ts`，流程在 `run.ts`；[导入](/product/features/import.md) 读文件夹和 zip 在 `src/import/source.ts`、`unzip.ts`，living.json 的检查、每一行要送的内容和链接的改写在 `archive.ts`，计划和流程在 `run.ts`；两者在设置里的一节是 `src/studio/settings/ExportSection.tsx`、`ImportSection.tsx`。
 
 ## 访客视角
 
@@ -111,7 +112,7 @@ React 19、wouter 路由；工具链是 [Vite+](/architecture/decisions/0006-vit
 
 登录后页眉右侧有搜索按钮，在任何页面按 `/`（不在输入框里时）也能打开 [搜索](/product/features/search.md)，已经在搜索页时把光标放进搜索框（`src/search/shortcut.ts`）。
 
-登录后图库、地图、索引合为「图库」一个分区，三个页面顶部用 `src/browse/LibraryTabs.tsx` 的「照片 / 地图 / 索引」切换；照片页和地点页也算在图库里。档案的时间线、日历和项目同样是一个分区，顶部用 `src/entries/ArchiveTabs.tsx` 的「时间线 / 日历 / 项目」切换，年度回顾算在日历里；项目页、项目的新建与编辑，已有记录的阅读和编辑页都算在档案里，新建记录算在今天里。分区数不变，手机底栏的拍照按钮仍在正中。
+登录后图库、地图、索引和 [媒体库](/product/features/library.md) 合为「图库」一个分区，四个页面顶部用 `src/browse/LibraryTabs.tsx` 的「照片 / 地图 / 索引 / 媒体库」切换；照片页和地点页也算在图库里。档案的时间线、日历和项目同样是一个分区，顶部用 `src/entries/ArchiveTabs.tsx` 的「时间线 / 日历 / 项目」切换，年度回顾算在日历里；项目页、项目的新建与编辑，已有记录的阅读和编辑页都算在档案里，新建记录算在今天里。分区数不变，手机底栏的拍照按钮仍在正中。
 
 # 设计令牌
 
