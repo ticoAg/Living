@@ -47,7 +47,9 @@ export default defineConfig({
     // fixes worth guarding, run on the story's data and session
     { name: 'regressions', testMatch: 'regressions.spec.ts', dependencies: ['story'], use: desktop },
     // videos, recordings and files; after the regressions, which count the story's entries
-    { name: 'attachments', testMatch: 'attachments.spec.ts', dependencies: ['regressions'], use: desktop }
+    { name: 'attachments', testMatch: 'attachments.spec.ts', dependencies: ['regressions'], use: desktop },
+    // the library, the gallery's entry layer and Living over entries; after the attachments, whose files it lists
+    { name: 'library', testMatch: 'library.spec.ts', dependencies: ['attachments'], use: desktop }
   ],
   webServer: {
     // a fresh database on every run, then the build `npm run test:e2e` has just made
