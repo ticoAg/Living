@@ -2,15 +2,16 @@
 // Spec: docs/product/features/living-mode.md ("参数").
 //
 // Two groups:
-//   Source   what to play (src, tags, place, city, theme, user, order). Comes from the link only,
+//   Source   what to play (src, tags, place, city, theme, entry, type, user, order). Comes from the link only,
 //            so a bare /living always means "everything, shuffled".
 //   Settings how to show it (every, fx, fit, fields, pos, size, brief, clock, awake, night).
 //            Link parameters win; anything the link leaves out falls back to the last settings
 //            used on this device (localStorage), then to the defaults below.
 
+import { ENTRY_TYPES, type EntryType } from '../../shared/types';
 import { keepVisitor } from '../lib/visitor';
 
-export const SRCS = ['all', 'tags', 'place', 'city', 'theme', 'today'] as const;
+export const SRCS = ['all', 'tags', 'place', 'city', 'theme', 'today', 'entries', 'entry'] as const;
 export const MATCHES = ['any', 'all'] as const;
 export const ORDERS = ['shuffle', 'time'] as const;
 export const FXS = ['drift', 'fade', 'cut'] as const;
@@ -18,7 +19,7 @@ export const FITS = ['cover', 'contain'] as const;
 export const POSS = ['bl', 'bc', 'br'] as const;
 export const SIZES = ['s', 'm', 'l'] as const;
 export const EVERY_PRESETS = [5, 10, 30, 60, 300, 900] as const;
-export const FIELD_KEYS = ['place', 'title', 'city', 'date', 'time', 'ago', 'coord', 'heading', 'exif', 'tags'] as const;
+export const FIELD_KEYS = ['place', 'title', 'entry', 'city', 'date', 'time', 'ago', 'coord', 'heading', 'exif', 'tags'] as const;
 
 export type Src = (typeof SRCS)[number];
 export type Match = (typeof MATCHES)[number];
@@ -36,11 +37,15 @@ export interface Source {
   match: Match;
   /** POI id */
   place: string;
-  /** exact city name; filters every source except themes */
+  /** exact city name; filters every source except a theme and an entry */
   city: string;
   /** theme id */
   theme: string;
-  /** owner handle; limits the list to one user's photos */
+  /** entry id, for `entry` */
+  entry: string;
+  /** entry types, for `entries`; none: every type */
+  types: EntryType[];
+  /** owner handle; limits the list to one user's photos (or entries) */
   user: string;
   order: Order;
 }
@@ -72,7 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
   every: 10,
   fx: 'drift',
   fit: 'cover',
-  fields: ['place', 'date'],
+  fields: ['place', 'entry', 'date'],
   pos: 'bl',
   size: 'm',
   brief: false,
@@ -83,8 +88,11 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const STORE_KEY = 'living:settings';
 
-/** A theme plays in its own (story) order unless the link asks for a shuffle. */
-export const defaultOrder = (src: Src): Order => (src === 'theme' ? 'time' : 'shuffle');
+/** A theme, and an entry, play in their own order unless the link asks for a shuffle. */
+export const defaultOrder = (src: Src): Order => (src === 'theme' || src === 'entry' ? 'time' : 'shuffle');
+
+/** Sources that play one thing in its own order: a city or a user says nothing of them. */
+export const ownOrder = (src: Src): boolean => src === 'theme' || src === 'entry';
 
 const oneOf = <T extends string>(allowed: readonly T[], v: unknown): T | undefined =>
   typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : undefined;
@@ -129,13 +137,25 @@ function coerceSettings(get: (key: string) => unknown): Partial<Settings> {
   return out;
 }
 
+/** The caption fields there were before `entry`: settings saved then made no choice about it, nor about any later one. */
+const FIELDS_BEFORE_ENTRY: readonly string[] = ['place', 'title', 'city', 'date', 'time', 'ago', 'coord', 'heading', 'exif', 'tags'];
+
 export function readStored(): Partial<Settings> {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) return {};
     const o: unknown = JSON.parse(raw);
     if (!o || typeof o !== 'object') return {};
-    return coerceSettings((k) => (o as Record<string, unknown>)[k]);
+    const stored = o as Record<string, unknown>;
+    const out = coerceSettings((k) => stored[k]);
+    // A field added since these were saved starts as it does for everyone: shown if it is by default. Settings that
+    // showed no field at all still show none.
+    if (out.fields?.length) {
+      const known: unknown[] = Array.isArray(stored.fieldKeys) ? stored.fieldKeys : [...FIELDS_BEFORE_ENTRY];
+      const added = DEFAULT_SETTINGS.fields.filter((k) => !known.includes(k));
+      if (added.length) out.fields = toFields([...out.fields, ...added]) ?? out.fields;
+    }
+    return out;
   } catch {
     return {};
   }
@@ -143,7 +163,8 @@ export function readStored(): Partial<Settings> {
 
 export function writeStored(s: Settings): void {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(s));
+    // with the fields there are now: one added later is then not taken for one turned off
+    localStorage.setItem(STORE_KEY, JSON.stringify({ ...s, fieldKeys: FIELD_KEYS }));
   } catch {
     /* private mode or blocked storage: the settings just don't persist */
   }
@@ -161,10 +182,14 @@ export function sourceFromQuery(q: URLSearchParams): Source {
   const place = (q.get('place') ?? '').trim();
   const city = (q.get('city') ?? '').trim();
   const theme = (q.get('theme') ?? '').trim();
+  const entry = (q.get('entry') ?? '').trim();
+  const wanted = new Set((q.get('type') ?? '').split(',').map((t) => t.trim()));
+  const types = ENTRY_TYPES.filter((t) => wanted.has(t));
   const user = (q.get('user') ?? '').trim().replace(/^@/, '');
   // `src` may be left out when the link carries a selector: /living?tags=lake, /living?theme=th_x
-  let src: Src = oneOf(SRCS, q.get('src')) ?? (tags.length ? 'tags' : place ? 'place' : theme ? 'theme' : city ? 'city' : 'all');
-  if ((src === 'place' && !place) || (src === 'theme' && !theme) || (src === 'city' && !city)) src = 'all';
+  let src: Src =
+    oneOf(SRCS, q.get('src')) ?? (tags.length ? 'tags' : place ? 'place' : theme ? 'theme' : entry ? 'entry' : city ? 'city' : 'all');
+  if ((src === 'place' && !place) || (src === 'theme' && !theme) || (src === 'entry' && !entry) || (src === 'city' && !city)) src = 'all';
   return {
     src,
     tags,
@@ -172,6 +197,8 @@ export function sourceFromQuery(q: URLSearchParams): Source {
     place,
     city,
     theme,
+    entry,
+    types,
     user,
     order: oneOf(ORDERS, q.get('order')) ?? defaultOrder(src)
   };
@@ -200,8 +227,10 @@ export function buildQuery(source: Source, s: Settings): string {
   if (source.src === 'tags') add('match', source.match);
   if (source.src === 'place' && source.place) add('place', encodeURIComponent(source.place));
   if (source.src === 'theme' && source.theme) add('theme', encodeURIComponent(source.theme));
-  if (source.city && source.src !== 'theme') add('city', encodeURIComponent(source.city));
-  if (source.user && source.src !== 'theme') add('user', encodeURIComponent(source.user));
+  if (source.src === 'entry' && source.entry) add('entry', encodeURIComponent(source.entry));
+  if (source.src === 'entries' && source.types.length) add('type', source.types.join(','));
+  if (source.city && !ownOrder(source.src)) add('city', encodeURIComponent(source.city));
+  if (source.user && !ownOrder(source.src)) add('user', encodeURIComponent(source.user));
   add('order', source.order);
   add('every', String(s.every));
   add('fx', s.fx);

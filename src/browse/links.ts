@@ -40,6 +40,13 @@ export const livingPlace = (poiId: string) =>
 
 export const livingStart = (photoId: string) => `/living${q([['start', photoId]])}`;
 
+/** Living over one entry's photos, in its order. */
+export const livingEntry = (entryId: string) =>
+  `/living${q([
+    ['src', 'entry'],
+    ['entry', entryId]
+  ])}`;
+
 /** Gallery link with a filter applied; `owner` targets that user's profile gallery. */
 export const galleryLink = (f: { tags?: readonly string[]; city?: string }, owner?: string) =>
   `${owner ? `/@${owner}` : '/'}${q([

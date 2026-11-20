@@ -87,6 +87,8 @@ html.lv-active .vv-bar { display: none; }
 @keyframes lv-cap-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .lv-cap-big { display: flex; align-items: center; justify-content: var(--lv-justify, flex-start); gap: 12px; font: 600 calc(var(--k) * clamp(28px, 3.2vw, 46px)) / 1.15 var(--serif); letter-spacing: 0.1em; }
 .lv-cap-sub { font: 500 calc(var(--k) * 20px) / 1.4 var(--serif); letter-spacing: 0.06em; }
+.lv-cap-entry { display: flex; align-items: center; justify-content: var(--lv-justify, flex-start); gap: 8px; font: 500 calc(var(--k) * 16px) / 1.45 var(--serif); letter-spacing: 0.04em; }
+.lv-cap-entry > svg { flex: none; opacity: 0.8; }
 .lv-cap-meta, .lv-cap-geo { display: flex; flex-wrap: wrap; justify-content: var(--lv-justify, flex-start); gap: 4px 18px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .lv-cap-meta { font-size: calc(var(--k) * 14px); }
 .lv-cap-geo { font-size: calc(var(--k) * 12.5px); color: #e1e3de; }

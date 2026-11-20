@@ -1,4 +1,5 @@
-import type { Source } from './settings';
+import { ENTRY_TYPE_LABELS } from '../../shared/entries';
+import { ownOrder, type Source } from './settings';
 
 // What the brand line says is playing, and the drawer's switches for the parts of the link the visit opened with.
 
@@ -7,6 +8,8 @@ export interface SourceNames {
   place: (id: string) => string | undefined;
   /** the theme's title once it has loaded (kept while a reload is in flight) */
   themeTitle: string;
+  /** the entry's name once it has loaded, likewise */
+  entryTitle: string;
   tag: (id: string) => string | undefined;
 }
 
@@ -15,29 +18,31 @@ export function sourceName(source: Source, names: SourceNames): string {
   const parts: string[] = [];
   if (source.src === 'place') parts.push(names.place(source.place) ?? '地点');
   else if (source.src === 'theme') parts.push(names.themeTitle || '合集');
+  else if (source.src === 'entry') parts.push(names.entryTitle || '记录');
+  else if (source.src === 'entries') parts.push(source.types.length ? source.types.map((t) => ENTRY_TYPE_LABELS[t]).join('、') : '记录');
   else if (source.src === 'today') parts.push('那年今日');
   else if (source.src === 'tags' && source.tags.length) {
     // ids the viewer cannot see (someone else's own tags) have no name; never print raw ids
     const tagNames = source.tags.map((id) => names.tag(id)).filter((x): x is string => !!x);
     parts.push(...(tagNames.length ? tagNames : ['标签']));
   }
-  if (source.city && source.src !== 'theme') parts.push(source.city);
-  if (source.user && source.src !== 'theme') parts.push(`@${source.user}`);
+  if (source.city && !ownOrder(source.src)) parts.push(source.city);
+  if (source.user && !ownOrder(source.src)) parts.push(`@${source.user}`);
   return parts.length ? parts.join(' · ') : '全部';
 }
 
 /** The brand line: source, order and count once ready; just the source after an error. */
 export function summaryLine(source: Source, names: SourceNames, status: 'loading' | 'error' | 'ready', count: number): string {
   const name = sourceName(source, names);
-  const order = source.order === 'time' ? (source.src === 'theme' ? '按顺序' : '按时间') : '随机';
+  const order = source.order === 'time' ? (ownOrder(source.src) ? '按顺序' : '按时间') : '随机';
   return status === 'ready' ? `${name} · ${order} · ${count} 张` : status === 'error' ? name : `${name} · 载入中`;
 }
 
 /** The parts of the opening link that the drawer can switch off and on again. */
-export type OpenedScope = Pick<Source, 'place' | 'theme' | 'city' | 'user'>;
+export type OpenedScope = Pick<Source, 'place' | 'theme' | 'entry' | 'types' | 'city' | 'user'>;
 
 export interface ScopeSwitch {
-  key: 'place' | 'theme' | 'city' | 'user';
+  key: 'place' | 'theme' | 'entry' | 'types' | 'city' | 'user';
   label: string;
   on: boolean;
   /** the source change that flips it */
@@ -62,6 +67,24 @@ export function scopeSwitches(opened: OpenedScope, source: Source, names: Source
       label: `合集 · ${names.themeTitle || '指定合集'}`,
       on,
       patch: on ? { src: 'all', order: 'shuffle' } : { src: 'theme', theme: opened.theme, order: 'time' }
+    });
+  }
+  if (opened.entry) {
+    const on = source.src === 'entry';
+    out.push({
+      key: 'entry',
+      label: `记录 · ${names.entryTitle || '指定记录'}`,
+      on,
+      patch: on ? { src: 'all', order: 'shuffle' } : { src: 'entry', entry: opened.entry, order: 'time' }
+    });
+  }
+  if (opened.types.length) {
+    const on = source.src === 'entries' && source.types.length > 0;
+    out.push({
+      key: 'types',
+      label: `类型 · ${opened.types.map((t) => ENTRY_TYPE_LABELS[t]).join('、')}`,
+      on,
+      patch: on ? { types: [] } : { src: 'entries', types: opened.types }
     });
   }
   if (opened.city) {

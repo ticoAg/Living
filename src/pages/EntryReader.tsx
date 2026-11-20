@@ -1,6 +1,7 @@
 import { Link, useParams } from 'wouter';
 import { ENTRY_STATUS_LABELS, entryLabel, entryTypeLabel, hasTime, occurredDay } from '../../shared/entries';
 import type { EntryDetail, EntryStatus } from '../../shared/types';
+import { livingEntry } from '../browse/links';
 import { LoadError, Loading } from '../browse/ui';
 import { useTagMap } from '../entries/api';
 import Markdown from '../entries/Markdown';
@@ -111,7 +112,7 @@ function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
         </div>
       )}
 
-      {(tagNames.length > 0 || e.themes.length > 0 || own) && (
+      {(tagNames.length > 0 || e.themes.length > 0 || own || e.media.length > 0) && (
         <footer className="er-foot">
           {(tagNames.length > 0 || e.themes.length > 0) && (
             <div className="er-foot-main">
@@ -136,14 +137,28 @@ function Reader({ entry: e, own }: { entry: EntryDetail; own: boolean }) {
               )}
             </div>
           )}
-          {own && (
+          {(own || e.media.length > 0) && (
             <div className="row er-own">
-              <ShareButton kind="entry" id={e.id} notice={SHARE_NOTICE[e.status]} />
-              <VisitorLink href={`/e/${e.id}`} />
-              <Link href={`/e/${e.id}/edit`} className="btn btn-quiet">
-                <Icon name="edit" size={16} />
-                编辑
-              </Link>
+              {e.media.length > 0 && (
+                <Link
+                  href={livingEntry(e.id)}
+                  className="btn btn-quiet btn-living"
+                  aria-label={`Living，播放这条记录的 ${e.media.length} 张照片`}
+                >
+                  <Icon name="play" size={16} />
+                  Living
+                </Link>
+              )}
+              {own && (
+                <>
+                  <ShareButton kind="entry" id={e.id} notice={SHARE_NOTICE[e.status]} />
+                  <VisitorLink href={`/e/${e.id}`} />
+                  <Link href={`/e/${e.id}/edit`} className="btn btn-quiet">
+                    <Icon name="edit" size={16} />
+                    编辑
+                  </Link>
+                </>
+              )}
             </div>
           )}
         </footer>

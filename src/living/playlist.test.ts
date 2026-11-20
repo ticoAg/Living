@@ -13,6 +13,8 @@ const source = (over: Partial<Source> = {}): Source => ({
   place: '',
   city: '',
   theme: '',
+  entry: '',
+  types: [],
   user: '',
   order: 'shuffle',
   ...over
@@ -211,6 +213,11 @@ describe('buildPlaylist', () => {
     it('does not filter a theme, which plays its own photos', () => {
       expect(ids(build(photos, { src: 'theme', theme: 'th_1', city: '杭州', order: 'time' }))).toEqual(['a', 'b', 'c', 'd']);
     });
+
+    it('nor an entry, and filters entries like any list', () => {
+      expect(ids(build(photos, { src: 'entry', entry: 'en_1', city: '杭州', order: 'time' }))).toEqual(['a', 'b', 'c', 'd']);
+      expect(ids(build(photos, { src: 'entries', city: '杭州', order: 'time' }))).toEqual(['a', 'd']);
+    });
   });
 
   describe('tags', () => {
@@ -278,6 +285,11 @@ describe('buildPlaylist', () => {
 
     it('plays a theme in the order of its items, even when asked for time', () => {
       expect(ids(build(photos, { src: 'theme', theme: 'th_1', order: 'time' }))).toEqual(['c', 'a', 'z', 'b']);
+    });
+
+    it('plays an entry in the order of its photos, even when asked for time; entries by capture time', () => {
+      expect(ids(build(photos, { src: 'entry', entry: 'en_1', order: 'time' }))).toEqual(['c', 'a', 'z', 'b']);
+      expect(ids(build(photos, { src: 'entries', order: 'time' }))).toEqual(['a', 'b', 'c', 'z']);
     });
 
     it('shuffles a theme when the link asks for it', () => {
