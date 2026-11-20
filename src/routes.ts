@@ -43,6 +43,7 @@ export const Photo = page(() => import('./pages/Photo'));
 export const Place = page(() => import('./pages/Place'));
 export const MapPage = page(() => import('./pages/MapPage'));
 export const IndexPage = page(() => import('./pages/IndexPage'));
+export const Library = page(() => import('./pages/Library'));
 export const Living = page(() => import('./pages/Living'));
 export const Upload = page(() => import('./pages/Upload'));
 export const PhotoEdit = page(() => import('./pages/PhotoEdit'));
@@ -102,6 +103,7 @@ const TABLE: [RegExp, Page, (m: string[]) => string[]][] = [
   ],
   [/^\/map$/, MapPage, () => BROWSE],
   [/^\/index$/, IndexPage, () => BROWSE],
+  [/^\/library$/, Library, () => ['/api/photos?mine=1', '/api/library']],
   [/^\/living$/, Living, () => []],
   [/^\/upload$/, Upload, () => []],
   [/^\/studio\/photo\/[^/]+$/, PhotoEdit, () => []],

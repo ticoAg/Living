@@ -59,12 +59,15 @@ export type EntryPayload = Required<Omit<CreateEntryBody, 'status'>>;
 /**
  * A new entry: a note of this moment, for the author alone. `start` for one begun from a project, or on another day
  * (the calendar's empty days): a day other than today is the whole day, its time unknown; or with the recordings of a
- * quick note.
+ * quick note, or the photos and files picked in the library.
  */
 export function emptyDraft(
   now = new Date(),
   body = '',
-  start: Partial<Pick<EntryDraft, 'type' | 'projectIds' | 'date'>> & { attachments?: readonly Attachment[] } = {}
+  start: Partial<Pick<EntryDraft, 'type' | 'projectIds' | 'date'>> & {
+    attachments?: readonly Attachment[];
+    photos?: readonly PhotoSummary[];
+  } = {}
 ): EntryDraft {
   const at = localDateTime(now);
   const date = start.date ?? at.slice(0, 10);
@@ -77,7 +80,7 @@ export function emptyDraft(
     time: timed ? at.slice(11, 16) : '',
     heldTime: timed ? at.slice(11) : '',
     visibility: 'private',
-    media: [],
+    media: addMedia([], start.photos ?? []),
     attachments: addAttachments([], start.attachments ?? []),
     tagIds: [],
     projectIds: start.projectIds ?? [],

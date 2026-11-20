@@ -78,7 +78,9 @@ const DERIVED: readonly { path: string; from: readonly string[] }[] = [
   // the year in review counts one's entries, photos, projects, collections, places and tags
   { path: '/api/review', from: ['/api/entries', '/api/photos', '/api/projects', '/api/themes', '/api/pois', '/api/tags'] },
   // a profile counts the person's photos, collections, entries and projects
-  { path: '/api/users/', from: ['/api/entries', '/api/photos', '/api/projects', '/api/themes'] }
+  { path: '/api/users/', from: ['/api/entries', '/api/photos', '/api/projects', '/api/themes'] },
+  // the library lists one's attachments with their entries, counts one's photos and finds those in entries
+  { path: '/api/library', from: ['/api/entries', '/api/photos', '/api/attachments'] }
 ];
 
 export function invalidate(prefix: string) {

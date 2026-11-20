@@ -14,6 +14,7 @@ import {
   EntryReader,
   Explore,
   IndexPage,
+  Library,
   Living,
   Login,
   MapPage,
@@ -44,6 +45,7 @@ import {
 // entries — Today, Archive, EntryReader, EntryEditor
 // projects — Projects, ProjectPage, ProjectForm
 // browse — Explore, Profile, Photo, Place, MapPage, IndexPage
+// library — Library
 // showcase — Works, Articles
 // living — Living
 // studio — Upload, PhotoEdit, PlaceEdit, TagsManager, Login, Register, Settings
@@ -77,6 +79,7 @@ function Routes() {
       <Route path="/place/:id" component={Place} />
       <Route path="/map" component={MapPage} />
       <Route path="/index" component={IndexPage} />
+      <Route path="/library" component={Library} />
       <Route path="/living" component={Living} />
       <Route path="/upload" component={Upload} />
       <Route path="/studio/photo/:id" component={PhotoEdit} />

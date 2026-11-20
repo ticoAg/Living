@@ -15,26 +15,12 @@ import { DEVICE_DRAFT_PREFIX } from '../lib/deviceDrafts';
 import { localDateTime } from '../lib/format';
 import { invalidate } from '../lib/useApi';
 import { attachmentOf } from './draft';
+import type { Handoff } from './handoff';
 import '../styles/attachments.css';
 
 // A line or two, or a recording, kept at once as a finished note of this moment, for the author alone. Ctrl/Cmd+Enter
 // keeps it; 写长文 carries the text and recordings into the editor. What is typed, and which recordings are up, stays
 // on this device until it is kept.
-
-/** history.state of the editor opened from here: what to start with. */
-export interface Handoff {
-  livingEntryBody: string;
-  livingEntryAttachments?: Attachment[];
-}
-
-export function handoffOf(state: unknown): { body: string; attachments: Attachment[] } {
-  const h = (state && typeof state === 'object' ? state : {}) as Partial<Record<keyof Handoff, unknown>>;
-  const list = Array.isArray(h.livingEntryAttachments) ? h.livingEntryAttachments : [];
-  return {
-    body: typeof h.livingEntryBody === 'string' ? h.livingEntryBody : '',
-    attachments: list.map(attachmentOf).filter((a): a is Attachment => !!a)
-  };
-}
 
 function stored(key: string): string {
   try {

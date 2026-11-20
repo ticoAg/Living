@@ -142,6 +142,20 @@ describe('invalidate', () => {
     invalidate('/api/photos/');
     expect(peek('/api/review/2026')).toBeUndefined();
   });
+
+  it('leaves the library stale after a change to one’s entries, photos or attachments, and nothing else', async () => {
+    const { prefetch, invalidate, peek } = await fresh();
+    api.mockResolvedValue({});
+    for (const changed of ['/api/entries?', '/api/photos', '/api/attachments']) {
+      prefetch('/api/library');
+      await settle();
+      invalidate('/api/tags');
+      invalidate('/api/themes');
+      expect(peek('/api/library'), changed).toBeDefined();
+      invalidate(changed);
+      expect(peek('/api/library'), changed).toBeUndefined();
+    }
+  });
 });
 
 describe('the visitor view', () => {

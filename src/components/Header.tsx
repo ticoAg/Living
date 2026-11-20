@@ -23,8 +23,8 @@ const GUEST_NAV: NavItem[] = [
   { href: '/index', label: '索引', icon: 'list', match: (p) => p.startsWith('/index') }
 ];
 
-// Someone signed in keeps an archive: the day, then everything kept; the photos, map and index are one library
-// (browse/LibraryTabs.tsx). Docs: /docs/architecture/frontend.md#导航
+// Someone signed in keeps an archive: the day, then everything kept; the photos, map, index and media library are one
+// section (browse/LibraryTabs.tsx). Docs: /docs/architecture/frontend.md#导航
 const MEMBER_NAV: NavItem[] = [
   { href: '/today', label: '今天', icon: 'today', match: (p) => p.startsWith('/today') || p.startsWith('/entries/') },
   { href: '/archive', label: '档案', icon: 'archive', match: (p) => ['/archive', '/e/', '/projects'].some((s) => p.startsWith(s)) },
@@ -32,7 +32,7 @@ const MEMBER_NAV: NavItem[] = [
     href: '/',
     label: '图库',
     icon: 'grid',
-    match: (p) => p === '/' || ['/p/', '/map', '/place/', '/index'].some((s) => p.startsWith(s))
+    match: (p) => p === '/' || ['/p/', '/map', '/place/', '/index', '/library'].some((s) => p.startsWith(s))
   },
   themes
 ];

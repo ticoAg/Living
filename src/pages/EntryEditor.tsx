@@ -36,7 +36,7 @@ import {
 } from '../entries/draft';
 import EntryPlaceField from '../entries/EntryPlaceField';
 import Markdown from '../entries/Markdown';
-import { handoffOf } from '../entries/QuickCapture';
+import { handoffOf, handsOver, NO_HANDOFF, type Start } from '../entries/handoff';
 import { SignedOut } from '../entries/ui';
 import { useEntryAutosave, type SaveState } from '../entries/useEntryAutosave';
 import { ApiError } from '../lib/api';
@@ -93,8 +93,8 @@ function fmtBackupTime(iso: string): string {
 interface EditorProps {
   user: SessionUser;
   initial: EntryDetail | null;
-  /** what the quick note carried over */
-  handoff: ReturnType<typeof handoffOf>;
+  /** what the quick note or the library carried over */
+  handoff: Start;
   /** a new entry's project, when it is written from the project's page */
   project: ProjectDetail | null;
   /** the day a new entry starts on, when not today */
@@ -111,12 +111,13 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
       : emptyDraft(new Date(), handoff.body, {
           ...(project ? { projectIds: [project.id], type: entryTypeFor(project.type) } : {}),
           ...(startDate ? { date: startDate } : {}),
-          attachments: handoff.attachments
+          attachments: handoff.attachments,
+          photos: handoff.photos
         })
   );
   // a copy kept on this device that the server does not have: offered once, as the editor opens
   const [offer, setOffer] = useState<Backup | null>(() => {
-    if (!initial && (handoff.body || handoff.attachments.length)) return null;
+    if (!initial && handsOver(handoff)) return null;
     const b = readBackup(user.id, initial?.id ?? null);
     if (!b) return null;
     const server = JSON.stringify(payloadOf(initial ? draftFromEntry(initial) : emptyDraft()));
@@ -524,8 +525,6 @@ function Editor({ user, initial, handoff, project, startDate, onCreated }: Edito
     </main>
   );
 }
-
-const NO_HANDOFF: ReturnType<typeof handoffOf> = { body: '', attachments: [] };
 
 /** Which editor is open: a new address starts a new one, except the address the editor's own entry has just moved to. */
 function useEditorSlot(id: string | null) {
