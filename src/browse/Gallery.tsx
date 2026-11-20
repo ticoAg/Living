@@ -25,7 +25,7 @@ const photoId = (p: PhotoSummary) => p.id;
 
 const SKELETON_RATIOS = ['4 / 5', '3 / 2', '2 / 3', '1 / 1', '3 / 4', '3 / 2', '4 / 5', '2 / 3', '3 / 2', '1 / 1', '3 / 4', '4 / 3'];
 
-export default function Gallery({ owner }: { owner?: string }) {
+export default function Gallery({ owner, lead }: { owner?: string; lead?: ReactNode }) {
   const { user } = useSession();
   const q = useQuery();
   const rawTags = useMemo(() => splitIds(q.get('tags')), [q]);
@@ -116,6 +116,7 @@ export default function Gallery({ owner }: { owner?: string }) {
   return (
     <div className="gal">
       <div className="gal-head">
+        {lead}
         {hasFilter && (
           <FilterToggle open={filterOpen} onToggle={() => setFilterOpen((o) => !o)} count={selected.length} controls={filterId} />
         )}

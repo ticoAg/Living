@@ -127,7 +127,8 @@ export function warm(url: URL, data: boolean): void {
     if (!m) continue;
     pg.preload();
     if (data) {
-      const list = paths(m);
+      // the gallery's entry layer reads the public entries instead of the photo lists
+      const list = pg === Explore && url.searchParams.get('layer') === 'entries' ? ['/api/entries'] : paths(m);
       // the theme list depends on ?mine=1 and the session, so only the public list is warmed
       if (pg === Themes && !url.search.includes('mine=1')) list.push('/api/themes');
       // the calendar reads the month in its address, this one by default

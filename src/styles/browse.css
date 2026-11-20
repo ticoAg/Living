@@ -58,6 +58,12 @@
    at most 4. The script reads the gaps from .msn and sizes tiles from the photo's ratio plus the caption heights
    fixed here (GalleryTile.tsx, PlaceTile.tsx), so a caption is one line that never wraps. */
 .gal-masonry { padding-top: 28px; }
+/* the entry layer (browse/EntryShelf.tsx): works' tiles, newest first */
+.gal-layers { flex: none; }
+.gal-entries { padding-top: 28px; }
+.gal-limit + .gal-entries { padding-top: 20px; }
+.gal-entries-skel > li { aspect-ratio: 4 / 5; border-radius: var(--r-img); background: var(--mat); animation: gal-pulse 1.3s ease-in-out infinite alternate; }
+.gal-more { display: flex; justify-content: center; padding-top: 32px; }
 .msn { position: relative; column-gap: clamp(12px, 1.6vw, 24px); row-gap: 26px; }
 .msn-cell { position: absolute; }
 .msn-end { height: 1px; }
